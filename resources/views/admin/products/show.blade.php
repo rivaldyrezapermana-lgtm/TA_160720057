@@ -11,26 +11,42 @@
         <x-ui.card title="Detail Produk">
             <div class="grid md:grid-cols-2 gap-4 text-sm">
                 <div><p class="text-ink-500">SKU</p><p class="font-medium text-ink-900">{{ $product->sku }}</p></div>
-                <div><p class="text-ink-500">Kategori</p><p class="font-medium text-ink-900">{{ $product->category }}</p></div>
-                <div><p class="text-ink-500">Harga</p><p class="font-medium text-ink-900">Rp {{ number_format($product->price, 0, ',', '.') }}</p></div>
+                <div><p class="text-ink-500">Kategori</p><p class="font-medium text-ink-900">{{ $product->category?->name ?? '—' }}</p></div>
+                <div><p class="text-ink-500">Harga</p><p class="font-medium text-ink-900">Rp {{ number_format((float) $product->price, 0, ',', '.') }}</p></div>
                 <div><p class="text-ink-500">Total Stok</p><p class="font-medium text-ink-900">{{ $product->stock }} pcs</p></div>
-                <div class="md:col-span-2"><p class="text-ink-500">Deskripsi</p><p class="text-ink-800 mt-1">{{ $product->description }}</p></div>
+                <div class="md:col-span-2"><p class="text-ink-500">Deskripsi</p><p class="text-ink-800 mt-1">{{ $product->description ?: '—' }}</p></div>
             </div>
         </x-ui.card>
 
         <x-ui.card title="Varian Ukuran">
-            <table class="table-clean">
-                <thead><tr><th>Size</th><th class="text-right">Lingkar Dada</th><th class="text-right">Panjang</th><th class="text-right">Lengan</th><th class="text-right">Stok</th></tr></thead>
-                <tbody>
-                    @foreach ($product->sizes as $s)
-                        <tr><td class="font-medium">{{ $s['size'] }}</td><td class="text-right">{{ $s['chest'] }} cm</td><td class="text-right">{{ $s['length'] }} cm</td><td class="text-right">{{ $s['sleeve'] }} cm</td><td class="text-right tabular-nums">{{ $s['stock'] }}</td></tr>
-                    @endforeach
-                </tbody>
-            </table>
+            @if ($product->sizes->isEmpty())
+                <p class="text-sm text-ink-500">Belum ada varian ukuran.</p>
+            @else
+                <table class="table-clean">
+                    <thead><tr><th>Size</th><th class="text-right">Lingkar Dada</th><th class="text-right">Panjang</th><th class="text-right">Lengan</th><th class="text-right">Stok</th></tr></thead>
+                    <tbody>
+                        @foreach ($product->sizes as $s)
+                            <tr>
+                                <td class="font-medium">{{ $s->size }}</td>
+                                <td class="text-right">{{ $s->chest_cm ?? '—' }} cm</td>
+                                <td class="text-right">{{ $s->length_cm ?? '—' }} cm</td>
+                                <td class="text-right">{{ $s->sleeve_cm ?? '—' }} cm</td>
+                                <td class="text-right tabular-nums">{{ $s->stock }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         </x-ui.card>
     </div>
 
     <div class="space-y-6">
+        @if ($product->image)
+            <x-ui.card title="Foto">
+                <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full rounded-lg">
+            </x-ui.card>
+        @endif
+
         <x-ui.card title="Status">
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between"><span class="text-ink-500">Status</span><x-ui.status-badge :status="$product->is_active ? 'active' : 'inactive'" /></div>

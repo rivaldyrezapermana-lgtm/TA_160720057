@@ -1,17 +1,17 @@
 @props(['id', 'columns', 'ajax' => null, 'createUrl' => null, 'createLabel' => 'Tambah Baru'])
 
-<div class="bg-white border border-ink-100 rounded-xl overflow-hidden">
+<div class="bg-white border border-slate-200 rounded-lg">
     @if ($createUrl)
-        <div class="flex items-center justify-end gap-3 px-5 py-4 border-b border-ink-100">
-            <a href="{{ $createUrl }}" class="btn-primary">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <div class="flex justify-end px-4 py-3 border-b border-slate-200">
+            <a href="{{ $createUrl }}" class="btn btn-primary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                 {{ $createLabel }}
             </a>
         </div>
     @endif
 
-    <div class="p-5">
-        <table id="{{ $id }}" class="table-clean w-full" style="width:100%">
+    <div class="p-4">
+        <table id="{{ $id }}" class="table-clean" style="width:100%">
             <thead>
                 <tr>
                     @foreach ($columns as $col)

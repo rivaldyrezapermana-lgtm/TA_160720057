@@ -2,63 +2,50 @@
 @section('title', 'Masuk')
 
 @section('content')
-    <p class="kicker">Masuk · Akun Atelier</p>
-    <h1 class="headline">Selamat datang kembali.</h1>
-    <p class="lead">Masuk untuk melanjutkan ke ruang kerja Anda.</p>
+    <h1 class="text-xl font-semibold text-slate-900 mb-1">Masuk</h1>
+    <p class="text-sm text-slate-500 mb-6">Masuk untuk melanjutkan ke akun Anda.</p>
 
     @if ($errors->any())
-        <div class="form-banner" role="alert">
-            <ul>
+        <div class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+            <ul class="list-disc list-inside">
                 @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
             </ul>
         </div>
     @endif
 
-    <form action="{{ route('login.attempt') }}" method="POST" novalidate>
+    <form action="{{ route('login.attempt') }}" method="POST">
         @csrf
 
         <div class="field">
-            <label class="label" for="email">Alamat Email</label>
-            <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus autocomplete="email"
+            <label class="label" for="email">Email</label>
+            <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
                 placeholder="anda@labasa.id"
                 class="input {{ $errors->has('email') ? 'has-error' : '' }}">
         </div>
 
         <div class="field">
             <label class="label" for="password">Kata Sandi</label>
-            <input type="password" name="password" id="password" required autocomplete="current-password"
+            <input type="password" name="password" id="password" required
                 placeholder="••••••••"
                 class="input {{ $errors->has('password') ? 'has-error' : '' }}">
         </div>
 
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.6rem; margin-bottom:1.75rem;">
-            <label class="check">
-                <input type="checkbox" name="remember">
-                <span class="box">
-                    <svg fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>
-                </span>
-                <span>Ingat saya</span>
-            </label>
-            <span style="font-family:'Fraunces', serif; font-style:italic; font-size:11.5px; color:var(--ink-mute);">tujuh hari</span>
-        </div>
+        <label class="flex items-center gap-2 text-sm text-slate-600 mb-6">
+            <input type="checkbox" name="remember" class="rounded-md border-slate-300">
+            Ingat saya
+        </label>
 
-        <button type="submit" class="cta">
-            Masuk
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M5 12h14M13 6l6 6-6 6"/>
-            </svg>
-        </button>
+        <button type="submit" class="btn btn-primary">Masuk</button>
     </form>
 
-    <p style="text-align:center; margin-top:2rem; font-family:'Fraunces', serif; font-style:italic; font-size:14px; color:var(--ink-soft);">
-        Belum punya akun? <a href="{{ route('register') }}" class="switch-link">Daftar sebagai pembeli</a>
+    <p class="text-sm text-slate-600 text-center mt-6">
+        Belum punya akun?
+        <a href="{{ route('register') }}" class="text-emerald-700 hover:text-emerald-800 font-medium">Daftar</a>
     </p>
 
-    <div class="footnote">
-        <p class="head">Akun Demo · Hanya Pengembangan</p>
-        <p style="line-height:1.7;">
-            <span style="display:block;">admin@labasa.test &nbsp;·&nbsp; karyawan@labasa.test &nbsp;·&nbsp; pembeli@labasa.test</span>
-            <span style="display:block; margin-top:4px;">kata sandi: <code>password</code></span>
-        </p>
+    <div class="mt-6 pt-4 border-t border-slate-200 text-xs text-slate-500">
+        <p class="font-medium text-slate-700 mb-1">Akun Demo</p>
+        <p>admin@labasa.test · karyawan@labasa.test · pembeli@labasa.test</p>
+        <p>Kata sandi: <code class="bg-slate-100 px-1 py-0.5 rounded">password</code></p>
     </div>
 @endsection
