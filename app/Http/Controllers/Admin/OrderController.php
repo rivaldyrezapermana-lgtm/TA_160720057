@@ -3,49 +3,88 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
-    public function index() { return view('admin.orders.index'); }
-
-    public function data(Request $request)
+    public function index()
     {
-        $statuses = ['pending','paid','processing','shipped','completed','cancelled'];
-        $rows = collect(range(1, 22))->map(fn($i) => [
-            'id'=>$i,'code'=>'ORD-2026-'.str_pad(1200+$i,4,'0',STR_PAD_LEFT),
-            'customer'=>['Siti Nurhaliza','Ahmad Fauzi','Diana Putri','Rahmat Hidayat','Lina Susanti'][$i % 5],
-            'date'=>now()->subDays($i)->format('d M Y H:i'),
-            'total'=>'Rp '.number_format(rand(150,800)*1000, 0, ',', '.'),
-            'status'=>$statuses[$i % 6],
-        ]);
-        return response()->json(['data'=>$rows]);
+        return view('admin.orders.index');
     }
 
-    public function show($id)
+    /** AJAX endpoint for DataTables. */
+    public function data(Request $request)
     {
-        $order = (object)[
-            'id'=>$id,'code'=>'ORD-2026-1209','customer'=>'Siti Nurhaliza',
-            'phone'=>'081234567890','email'=>'siti@example.com',
-            'date'=>'05 May 2026, 14:32',
-            'shipping_address'=>'Jl. Pahlawan No. 123, Surabaya',
-            'status'=>'paid','total'=>425000,
-            'payment'=>['method'=>'transfer','status'=>'verified','proof'=>'uploaded','paid_at'=>'05 May 2026, 15:00'],
-            'items'=>[
-                ['product'=>'Gamis Anaya Navy','size'=>'M','qty'=>1,'price'=>225000,'subtotal'=>225000],
-                ['product'=>'Hijab Pashmina Plain','size'=>'-','qty'=>4,'price'=>50000,'subtotal'=>200000],
-            ],
-        ];
+        $rows = Order::with('user')
+            ->latest()
+            ->get()
+            ->map(fn (Order $o) => [
+                'id' => $o->id,
+                'code' => $o->code,
+                'customer' => $o->user?->name ?? '—',
+                'date' => optional($o->created_at)->translatedFormat('d M Y H:i'),
+                'total' => 'Rp '.number_format((float) $o->total, 0, ',', '.'),
+                'status' => $o->status,
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function show(Order $order)
+    {
+        $order->load(['user', 'items.product', 'payment']);
+
         return view('admin.orders.show', compact('order'));
     }
 
-    public function updateStatus(Request $request, $order)
+    public function updateStatus(Request $request, Order $order)
     {
-        return back()->with('success','Status pesanan diperbarui');
+        $data = $request->validate([
+            'status' => ['required', Rule::in(Order::STATUSES)],
+        ]);
+
+        $order->status = $data['status'];
+        $order->save();
+
+        return back()->with('success', 'Status pesanan diperbarui.');
     }
 
-    public function verifyPayment(Request $request, $order)
+    /**
+     * Mark the payment as verified, flip the order to "paid", and decrement
+     * the stock for each ordered product. Wrapped in a transaction so partial
+     * failures don't leave inventory in a bad state.
+     */
+    public function verifyPayment(Request $request, Order $order)
     {
-        return back()->with('success','Pembayaran diverifikasi');
+        $order->load(['items', 'payment']);
+
+        if (! $order->payment) {
+            return back()->with('error', 'Pesanan ini belum memiliki data pembayaran.');
+        }
+
+        if ($order->payment->status === 'verified') {
+            return back()->with('error', 'Pembayaran sudah diverifikasi sebelumnya.');
+        }
+
+        DB::transaction(function () use ($order) {
+            $order->payment->forceFill([
+                'status' => 'verified',
+                'paid_at' => now(),
+            ])->save();
+
+            $order->status = 'paid';
+            $order->save();
+
+            foreach ($order->items as $item) {
+                Product::where('id', $item->product_id)
+                    ->decrement('stock', $item->qty);
+            }
+        });
+
+        return back()->with('success', 'Pembayaran diverifikasi, stok produk dipotong.');
     }
 }

@@ -7,7 +7,7 @@
 
 @section('content')
 <div class="flex justify-end mb-4">
-    <a href="{{ route('admin.reports.export', 'inventory') }}?format=pdf" class="btn-secondary">Export PDF</a>
+    <a href="{{ route('admin.reports.export', 'inventory') }}" class="btn-secondary">Export CSV</a>
 </div>
 
 <x-ui.card>

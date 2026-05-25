@@ -3,44 +3,91 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Material;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Payment;
+use App\Models\Product;
+use App\Models\Production;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // TODO: replace with real DB queries
         $stats = [
-            'total_products'      => 124,
-            'low_stock_materials' => 4,
-            'productions_running' => 6,
-            'orders_pending'      => 11,
-            'sales_this_month'    => 18_450_000,
+            'total_products' => Product::where('is_active', true)->count(),
+            'low_stock_materials' => Material::whereColumn('stock', '<=', 'min_stock')->count(),
+            'productions_running' => Production::where('status', 'in_progress')->count(),
+            'orders_pending' => Order::where('status', 'pending')->count(),
+            'sales_this_month' => (float) Payment::where('status', 'verified')
+                ->whereMonth('paid_at', now()->month)
+                ->whereYear('paid_at', now()->year)
+                ->sum('amount'),
         ];
 
-        $runningProductions = [
-            ['code' => 'PRD-2026-0042', 'product' => 'Gamis Anaya Navy', 'stage' => 'Sewing', 'planned' => 200, 'actual' => 124, 'progress' => 62],
-            ['code' => 'PRD-2026-0041', 'product' => 'Koko Modern Sage',  'stage' => 'Cutting', 'planned' => 150, 'actual' => 0,   'progress' => 12],
-            ['code' => 'PRD-2026-0040', 'product' => 'Tunik Basic Cream', 'stage' => 'QC',      'planned' => 100, 'actual' => 98,  'progress' => 95],
-        ];
+        $runningProductions = Production::with('product')
+            ->where('status', 'in_progress')
+            ->latest('start_date')
+            ->take(5)
+            ->get()
+            ->map(function (Production $p) {
+                $progress = $p->planned_qty > 0
+                    ? min(100, (int) round(($p->actual_qty / $p->planned_qty) * 100))
+                    : 0;
 
-        $bestSellers = [
-            ['name' => 'Gamis Anaya Navy', 'sold' => 86],
-            ['name' => 'Koko Modern Sage', 'sold' => 64],
-            ['name' => 'Tunik Basic Cream', 'sold' => 41],
-            ['name' => 'Hijab Pashmina Plain', 'sold' => 38],
-        ];
+                $currentStage = $p->stages()->where('status', 'in_progress')->orderBy('id')->first()
+                    ?? $p->stages()->where('status', 'pending')->orderBy('id')->first();
 
-        $lowStock = [
-            ['name' => 'Kain Katun Premium', 'stock' => 12, 'min' => 30, 'unit' => 'meter'],
-            ['name' => 'Benang Hitam',       'stock' => 4,  'min' => 10, 'unit' => 'roll'],
-            ['name' => 'Resleting 30cm',     'stock' => 22, 'min' => 50, 'unit' => 'pcs'],
-        ];
+                return [
+                    'code' => $p->code,
+                    'product' => $p->product?->name ?? '—',
+                    'stage' => ucfirst($currentStage?->stage ?? '—'),
+                    'planned' => $p->planned_qty,
+                    'actual' => $p->actual_qty,
+                    'progress' => $progress,
+                ];
+            })
+            ->all();
 
-        $recentOrders = [
-            ['code' => 'ORD-2026-1209', 'customer' => 'Siti Nurhaliza', 'total' => 425_000, 'status' => 'pending'],
-            ['code' => 'ORD-2026-1208', 'customer' => 'Ahmad Fauzi',     'total' => 280_000, 'status' => 'paid'],
-            ['code' => 'ORD-2026-1207', 'customer' => 'Diana Putri',     'total' => 670_000, 'status' => 'shipped'],
-        ];
+        $bestSellers = OrderItem::select('product_id', DB::raw('SUM(qty) as sold'))
+            ->whereHas('order', fn ($q) => $q->where('status', '!=', 'cancelled'))
+            ->groupBy('product_id')
+            ->orderByDesc('sold')
+            ->with('product:id,name')
+            ->take(4)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->product?->name ?? '—',
+                'sold' => (int) $row->sold,
+            ])
+            ->all();
+
+        $lowStock = Material::whereColumn('stock', '<=', 'min_stock')
+            ->orderBy('stock')
+            ->take(5)
+            ->get()
+            ->map(fn (Material $m) => [
+                'id' => $m->id,
+                'name' => $m->name,
+                'stock' => $m->stock,
+                'min' => $m->min_stock,
+                'unit' => $m->unit,
+            ])
+            ->all();
+
+        $recentOrders = Order::with('user')
+            ->latest()
+            ->take(3)
+            ->get()
+            ->map(fn (Order $o) => [
+                'id' => $o->id,
+                'code' => $o->code,
+                'customer' => $o->user?->name ?? '—',
+                'total' => (float) $o->total,
+                'status' => $o->status,
+            ])
+            ->all();
 
         return view('admin.dashboard.index', compact(
             'stats', 'runningProductions', 'bestSellers', 'lowStock', 'recentOrders'

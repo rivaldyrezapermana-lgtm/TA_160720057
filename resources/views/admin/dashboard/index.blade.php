@@ -115,7 +115,7 @@
     <x-ui.card title="Pesanan Terbaru" subtitle="3 pesanan masuk terakhir">
         <div class="space-y-3">
             @foreach ($recentOrders as $o)
-                <a href="{{ route('admin.orders.show', 1) }}" class="flex items-center gap-3 -mx-2 px-2 py-2 rounded-lg hover:bg-ink-50">
+                <a href="{{ route('admin.orders.show', $o['id']) }}" class="flex items-center gap-3 -mx-2 px-2 py-2 rounded-lg hover:bg-ink-50">
                     <div class="w-9 h-9 rounded-full bg-ink-100 flex items-center justify-center text-ink-600 font-semibold text-sm flex-shrink-0">
                         {{ strtoupper(substr($o['customer'], 0, 1)) }}
                     </div>

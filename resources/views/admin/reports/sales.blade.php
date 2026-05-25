@@ -12,8 +12,7 @@
         <button class="btn-secondary">Filter</button>
     </form>
     <div class="flex gap-2">
-        <a href="{{ route('admin.reports.export', 'sales') }}?format=pdf" class="btn-secondary">Export PDF</a>
-        <a href="{{ route('admin.reports.export', 'sales') }}?format=xlsx" class="btn-secondary">Export Excel</a>
+        <a href="{{ route('admin.reports.export', 'sales') }}" class="btn-secondary">Export CSV</a>
     </div>
 </div>
 

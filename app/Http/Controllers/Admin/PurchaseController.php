@@ -3,56 +3,173 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Material;
+use App\Models\Purchase;
+use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PurchaseController extends Controller
 {
-    public function index() { return view('admin.purchases.index'); }
+    public function index()
+    {
+        return view('admin.purchases.index');
+    }
 
     public function data(Request $request)
     {
-        $rows = collect(range(1, 12))->map(fn($i) => [
-            'id'=>$i,'code'=>'PO-2026-'.str_pad($i,4,'0',STR_PAD_LEFT),
-            'supplier'=>['CV Tekstil Jaya','Toko Benang Mulia','PT Kancing Sentosa'][$i % 3],
-            'date'=>now()->subDays($i*3)->format('d M Y'),
-            'total'=>'Rp '.number_format(rand(800,5000)*1000, 0, ',', '.'),
-            'status'=>['pending','received','cancelled'][$i % 3],
-        ]);
-        return response()->json(['data'=>$rows]);
+        $rows = Purchase::with('supplier')
+            ->latest('purchase_date')
+            ->get()
+            ->map(fn (Purchase $p) => [
+                'id' => $p->id,
+                'code' => $p->code,
+                'supplier' => $p->supplier?->name ?? '—',
+                'date' => optional($p->purchase_date)->translatedFormat('d M Y'),
+                'total' => 'Rp '.number_format((float) $p->total, 0, ',', '.'),
+                'status' => $p->status,
+            ]);
+
+        return response()->json(['data' => $rows]);
     }
 
     public function create()
     {
-        $suppliers = collect([
-            (object)['id'=>1,'name'=>'CV Tekstil Jaya'],
-            (object)['id'=>2,'name'=>'Toko Benang Mulia'],
-            (object)['id'=>3,'name'=>'PT Kancing Sentosa'],
-        ]);
-        $materials = collect([
-            (object)['id'=>1,'name'=>'Kain Katun Premium','unit'=>'meter','unit_cost'=>45000],
-            (object)['id'=>2,'name'=>'Benang Hitam','unit'=>'roll','unit_cost'=>15000],
-            (object)['id'=>3,'name'=>'Kancing Bulat','unit'=>'pcs','unit_cost'=>500],
-        ]);
-        return view('admin.purchases.create', compact('suppliers','materials'));
+        $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
+        $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
+
+        return view('admin.purchases.create', compact('suppliers', 'materials'));
     }
 
-    public function store(Request $request) { return redirect()->route('admin.purchases.index')->with('success','Purchase order dibuat'); }
-
-    public function show($id)
+    public function store(Request $request)
     {
-        $purchase = (object)[
-            'id'=>$id,'code'=>'PO-2026-0007','supplier'=>'CV Tekstil Jaya',
-            'date'=>'24 Apr 2026','status'=>'pending','total'=>'Rp 4.500.000',
-            'items'=>[
-                ['material'=>'Kain Katun Premium','qty'=>50,'unit'=>'meter','unit_cost'=>45000,'subtotal'=>2250000],
-                ['material'=>'Benang Hitam','qty'=>20,'unit'=>'roll','unit_cost'=>15000,'subtotal'=>300000],
-                ['material'=>'Kancing Bulat','qty'=>3900,'unit'=>'pcs','unit_cost'=>500,'subtotal'=>1950000],
-            ],
-        ];
+        $data = $request->validate([
+            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'purchase_date' => ['required', 'date'],
+            'code' => ['nullable', 'string', 'max:50'],
+            'items' => ['required', 'array'],
+        ]);
+
+        $items = collect($request->input('items', []))
+            ->filter(fn ($row) => ! empty($row['selected']) && (int) ($row['qty'] ?? 0) > 0);
+
+        if ($items->isEmpty()) {
+            return back()->withInput()->with('error', 'Pilih minimal satu bahan dengan qty.');
+        }
+
+        $purchase = DB::transaction(function () use ($data, $items) {
+            $purchase = Purchase::create([
+                'supplier_id' => $data['supplier_id'],
+                'code' => $data['code'] ?: 'TMP',
+                'purchase_date' => $data['purchase_date'],
+                'total' => 0,
+                'status' => 'pending',
+            ]);
+
+            if (empty($data['code'])) {
+                $purchase->forceFill(['code' => 'PO-'.now()->year.'-'.str_pad((string) $purchase->id, 4, '0', STR_PAD_LEFT)])->save();
+            }
+
+            $total = 0;
+
+            foreach ($items as $materialId => $row) {
+                $material = Material::find($materialId);
+                if (! $material) {
+                    continue;
+                }
+
+                $qty = (int) $row['qty'];
+                $unitCost = (float) $material->unit_cost;
+                $subtotal = $qty * $unitCost;
+
+                $purchase->items()->create([
+                    'material_id' => $materialId,
+                    'qty' => $qty,
+                    'unit_cost' => $unitCost,
+                    'subtotal' => $subtotal,
+                ]);
+
+                $total += $subtotal;
+            }
+
+            $purchase->forceFill(['total' => $total])->save();
+
+            return $purchase;
+        });
+
+        return redirect()->route('admin.purchases.show', $purchase->id)
+            ->with('success', 'PO berhasil dibuat.');
+    }
+
+    public function show(Purchase $purchase)
+    {
+        $purchase->load(['supplier', 'items.material']);
+
         return view('admin.purchases.show', compact('purchase'));
     }
 
-    public function edit($id) { return $this->show($id); }
-    public function update(Request $request, $id) { return redirect()->route('admin.purchases.index')->with('success','PO diperbarui'); }
-    public function destroy($id) { return redirect()->route('admin.purchases.index')->with('success','PO dihapus'); }
+    public function edit(Purchase $purchase)
+    {
+        return redirect()->route('admin.purchases.show', $purchase->id);
+    }
+
+    public function update(Request $request, Purchase $purchase)
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:pending,received,cancelled'],
+        ]);
+
+        $purchase->status = $data['status'];
+        $purchase->save();
+
+        return back()->with('success', 'PO diperbarui.');
+    }
+
+    public function destroy(Purchase $purchase)
+    {
+        if ($purchase->status === 'received') {
+            return back()->with('error', 'PO yang sudah diterima tidak bisa dihapus.');
+        }
+
+        $purchase->delete();
+
+        return redirect()->route('admin.purchases.index')->with('success', 'PO dihapus.');
+    }
+
+    /**
+     * Mark a PO as received and credit each item's qty to material stock.
+     */
+    public function receive(Purchase $purchase)
+    {
+        if ($purchase->status === 'received') {
+            return back()->with('error', 'PO sudah diterima sebelumnya.');
+        }
+
+        if ($purchase->status === 'cancelled') {
+            return back()->with('error', 'PO sudah dibatalkan.');
+        }
+
+        DB::transaction(function () use ($purchase) {
+            $purchase->load('items');
+            foreach ($purchase->items as $item) {
+                Material::where('id', $item->material_id)->increment('stock', $item->qty);
+            }
+            $purchase->status = 'received';
+            $purchase->save();
+        });
+
+        return back()->with('success', 'PO ditandai diterima, stok bahan diperbarui.');
+    }
+
+    public function cancel(Purchase $purchase)
+    {
+        if ($purchase->status === 'received') {
+            return back()->with('error', 'PO yang sudah diterima tidak bisa dibatalkan.');
+        }
+
+        $purchase->status = 'cancelled';
+        $purchase->save();
+
+        return back()->with('success', 'PO dibatalkan.');
+    }
 }

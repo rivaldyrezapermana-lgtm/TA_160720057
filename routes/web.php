@@ -120,6 +120,8 @@ Route::middleware(['auth', 'role:admin,karyawan'])
 
     // Operations
     Route::resource('purchases', PurchaseController::class);
+    Route::patch('purchases/{purchase}/receive', [PurchaseController::class, 'receive'])->name('purchases.receive');
+    Route::patch('purchases/{purchase}/cancel', [PurchaseController::class, 'cancel'])->name('purchases.cancel');
     Route::resource('productions', ProductionController::class);
     Route::patch('productions/{production}/stage/{stage}', [ProductionController::class, 'updateStage'])->name('productions.stage');
 

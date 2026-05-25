@@ -17,7 +17,7 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="font-medium text-ink-900">{{ $o->code }}</p>
-                            <p class="text-sm text-ink-500">{{ $o->date }}</p>
+                            <p class="text-sm text-ink-500">{{ $o->created_at->translatedFormat('d M Y') }}</p>
                         </div>
                         <div class="text-right">
                             <p class="font-display text-xl font-semibold tabular-nums">Rp {{ number_format($o->total, 0, ',', '.') }}</p>
