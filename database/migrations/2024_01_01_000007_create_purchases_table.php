@@ -25,6 +25,7 @@ return new class extends Migration {
             $t->integer('qty');
             $t->decimal('unit_cost', 12, 2);
             $t->decimal('subtotal', 14, 2);
+            $t->timestamps();
         });
     }
     public function down(): void

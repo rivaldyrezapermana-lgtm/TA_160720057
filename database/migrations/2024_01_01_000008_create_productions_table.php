@@ -27,6 +27,7 @@ return new class extends Migration {
             $t->foreignId('production_id')->constrained()->cascadeOnDelete();
             $t->foreignId('material_id')->constrained()->cascadeOnDelete();
             $t->integer('qty_used');
+            $t->timestamps();
         });
 
         Schema::create('production_stages', function (Blueprint $t) {
@@ -37,6 +38,7 @@ return new class extends Migration {
             $t->timestamp('started_at')->nullable();
             $t->timestamp('finished_at')->nullable();
             $t->text('notes')->nullable();
+            $t->timestamps();
         });
     }
     public function down(): void

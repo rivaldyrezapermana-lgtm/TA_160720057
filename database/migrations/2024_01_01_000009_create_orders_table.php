@@ -26,6 +26,7 @@ return new class extends Migration {
             $t->integer('qty');
             $t->decimal('price', 12, 2);
             $t->decimal('subtotal', 14, 2);
+            $t->timestamps();
         });
 
         Schema::create('payments', function (Blueprint $t) {
