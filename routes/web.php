@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\ProductionController;
+use App\Http\Controllers\Admin\ProductionMachineController;
 use App\Http\Controllers\Admin\RecommendationController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\UserController;
@@ -108,6 +109,7 @@ Route::middleware(['auth', 'role:admin,karyawan'])
     Route::resource('materials', MaterialController::class);
     Route::resource('suppliers', SupplierController::class);
     Route::resource('users', UserController::class);
+    Route::resource('production-machines', ProductionMachineController::class);
 
     // DataTables AJAX endpoints
     Route::prefix('datatables')->name('datatables.')->group(function () {
@@ -116,6 +118,7 @@ Route::middleware(['auth', 'role:admin,karyawan'])
         Route::get('orders', [AdminOrderController::class, 'data'])->name('orders');
         Route::get('productions', [ProductionController::class, 'data'])->name('productions');
         Route::get('purchases', [PurchaseController::class, 'data'])->name('purchases');
+        Route::get('production-machines', [ProductionMachineController::class, 'data'])->name('production-machines');
     });
 
     // Operations

@@ -38,6 +38,25 @@
                 </table>
             @endif
         </x-ui.card>
+
+        <x-ui.card title="Bahan Baku (Resep)" subtitle="Bahan yang dibutuhkan per 1 unit produk">
+            @if ($product->materials->isEmpty())
+                <p class="text-sm text-ink-500">Belum ada resep bahan baku.</p>
+            @else
+                <table class="table-clean">
+                    <thead><tr><th>Bahan</th><th class="text-right">Qty per Unit</th><th>Unit</th></tr></thead>
+                    <tbody>
+                        @foreach ($product->materials as $bom)
+                            <tr>
+                                <td class="font-medium">{{ $bom->material?->name ?? '—' }}</td>
+                                <td class="text-right tabular-nums">{{ $bom->qty_required }}</td>
+                                <td class="text-ink-500">{{ $bom->material?->unit ?? '-' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </x-ui.card>
     </div>
 
     <div class="space-y-6">

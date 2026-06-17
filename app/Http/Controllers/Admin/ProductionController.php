@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Material;
 use App\Models\Product;
 use App\Models\Production;
+use App\Models\ProductionMachine;
 use App\Models\ProductionStage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,27 +40,28 @@ class ProductionController extends Controller
     public function create()
     {
         $products = Product::orderBy('name')->get(['id', 'name']);
-        $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'stock']);
+        $machines = ProductionMachine::where('status', 'active')->orderBy('name')->get(['id', 'name']);
 
-        return view('admin.productions.create', compact('products', 'materials'));
+        return view('admin.productions.create', compact('products', 'machines'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'product_id' => ['required', 'exists:products,id'],
+            'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             'planned_qty' => ['required', 'integer', 'min:1'],
             'code' => ['nullable', 'string', 'max:50'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
-            'materials' => ['nullable', 'array'],
         ]);
 
-        $production = DB::transaction(function () use ($request, $data) {
+        $production = DB::transaction(function () use ($data) {
             $production = Production::create([
                 'product_id' => $data['product_id'],
                 'user_id' => auth()->id(),
+                'production_machine_id' => $data['production_machine_id'] ?? null,
                 'code' => $data['code'] ?: 'TMP',
                 'planned_qty' => $data['planned_qty'],
                 'actual_qty' => 0,
@@ -72,24 +73,6 @@ class ProductionController extends Controller
 
             if (empty($data['code'])) {
                 $production->forceFill(['code' => 'PRD-'.now()->year.'-'.str_pad((string) $production->id, 4, '0', STR_PAD_LEFT)])->save();
-            }
-
-            foreach ($request->input('materials', []) as $materialId => $row) {
-                if (empty($row['use']) || empty($row['qty'])) {
-                    continue;
-                }
-
-                $qty = (int) $row['qty'];
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $production->materials()->create([
-                    'material_id' => $materialId,
-                    'qty_used' => $qty,
-                ]);
-
-                Material::where('id', $materialId)->decrement('stock', $qty);
             }
 
             foreach (ProductionStage::STAGES as $stage) {
@@ -108,22 +91,26 @@ class ProductionController extends Controller
 
     public function show(Production $production)
     {
-        $production->load(['product', 'materials.material', 'stages' => fn ($q) => $q->orderBy('id')]);
+        $production->load(['product', 'machine', 'stages' => fn ($q) => $q->orderBy('id')]);
 
         return view('admin.productions.show', compact('production'));
     }
 
     public function edit(Production $production)
     {
-        $production->load(['materials.material']);
+        $production->load(['machine']);
         $products = Product::orderBy('name')->get(['id', 'name']);
+        $machines = ProductionMachine::where('status', 'active')
+            ->orWhere('id', $production->production_machine_id)
+            ->orderBy('name')->get(['id', 'name']);
 
-        return view('admin.productions.edit', compact('production', 'products'));
+        return view('admin.productions.edit', compact('production', 'products', 'machines'));
     }
 
     public function update(Request $request, Production $production)
     {
         $data = $request->validate([
+            'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             'planned_qty' => ['required', 'integer', 'min:1'],
             'actual_qty' => ['nullable', 'integer', 'min:0'],
             'start_date' => ['required', 'date'],
@@ -133,6 +120,7 @@ class ProductionController extends Controller
         ]);
 
         $production->fill([
+            'production_machine_id' => $data['production_machine_id'] ?? null,
             'planned_qty' => $data['planned_qty'],
             'actual_qty' => $data['actual_qty'] ?? $production->actual_qty,
             'start_date' => $data['start_date'],

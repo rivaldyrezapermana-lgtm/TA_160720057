@@ -52,6 +52,26 @@
         </div>
     </x-ui.card>
 
+    <x-ui.card title="Bahan Baku (Resep)" subtitle="Centang bahan yang dibutuhkan untuk membuat 1 unit produk ini">
+        <table class="table-clean">
+            <thead><tr><th>Bahan</th><th class="text-right">Qty per Unit</th><th>Unit</th></tr></thead>
+            <tbody>
+                @foreach ($materials as $m)
+                    <tr>
+                        <td>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" name="materials[{{ $m->id }}][use]" value="1" @checked(old('materials.'.$m->id.'.use')) class="rounded">
+                                <span>{{ $m->name }}</span>
+                            </label>
+                        </td>
+                        <td><input type="number" min="1" name="materials[{{ $m->id }}][qty_required]" value="{{ old('materials.'.$m->id.'.qty_required') }}" class="input text-right" placeholder="0"></td>
+                        <td class="text-ink-500">{{ $m->unit }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </x-ui.card>
+
     <div class="flex justify-end gap-3">
         <a href="{{ route('admin.products.index') }}" class="btn-secondary">Batal</a>
         <button class="btn-primary">Simpan Produk</button>

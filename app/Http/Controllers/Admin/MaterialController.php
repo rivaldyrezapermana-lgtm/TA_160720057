@@ -64,9 +64,9 @@ class MaterialController extends Controller
 
     public function destroy(Material $material)
     {
-        if ($material->purchaseItems()->exists() || $material->productionMaterials()->exists()) {
+        if ($material->purchaseItems()->exists() || $material->productMaterials()->exists()) {
             return redirect()->route('admin.materials.index')
-                ->with('error', 'Bahan baku tidak bisa dihapus karena sudah dipakai pada pembelian atau produksi.');
+                ->with('error', 'Bahan baku tidak bisa dihapus karena sudah dipakai pada pembelian atau resep produk.');
         }
 
         $material->delete();

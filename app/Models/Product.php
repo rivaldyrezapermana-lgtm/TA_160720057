@@ -23,5 +23,6 @@ class Product extends Model
     public function sizes() { return $this->hasMany(ProductSize::class); }
     public function orderItems() { return $this->hasMany(OrderItem::class); }
     public function productions() { return $this->hasMany(Production::class); }
+    public function materials() { return $this->hasMany(ProductMaterial::class); }
     public function salesHistories() { return $this->hasMany(SalesHistory::class); }
 }

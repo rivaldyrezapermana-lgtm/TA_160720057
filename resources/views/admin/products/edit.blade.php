@@ -6,7 +6,7 @@
 @endsection
 
 @section('content')
-@php $sizeRows = $product->sizes->keyBy('size'); @endphp
+@php $sizeRows = $product->sizes->keyBy('size'); $bomRows = $product->materials->keyBy('material_id'); @endphp
 <form action="{{ route('admin.products.update', $product->id) }}" method="POST" enctype="multipart/form-data" class="max-w-3xl space-y-4">
     @csrf @method('PUT')
     <x-ui.card title="Informasi Produk">
@@ -57,6 +57,27 @@
                 </div>
             @endforeach
         </div>
+    </x-ui.card>
+
+    <x-ui.card title="Bahan Baku (Resep)" subtitle="Centang bahan yang dibutuhkan untuk membuat 1 unit produk ini">
+        <table class="table-clean">
+            <thead><tr><th>Bahan</th><th class="text-right">Qty per Unit</th><th>Unit</th></tr></thead>
+            <tbody>
+                @foreach ($materials as $m)
+                    @php $bom = $bomRows->get($m->id); @endphp
+                    <tr>
+                        <td>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" name="materials[{{ $m->id }}][use]" value="1" @checked(old('materials.'.$m->id.'.use', $bom !== null)) class="rounded">
+                                <span>{{ $m->name }}</span>
+                            </label>
+                        </td>
+                        <td><input type="number" min="1" name="materials[{{ $m->id }}][qty_required]" value="{{ old('materials.'.$m->id.'.qty_required', $bom->qty_required ?? '') }}" class="input text-right" placeholder="0"></td>
+                        <td class="text-ink-500">{{ $m->unit }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
     </x-ui.card>
 
     <div class="flex justify-end gap-3">

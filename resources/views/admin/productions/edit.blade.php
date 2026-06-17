@@ -10,6 +10,7 @@
     @csrf @method('PUT')
     <x-ui.card title="Informasi Produksi">
         <div class="grid md:grid-cols-3 gap-4">
+            <x-ui.select name="production_machine_id" label="Mesin Produksi" :options="$machines->pluck('name','id')->toArray()" :selected="$production->production_machine_id" placeholder="— Tanpa mesin —" />
             <x-ui.input name="planned_qty" type="number" label="Target Qty" required :value="$production->planned_qty" />
             <x-ui.input name="actual_qty" type="number" label="Aktual Qty" :value="$production->actual_qty" />
             <x-ui.select name="status" label="Status" required :options="collect(\App\Models\Production::STATUSES)->mapWithKeys(fn ($s) => [$s => $s])->toArray()" :selected="$production->status" />

@@ -77,6 +77,11 @@
             <span class="sidebar-label">Produksi</span>
         </a>
 
+        <a href="{{ route('admin.production-machines.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.production-machines.*') }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span class="sidebar-label">Mesin Produksi</span>
+        </a>
+
         <a href="{{ route('admin.recommendations.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.recommendations.*') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3 11.13c.37.27.66.62.83 1.04.19.59.56.83.96.83h2.42c.4 0 .77-.24.96-.83.17-.42.46-.77.83-1.04A6 6 0 0012 3z"/></svg>
             <span class="sidebar-label">Rekomendasi</span>

@@ -11,6 +11,7 @@
         <x-ui.card title="Informasi Batch">
             <div class="grid md:grid-cols-2 gap-4 text-sm">
                 <div><p class="text-ink-500">Produk</p><p class="font-medium">{{ $production->product?->name ?? '—' }}</p></div>
+                <div><p class="text-ink-500">Mesin</p><p class="font-medium">{{ $production->machine?->name ?? '—' }}</p></div>
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$production->status" /></div>
                 <div><p class="text-ink-500">Target</p><p class="font-medium tabular-nums">{{ $production->planned_qty }} pcs</p></div>
                 <div><p class="text-ink-500">Aktual</p><p class="font-medium tabular-nums">{{ $production->actual_qty }} pcs</p></div>
@@ -64,24 +65,6 @@
             </div>
         </x-ui.card>
 
-        <x-ui.card title="Bahan Digunakan">
-            @if ($production->materials->isEmpty())
-                <p class="text-sm text-ink-500">Tidak ada bahan dicatat untuk batch ini.</p>
-            @else
-                <table class="table-clean">
-                    <thead><tr><th>Bahan</th><th class="text-right">Qty</th><th>Unit</th></tr></thead>
-                    <tbody>
-                        @foreach ($production->materials as $m)
-                            <tr>
-                                <td class="font-medium">{{ $m->material?->name ?? '—' }}</td>
-                                <td class="text-right tabular-nums">{{ $m->qty_used }}</td>
-                                <td class="text-ink-500">{{ $m->material?->unit ?? '-' }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @endif
-        </x-ui.card>
     </div>
 
     <div class="space-y-4">

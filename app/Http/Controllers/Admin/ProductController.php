@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Material;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -35,8 +36,9 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::orderBy('name')->get();
+        $materials = Material::orderBy('name')->get(['id', 'name', 'unit']);
 
-        return view('admin.products.create', compact('categories'));
+        return view('admin.products.create', compact('categories', 'materials'));
     }
 
     public function store(Request $request)
@@ -57,6 +59,7 @@ class ProductController extends Controller
         ]);
 
         $this->syncSizes($product, $request->input('sizes', []));
+        $this->syncMaterials($product, $request->input('materials', []));
 
         return redirect()->route('admin.products.index')
             ->with('success', 'Produk berhasil ditambahkan.');
@@ -64,17 +67,18 @@ class ProductController extends Controller
 
     public function show(Product $product)
     {
-        $product->load('category', 'sizes');
+        $product->load('category', 'sizes', 'materials.material');
 
         return view('admin.products.show', compact('product'));
     }
 
     public function edit(Product $product)
     {
-        $product->load('sizes');
+        $product->load('sizes', 'materials');
         $categories = Category::orderBy('name')->get();
+        $materials = Material::orderBy('name')->get(['id', 'name', 'unit']);
 
-        return view('admin.products.edit', compact('product', 'categories'));
+        return view('admin.products.edit', compact('product', 'categories', 'materials'));
     }
 
     public function update(Request $request, Product $product)
@@ -100,6 +104,7 @@ class ProductController extends Controller
 
         $product->save();
         $this->syncSizes($product, $request->input('sizes', []));
+        $this->syncMaterials($product, $request->input('materials', []));
 
         return redirect()->route('admin.products.index')
             ->with('success', 'Produk berhasil diperbarui.');
@@ -141,6 +146,9 @@ class ProductController extends Controller
             'sizes.*.length_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.sleeve_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.stock' => ['nullable', 'integer', 'min:0'],
+            'materials' => ['nullable', 'array'],
+            'materials.*.use' => ['nullable'],
+            'materials.*.qty_required' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -162,6 +170,35 @@ class ProductController extends Controller
                 ],
             );
         }
+    }
+
+    /**
+     * Replace the product's bill of materials with the submitted rows.
+     * Each checked material with a positive qty becomes one BOM line.
+     */
+    private function syncMaterials(Product $product, array $materials): void
+    {
+        $keep = [];
+
+        foreach ($materials as $materialId => $row) {
+            if (empty($row['use'])) {
+                continue;
+            }
+
+            $qty = $this->intOrNull($row['qty_required'] ?? null);
+            if ($qty === null || $qty <= 0) {
+                continue;
+            }
+
+            $product->materials()->updateOrCreate(
+                ['material_id' => $materialId],
+                ['qty_required' => $qty],
+            );
+
+            $keep[] = $materialId;
+        }
+
+        $product->materials()->whereNotIn('material_id', $keep ?: [0])->delete();
     }
 
     /** Cast a form value to an integer, treating blank input as null. */
