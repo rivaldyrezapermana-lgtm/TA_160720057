@@ -33,15 +33,8 @@
                         <label class="flex items-center gap-3 p-3 border border-ink-200 rounded-lg cursor-pointer hover:bg-ink-50">
                             <input type="radio" name="payment_method" value="transfer" checked class="border-ink-300">
                             <div>
-                                <p class="font-medium">Transfer Bank</p>
-                                <p class="text-xs text-ink-500">BCA · Mandiri · BNI · BRI</p>
-                            </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border border-ink-200 rounded-lg cursor-pointer hover:bg-ink-50">
-                            <input type="radio" name="payment_method" value="ewallet" class="border-ink-300">
-                            <div>
-                                <p class="font-medium">E-Wallet</p>
-                                <p class="text-xs text-ink-500">GoPay · OVO · Dana</p>
+                                <p class="font-medium">Transfer Bank BCA</p>
+                                <p class="text-xs text-ink-500">{{ \App\Http\Controllers\Customer\CheckoutController::bankInfo() }}</p>
                             </div>
                         </label>
                     </div>

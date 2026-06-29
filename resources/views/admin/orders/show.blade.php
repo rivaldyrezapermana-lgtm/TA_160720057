@@ -49,6 +49,12 @@
                     </div>
                     <div><p class="text-ink-500">Tanggal Bayar</p><p class="font-medium">{{ $order->payment->paid_at?->translatedFormat('d M Y, H:i') ?? '-' }}</p></div>
                 </div>
+                @if ($order->payment->status === 'rejected' && $order->payment->note)
+                    <div class="mt-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                        <p class="text-xs font-semibold text-red-700">Alasan penolakan</p>
+                        <p class="text-sm text-red-600 mt-1">{{ $order->payment->note }}</p>
+                    </div>
+                @endif
             @else
                 <p class="text-sm text-ink-500">Belum ada data pembayaran.</p>
             @endif
@@ -72,10 +78,24 @@
             </form>
 
             @if ($order->payment && $order->payment->status !== 'verified')
-                <form action="{{ route('admin.orders.verify', $order->id) }}" method="POST" class="mt-3">
-                    @csrf @method('PATCH')
-                    <button class="btn-secondary w-full justify-center">Verifikasi Pembayaran</button>
-                </form>
+                <div class="mt-4 pt-4 border-t border-ink-100 space-y-2">
+                    <p class="text-xs text-ink-500">Verifikasi Pembayaran</p>
+
+                    @if ($order->payment->proof_image)
+                        <form action="{{ route('admin.orders.verify', $order->id) }}" method="POST">
+                            @csrf @method('PATCH')
+                            <button class="btn-primary w-full justify-center">Verifikasi Pembayaran</button>
+                        </form>
+                    @else
+                        <p class="text-xs text-ink-400">Pembeli belum mengupload bukti.</p>
+                    @endif
+
+                    <form action="{{ route('admin.orders.reject', $order->id) }}" method="POST" class="space-y-2">
+                        @csrf @method('PATCH')
+                        <textarea name="note" rows="2" class="input text-sm" placeholder="Alasan penolakan (opsional)">{{ $order->payment->status === 'rejected' ? $order->payment->note : '' }}</textarea>
+                        <button class="btn-secondary w-full justify-center">Tolak Pembayaran</button>
+                    </form>
+                </div>
             @endif
         </x-ui.card>
     </div>

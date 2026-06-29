@@ -70,9 +70,14 @@ class OrderController extends Controller
             return back()->with('error', 'Pembayaran sudah diverifikasi sebelumnya.');
         }
 
+        if (! $order->payment->proof_image) {
+            return back()->with('error', 'Belum ada bukti pembayaran yang diupload.');
+        }
+
         DB::transaction(function () use ($order) {
             $order->payment->forceFill([
                 'status' => 'verified',
+                'note' => null,
                 'paid_at' => now(),
             ])->save();
 
@@ -86,5 +91,35 @@ class OrderController extends Controller
         });
 
         return back()->with('success', 'Pembayaran diverifikasi, stok produk dipotong.');
+    }
+
+    /**
+     * Reject the payment with an optional reason. The order stays "pending" so
+     * the customer can re-upload a new proof; no stock was decremented, so there
+     * is nothing to roll back.
+     */
+    public function rejectPayment(Request $request, Order $order)
+    {
+        $order->load('payment');
+
+        if (! $order->payment) {
+            return back()->with('error', 'Pesanan ini belum memiliki data pembayaran.');
+        }
+
+        if ($order->payment->status === 'verified') {
+            return back()->with('error', 'Pembayaran sudah diverifikasi, tidak bisa ditolak.');
+        }
+
+        $data = $request->validate([
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $order->payment->forceFill([
+            'status' => 'rejected',
+            'note' => $data['note'] ?? null,
+            'paid_at' => null,
+        ])->save();
+
+        return back()->with('success', 'Pembayaran ditolak. Pembeli dapat mengupload ulang bukti.');
     }
 }

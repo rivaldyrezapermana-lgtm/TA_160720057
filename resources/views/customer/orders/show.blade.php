@@ -68,18 +68,36 @@
 
             <div class="bg-white border border-ink-100 rounded-xl p-5">
                 <h3 class="font-medium mb-2">Pembayaran</h3>
+                @php $payment = $order->payment; $pStatus = $payment?->status ?? 'pending'; @endphp
                 <div class="text-sm space-y-1">
-                    <p class="text-ink-500">Metode: <span class="text-ink-900 capitalize">{{ $order->payment?->method ?? '-' }}</span></p>
-                    <p class="text-ink-500">Status: <x-ui.status-badge :status="$order->payment?->status ?? 'pending'" /></p>
+                    <p class="text-ink-500">Metode: <span class="text-ink-900 capitalize">{{ $payment?->method ?? '-' }}</span></p>
+                    <p class="text-ink-500">Status: <x-ui.status-badge :status="$pStatus" /></p>
                 </div>
-                @if (! $order->payment?->proof_image)
+
+                @if ($payment?->proof_image)
+                    <a href="{{ asset('storage/'.$payment->proof_image) }}" target="_blank" class="text-xs text-ink-900 underline mt-2 inline-block">Lihat bukti transfer</a>
+                @endif
+
+                @if ($pStatus === 'rejected')
+                    <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
+                        <p class="text-xs font-semibold text-red-700">Bukti pembayaran ditolak</p>
+                        @if ($payment->note)
+                            <p class="text-xs text-red-600 mt-1">Alasan: {{ $payment->note }}</p>
+                        @endif
+                    </div>
+                @endif
+
+                @if ($pStatus === 'verified')
+                    <p class="text-xs text-emerald-600 mt-2">Pembayaran sudah diverifikasi.</p>
+                @elseif ($pStatus === 'pending' && $payment?->proof_image)
+                    <p class="text-xs text-amber-600 mt-2">Menunggu verifikasi admin.</p>
+                @else
+                    {{-- belum upload, atau ditolak: izinkan (re-)upload --}}
                     <form action="{{ route('checkout.proof', $order->id) }}" method="POST" enctype="multipart/form-data" class="mt-3 space-y-2">
                         @csrf
                         <input type="file" name="proof" accept="image/*" required class="input text-xs">
-                        <button class="btn-primary w-full justify-center text-sm">Upload Bukti</button>
+                        <button class="btn-primary w-full justify-center text-sm">{{ $pStatus === 'rejected' ? 'Upload Ulang Bukti' : 'Upload Bukti' }}</button>
                     </form>
-                @else
-                    <a href="{{ asset('storage/'.$order->payment->proof_image) }}" target="_blank" class="text-xs text-ink-900 underline mt-2 inline-block">Lihat bukti transfer</a>
                 @endif
             </div>
         </div>

@@ -15,6 +15,12 @@ class CheckoutController extends Controller
 
     private const BANK_INFO = 'BCA 1234567890 a/n Toko Labasa';
 
+    /** Single source of truth for the bank details shown in checkout + success pages. */
+    public static function bankInfo(): string
+    {
+        return self::BANK_INFO;
+    }
+
     public function __construct(private CartService $cart) {}
 
     public function index()
@@ -36,7 +42,7 @@ class CheckoutController extends Controller
             'recipient' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', 'max:30'],
             'shipping_address' => ['required', 'string', 'max:500'],
-            'payment_method' => ['required', 'in:transfer,ewallet,cod'],
+            'payment_method' => ['required', 'in:transfer'],
         ]);
 
         $items = $this->cart->items();
@@ -98,6 +104,11 @@ class CheckoutController extends Controller
     {
         abort_unless($order->user_id === auth()->id(), 403);
 
+        if ($order->payment?->status === 'verified') {
+            return redirect()->route('customer.orders.show', $order->id)
+                ->with('error', 'Pembayaran sudah diverifikasi, tidak bisa diubah.');
+        }
+
         $request->validate([
             'proof' => ['required', 'image', 'max:2048'],
         ]);
@@ -114,6 +125,7 @@ class CheckoutController extends Controller
         $payment->forceFill([
             'proof_image' => $path,
             'status' => 'pending',
+            'note' => null,
         ])->save();
 
         return redirect()->route('customer.orders.show', $order->id)

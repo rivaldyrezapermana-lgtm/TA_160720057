@@ -142,6 +142,7 @@ Route::middleware(['auth', 'role:admin,karyawan'])
         Route::get('/{order}', [AdminOrderController::class, 'show'])->name('show');
         Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('status');
         Route::patch('/{order}/verify-payment', [AdminOrderController::class, 'verifyPayment'])->name('verify');
+        Route::patch('/{order}/reject-payment', [AdminOrderController::class, 'rejectPayment'])->name('reject');
     });
 
     // Chat
