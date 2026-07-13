@@ -14,6 +14,7 @@
     <table class="table-clean">
         <thead>
             <tr>
+                <th>id</th>
                 <th>Nama</th>
                 <th>Slug</th>
                 <th>Deskripsi</th>
@@ -24,6 +25,7 @@
         <tbody>
             @foreach ($categories as $c)
                 <tr>
+                    <td class="font-medium">{{ $c->id}}</td>
                     <td class="font-medium">{{ $c->name }}</td>
                     <td class="text-ink-500">{{ $c->slug }}</td>
                     <td class="text-ink-600">{{ $c->description }}</td>
