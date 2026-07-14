@@ -15,7 +15,11 @@
             <x-ui.input name="sku" label="SKU" :value="$product->sku" required />
             <x-ui.select name="category_id" label="Kategori" required :selected="$product->category_id" :options="$categories->pluck('name','id')->toArray()" />
             <x-ui.input name="price" type="number" label="Harga (Rp)" :value="$product->price" required />
-            <x-ui.input name="stock" type="number" label="Stok" :value="$product->stock" />
+            <div class="field">
+                <label class="label">Stok</label>
+                <input type="number" value="{{ $product->stock }}" class="input bg-ink-50" readonly disabled>
+                <p class="field-help">Stok hanya berubah lewat penjualan &amp; produksi.</p>
+            </div>
             <div class="md:col-span-2"><x-ui.textarea name="description" label="Deskripsi" :value="$product->description" rows="4" /></div>
             <div class="md:col-span-2">
                 <label class="label">Foto Produk</label>
@@ -68,11 +72,11 @@
                     <tr>
                         <td>
                             <label class="flex items-center gap-2">
-                                <input type="checkbox" name="materials[{{ $m->id }}][use]" value="1" @checked(old('materials.'.$m->id.'.use', $bom !== null)) class="rounded">
+                                <input type="checkbox" name="materials[{{ $m->id }}][use]" value="1" @checked(old('materials.'.$m->id.'.use', $bom !== null)) class="rounded js-bom-use">
                                 <span>{{ $m->name }}</span>
                             </label>
                         </td>
-                        <td><input type="number" min="1" name="materials[{{ $m->id }}][qty_required]" value="{{ old('materials.'.$m->id.'.qty_required', $bom->qty_required ?? '') }}" class="input text-right" placeholder="0"></td>
+                        <td><input type="number" min="1" name="materials[{{ $m->id }}][qty_required]" value="{{ old('materials.'.$m->id.'.qty_required', $bom->qty_required ?? '') }}" class="input text-right js-bom-qty" data-unit-cost="{{ (float) $m->unit_cost }}" placeholder="0"></td>
                         <td class="text-ink-500">{{ $m->unit }}</td>
                     </tr>
                 @endforeach
@@ -80,9 +84,42 @@
         </table>
     </x-ui.card>
 
+    <x-ui.card title="HPP (Harga Pokok)" subtitle="Dihitung otomatis dari resep bahan baku">
+        <div class="flex items-center justify-between">
+            <p class="text-sm text-ink-500">Total biaya bahan per unit</p>
+            <p class="font-display text-2xl font-semibold tabular-nums">Rp <span id="hpp-total">0</span></p>
+        </div>
+        <p id="hpp-warning" class="hidden mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            ⚠ Harga jual di bawah HPP. Periksa kembali margin.
+        </p>
+    </x-ui.card>
+
     <div class="flex justify-end gap-3">
         <a href="{{ route('admin.products.index') }}" class="btn-secondary">Batal</a>
         <button class="btn-primary">Simpan Perubahan</button>
     </div>
 </form>
+
+@push('scripts')
+<script>
+$(function () {
+    function fmt(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
+    function recalc() {
+        let hpp = 0;
+        $('.js-bom-qty').each(function () {
+            const $row = $(this).closest('tr');
+            const used = $row.find('.js-bom-use').is(':checked');
+            const qty = parseFloat($(this).val()) || 0;
+            const cost = parseFloat($(this).data('unit-cost')) || 0;
+            if (used && qty > 0) hpp += qty * cost;
+        });
+        $('#hpp-total').text(fmt(hpp));
+        const price = parseFloat($('#price').val()) || 0;
+        $('#hpp-warning').toggleClass('hidden', !(hpp > 0 && price < hpp));
+    }
+    $(document).on('input change', '.js-bom-qty, .js-bom-use, #price', recalc);
+    recalc();
+});
+</script>
+@endpush
 @endsection

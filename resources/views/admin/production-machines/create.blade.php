@@ -13,6 +13,7 @@
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama Mesin" required /></div>
             <x-ui.input name="code" label="Kode" required />
             <x-ui.select name="status" label="Status" required :options="['active' => 'Aktif', 'maintenance' => 'Perawatan', 'inactive' => 'Nonaktif']" selected="active" />
+            <x-ui.select name="machine_category_id" label="Kategori" :options="$categories" />
             <x-ui.input name="capacity" type="number" label="Kapasitas (pcs/hari)" />
             <div class="md:col-span-2"><x-ui.textarea name="notes" label="Catatan" /></div>
         </div>

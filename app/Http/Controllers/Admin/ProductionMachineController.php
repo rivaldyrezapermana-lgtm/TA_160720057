@@ -30,7 +30,9 @@ class ProductionMachineController extends Controller
 
     public function create()
     {
-        return view('admin.production-machines.create');
+        return view('admin.production-machines.create', [
+            'categories' => \App\Models\MachineCategory::orderBy('name')->pluck('name', 'id')->toArray(),
+        ]);
     }
 
     public function store(Request $request)
@@ -48,7 +50,10 @@ class ProductionMachineController extends Controller
 
     public function edit(ProductionMachine $production_machine)
     {
-        return view('admin.production-machines.edit', ['machine' => $production_machine]);
+        return view('admin.production-machines.edit', [
+            'machine' => $production_machine,
+            'categories' => \App\Models\MachineCategory::orderBy('name')->pluck('name', 'id')->toArray(),
+        ]);
     }
 
     public function update(Request $request, ProductionMachine $production_machine)
@@ -78,6 +83,7 @@ class ProductionMachineController extends Controller
         return [
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:255', Rule::unique('production_machines', 'code')->ignore($machine)],
+            'machine_category_id' => ['nullable', 'exists:machine_categories,id'],
             'status' => ['required', Rule::in(ProductionMachine::STATUSES)],
             'capacity' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],

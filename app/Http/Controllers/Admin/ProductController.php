@@ -36,7 +36,7 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::orderBy('name')->get();
-        $materials = Material::orderBy('name')->get(['id', 'name', 'unit']);
+        $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
 
         return view('admin.products.create', compact('categories', 'materials'));
     }
@@ -60,9 +60,11 @@ class ProductController extends Controller
 
         $this->syncSizes($product, $request->input('sizes', []));
         $this->syncMaterials($product, $request->input('materials', []));
+        $this->refreshHpp($product);
 
         return redirect()->route('admin.products.index')
-            ->with('success', 'Produk berhasil ditambahkan.');
+            ->with('success', 'Produk berhasil ditambahkan.')
+            ->with($this->hppWarning($product));
     }
 
     public function show(Product $product)
@@ -76,7 +78,7 @@ class ProductController extends Controller
     {
         $product->load('sizes', 'materials');
         $categories = Category::orderBy('name')->get();
-        $materials = Material::orderBy('name')->get(['id', 'name', 'unit']);
+        $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
 
         return view('admin.products.edit', compact('product', 'categories', 'materials'));
     }
@@ -91,7 +93,6 @@ class ProductController extends Controller
             'sku' => $data['sku'],
             'description' => $data['description'] ?? null,
             'price' => $data['price'],
-            'stock' => (int) ($data['stock'] ?? 0),
             'is_active' => $request->boolean('is_active'),
         ]);
 
@@ -105,9 +106,11 @@ class ProductController extends Controller
         $product->save();
         $this->syncSizes($product, $request->input('sizes', []));
         $this->syncMaterials($product, $request->input('materials', []));
+        $this->refreshHpp($product);
 
         return redirect()->route('admin.products.index')
-            ->with('success', 'Produk berhasil diperbarui.');
+            ->with('success', 'Produk berhasil diperbarui.')
+            ->with($this->hppWarning($product));
     }
 
     public function destroy(Product $product)
@@ -205,5 +208,22 @@ class ProductController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return ($value === null || $value === '') ? null : (int) $value;
+    }
+
+    /** Recalculate and persist the product's HPP snapshot from its recipe. */
+    private function refreshHpp(Product $product): void
+    {
+        $product->forceFill(['hpp' => $product->computeHpp()])->save();
+    }
+
+    /** Build a flash payload warning when the selling price is below HPP. */
+    private function hppWarning(Product $product): array
+    {
+        if ((float) $product->hpp > 0 && (float) $product->price < (float) $product->hpp) {
+            return ['warning' => 'Harga jual (Rp '.number_format((float) $product->price, 0, ',', '.').
+                ') di bawah HPP (Rp '.number_format((float) $product->hpp, 0, ',', '.').'). Periksa kembali margin.'];
+        }
+
+        return [];
     }
 }

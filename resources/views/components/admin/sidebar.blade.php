@@ -82,6 +82,11 @@
             <span class="sidebar-label">Mesin Produksi</span>
         </a>
 
+        <a href="{{ route('admin.machine-categories.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.machine-categories.*') }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span class="sidebar-label">Kategori Mesin</span>
+        </a>
+
         <a href="{{ route('admin.recommendations.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.recommendations.*') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3 11.13c.37.27.66.62.83 1.04.19.59.56.83.96.83h2.42c.4 0 .77-.24.96-.83.17-.42.46-.77.83-1.04A6 6 0 0012 3z"/></svg>
             <span class="sidebar-label">Rekomendasi</span>

@@ -22,4 +22,31 @@ class Production extends Model
     public function user() { return $this->belongsTo(User::class); }
     public function machine() { return $this->belongsTo(ProductionMachine::class, 'production_machine_id'); }
     public function stages() { return $this->hasMany(ProductionStage::class); }
+    public function productionMaterials() { return $this->hasMany(ProductionMaterial::class); }
+
+    /** Half the planned quantity, rounded up — the handoff threshold. */
+    public function gateQty(): int
+    {
+        return (int) ceil(0.5 * (int) $this->planned_qty);
+    }
+
+    /** Progress of a stage as a percentage of planned quantity. */
+    public function stageProgressPct(ProductionStage $stage): int
+    {
+        return $this->planned_qty > 0 ? (int) round($stage->output_qty / $this->planned_qty * 100) : 0;
+    }
+
+    /** A stage can start once its predecessor's output reaches the 50% gate. */
+    public function stageUnlocked(ProductionStage $stage): bool
+    {
+        $order = ProductionStage::STAGES;
+        $idx = array_search($stage->stage, $order, true);
+        if ($idx === false || $idx === 0) {
+            return true;
+        }
+
+        $prev = $this->stages->firstWhere('stage', $order[$idx - 1]);
+
+        return $prev !== null && (int) $prev->output_qty >= $this->gateQty();
+    }
 }

@@ -56,7 +56,9 @@ class MaterialController extends Controller
 
     public function update(Request $request, Material $material)
     {
-        $material->update($request->validate($this->rules($material)));
+        $data = $request->validate($this->rules($material));
+        unset($data['stock']); // stock only moves via purchases/production
+        $material->update($data);
 
         return redirect()->route('admin.materials.index')
             ->with('success', 'Bahan baku berhasil diperbarui.');

@@ -98,15 +98,20 @@ class DatabaseSeeder extends Seeder
             }
         }
 
+        // ---- Machine categories (mapped to production stages) ----------
+        $catCut = \App\Models\MachineCategory::create(['name' => 'Mesin Potong', 'code' => 'CAT-CUT', 'stage' => 'cutting']);
+        $catSew = \App\Models\MachineCategory::create(['name' => 'Mesin Jahit', 'code' => 'CAT-SEW', 'stage' => 'sewing']);
+        $catPack = \App\Models\MachineCategory::create(['name' => 'Mesin Packing', 'code' => 'CAT-PACK', 'stage' => 'packing']);
+
         // ---- Production machines ---------------------------------------
         $machines = [
-            ['Mesin Jahit Juki A', 'MCH-0001', 'active', 120, 'Lini jahit utama'],
-            ['Mesin Potong Kain', 'MCH-0002', 'active', 300, 'Cutting otomatis'],
-            ['Mesin Obras', 'MCH-0003', 'maintenance', 150, 'Sedang perawatan berkala'],
+            [$catSew->id, 'Mesin Jahit Juki A', 'MCH-0001', 'active', 120, 'Lini jahit utama'],
+            [$catCut->id, 'Mesin Potong Kain', 'MCH-0002', 'active', 300, 'Cutting otomatis'],
+            [$catPack->id, 'Mesin Obras', 'MCH-0003', 'maintenance', 150, 'Sedang perawatan berkala'],
         ];
         foreach ($machines as $m) {
             ProductionMachine::create([
-                'name' => $m[0], 'code' => $m[1], 'status' => $m[2], 'capacity' => $m[3], 'notes' => $m[4],
+                'machine_category_id' => $m[0], 'name' => $m[1], 'code' => $m[2], 'status' => $m[3], 'capacity' => $m[4], 'notes' => $m[5],
             ]);
         }
 
@@ -133,5 +138,10 @@ class DatabaseSeeder extends Seeder
                 'produced' => $row[2],
             ]);
         }
+
+        // ---- Backfill HPP from each product's recipe ------------------
+        Product::with('materials.material')->get()->each(function (Product $product) {
+            $product->forceFill(['hpp' => $product->computeHpp()])->save();
+        });
     }
 }

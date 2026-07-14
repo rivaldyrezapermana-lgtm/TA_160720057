@@ -11,7 +11,6 @@
     <x-ui.card title="Informasi Produksi">
         <div class="grid md:grid-cols-3 gap-4">
             <x-ui.select name="product_id" label="Produk" required :options="$products->pluck('name','id')->toArray()" />
-            <x-ui.select name="production_machine_id" label="Mesin Produksi" :options="$machines->pluck('name','id')->toArray()" placeholder="— Tanpa mesin —" />
             <x-ui.input name="planned_qty" type="number" label="Target Qty" required />
             <x-ui.input name="code" label="Kode Batch" placeholder="auto" />
             <x-ui.input name="start_date" type="date" label="Tanggal Mulai" required />

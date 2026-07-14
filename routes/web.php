@@ -110,6 +110,7 @@ Route::middleware(['auth', 'role:admin,karyawan'])
     Route::resource('suppliers', SupplierController::class);
     Route::resource('users', UserController::class);
     Route::resource('production-machines', ProductionMachineController::class);
+    Route::resource('machine-categories', \App\Http\Controllers\Admin\MachineCategoryController::class);
 
     // DataTables AJAX endpoints
     Route::prefix('datatables')->name('datatables.')->group(function () {
@@ -119,6 +120,7 @@ Route::middleware(['auth', 'role:admin,karyawan'])
         Route::get('productions', [ProductionController::class, 'data'])->name('productions');
         Route::get('purchases', [PurchaseController::class, 'data'])->name('purchases');
         Route::get('production-machines', [ProductionMachineController::class, 'data'])->name('production-machines');
+        Route::get('machine-categories', [\App\Http\Controllers\Admin\MachineCategoryController::class, 'data'])->name('machine-categories');
     });
 
     // Operations

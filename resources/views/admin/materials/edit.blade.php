@@ -13,7 +13,11 @@
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama Bahan" :value="$material->name" required /></div>
             <x-ui.input name="code" label="Kode" :value="$material->code" required />
             <x-ui.input name="unit" label="Satuan" :value="$material->unit" required />
-            <x-ui.input name="stock" type="number" label="Stok" :value="$material->stock" required />
+            <div class="field">
+                <label class="label">Stok</label>
+                <input type="number" value="{{ $material->stock }}" class="input bg-ink-50" readonly disabled>
+                <p class="field-help">Stok hanya berubah lewat pembelian &amp; produksi.</p>
+            </div>
             <x-ui.input name="min_stock" type="number" label="Min Stok" :value="$material->min_stock" required />
             <x-ui.input name="unit_cost" type="number" label="Harga/Unit" :value="$material->unit_cost" required />
         </div>
