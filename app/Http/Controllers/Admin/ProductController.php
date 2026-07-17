@@ -48,7 +48,7 @@ class ProductController extends Controller
         $product = Product::create([
             'category_id' => $data['category_id'],
             'name' => $data['name'],
-            'sku' => $data['sku'],
+            'sku' => Product::nextSku(),
             'description' => $data['description'] ?? null,
             'price' => $data['price'],
             'stock' => (int) ($data['stock'] ?? 0),
@@ -85,12 +85,11 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        $data = $request->validate($this->rules($product));
+        $data = $request->validate($this->rules());
 
         $product->fill([
             'category_id' => $data['category_id'],
             'name' => $data['name'],
-            'sku' => $data['sku'],
             'description' => $data['description'] ?? null,
             'price' => $data['price'],
             'is_active' => $request->boolean('is_active'),
@@ -133,11 +132,10 @@ class ProductController extends Controller
     }
 
     /** Validation rules shared by store and update. */
-    private function rules(?Product $product = null): array
+    private function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'sku' => ['required', 'string', 'max:255', Rule::unique('products', 'sku')->ignore($product)],
             'category_id' => ['required', Rule::exists('categories', 'id')],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],

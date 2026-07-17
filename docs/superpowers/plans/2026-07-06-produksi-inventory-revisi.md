@@ -68,7 +68,7 @@
 **Interfaces:**
 - Produces: `MachineCategory` model (`name, code, stage, notes`; `machines()` hasMany). `ProductionMachine::category()` belongsTo. `machine_categories.stage` holds one of `ProductionStage::STAGES` or null.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/Unit/ProductionStageFlowTest.php`:
 ```php
@@ -96,12 +96,12 @@ class ProductionStageFlowTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --filter=ProductionStageFlowTest`
 Expected: FAIL — `Class "App\Models\MachineCategory" not found`.
 
-- [ ] **Step 3: Write the migrations and models**
+- [x] **Step 3: Write the migrations and models**
 
 `database/migrations/2026_07_06_000001_create_machine_categories_table.php`:
 ```php
@@ -187,12 +187,12 @@ Modify `app/Models/ProductionMachine.php` — add `machine_category_id` to `$fil
     }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `php artisan test --filter=ProductionStageFlowTest`
 Expected: PASS.
 
-- [ ] **Step 5: Commit** — stop and report Task 1 ready for the user to commit (files: the two migrations, `MachineCategory.php`, `ProductionMachine.php`, the test).
+- [x] **Step 5: Commit** — stop and report Task 1 ready for the user to commit (files: the two migrations, `MachineCategory.php`, `ProductionMachine.php`, the test).
 
 ---
 
@@ -214,7 +214,7 @@ Expected: PASS.
 - Consumes: `MachineCategory` (Task 1).
 - Produces: routes `admin.machine-categories.{index,create,store,edit,update,destroy}`, `admin.datatables.machine-categories`. `ProductionMachineController::create/edit` pass `$categories` (id⇒name) to the machine forms.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/Feature/Admin/MachineCategoryTest.php`:
 ```php
@@ -279,12 +279,12 @@ class MachineCategoryTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --filter=MachineCategoryTest`
 Expected: FAIL — route `admin.machine-categories.index` not defined.
 
-- [ ] **Step 3: Write controller, routes, views, nav, and machine-form dropdown**
+- [x] **Step 3: Write controller, routes, views, nav, and machine-form dropdown**
 
 `app/Http/Controllers/Admin/MachineCategoryController.php`:
 ```php
@@ -536,17 +536,17 @@ In `resources/views/admin/production-machines/edit.blade.php`, add the same sele
             <x-ui.select name="machine_category_id" label="Kategori" :selected="$machine->machine_category_id" :options="$categories" />
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `php artisan test --filter=MachineCategoryTest`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Verify machine form still passes existing suite**
+- [x] **Step 5: Verify machine form still passes existing suite**
 
 Run: `php artisan test --filter=MasterDataTest`
 Expected: PASS (no regressions).
 
-- [ ] **Step 6: Commit** — stop and report Task 2 ready for the user to commit.
+- [x] **Step 6: Commit** — stop and report Task 2 ready for the user to commit.
 
 ---
 
@@ -562,7 +562,7 @@ Expected: PASS (no regressions).
 - Consumes: `ProductMaterial` (existing), `Material.unit_cost`.
 - Produces: `Product::computeHpp(): float` = Σ(`qty_required` × `material.unit_cost`). `products.hpp` column, recomputed on `store()`/`update()` after materials sync. Flash `warning` when saved `price < hpp`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/Unit/HppTest.php`:
 ```php
@@ -608,12 +608,12 @@ class HppTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --filter=HppTest`
 Expected: FAIL — `Call to undefined method App\Models\Product::computeHpp()`.
 
-- [ ] **Step 3: Write migration + model method**
+- [x] **Step 3: Write migration + model method**
 
 `database/migrations/2026_07_06_000005_add_hpp_to_products_table.php`:
 ```php
@@ -665,12 +665,12 @@ In `app/Models/Product.php`, add `'hpp'` to `$fillable`, cast it, and add the me
     }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `php artisan test --filter=HppTest`
 Expected: PASS (2 tests).
 
-- [ ] **Step 5: Wire recompute + warning into the controller**
+- [x] **Step 5: Wire recompute + warning into the controller**
 
 In `app/Http/Controllers/Admin/ProductController.php`, extract the flash into a shared helper and call it from both `store()` and `update()`. Replace the end of `store()` (the `return redirect()...` block) with:
 ```php
@@ -716,16 +716,16 @@ Add these private helpers to the controller:
 
 Note: `->with([])` is a no-op flash, so the warning key is simply absent when price ≥ HPP.
 
-- [ ] **Step 6: Add a controller test for the warning flash**
+- [x] **Step 6: Add a controller test for the warning flash**
 
 Append to `tests/Unit/HppTest.php` a feature-style assertion is awkward in a Unit test; instead create it in `tests/Feature/Admin/StockLockTest.php` later. For now, verify the snapshot is stored by extending the controller through an HTTP test in Task 5's file. Skip here.
 
-- [ ] **Step 7: Run the suite**
+- [x] **Step 7: Run the suite**
 
 Run: `php artisan test --filter=HppTest`
 Expected: PASS.
 
-- [ ] **Step 8: Commit** — stop and report Task 3 ready for the user to commit.
+- [x] **Step 8: Commit** — stop and report Task 3 ready for the user to commit.
 
 ---
 
@@ -738,7 +738,7 @@ Expected: PASS.
 **Interfaces:**
 - Consumes: `$materials` already passed to both views (has `id`, `name`, `unit`). Needs `unit_cost` too — update the controller queries.
 
-- [ ] **Step 1: Pass unit_cost to the views**
+- [x] **Step 1: Pass unit_cost to the views**
 
 In `app/Http/Controllers/Admin/ProductController.php`, both `create()` and `edit()` load materials — add `unit_cost` to the selected columns:
 ```php
@@ -746,7 +746,7 @@ In `app/Http/Controllers/Admin/ProductController.php`, both `create()` and `edit
 ```
 (Apply in both methods.)
 
-- [ ] **Step 2: Add the HPP panel + data attributes to `create.blade.php`**
+- [x] **Step 2: Add the HPP panel + data attributes to `create.blade.php`**
 
 In the "Bahan Baku (Resep)" card, add `data-unit-cost` to each qty input and an id to the checkbox/qty so JS can sum. Replace the qty `<td>` line inside the loop with:
 ```blade
@@ -796,11 +796,11 @@ Then add before the submit button row:
     @endpush
 ```
 
-- [ ] **Step 3: Apply the same panel + attributes to `edit.blade.php`**
+- [x] **Step 3: Apply the same panel + attributes to `edit.blade.php`**
 
 Make the identical edits in `resources/views/admin/products/edit.blade.php`: add `id="price-input"` to the price input, `class="... js-bom-use"` to each recipe checkbox, `class="input text-right js-bom-qty" data-unit-cost="{{ (float) $m->unit_cost }}"` to each recipe qty input, and paste the same "HPP (Harga Pokok)" card + `@push('scripts')` block before the submit button row.
 
-- [ ] **Step 4: Lock the stock field**
+- [x] **Step 4: Lock the stock field**
 
 In `create.blade.php` keep the stock field but label it clearly as initial stock (it already reads "Stok Awal" — leave as-is).
 
@@ -817,11 +817,11 @@ with a read-only display (no editable `name` so nothing is submitted):
             </div>
 ```
 
-- [ ] **Step 5: Manual smoke check**
+- [x] **Step 5: Manual smoke check**
 
 Run: `php artisan serve` (in a spare terminal), open `/admin/products/create`, check a material, set qty → HPP updates; set price below HPP → warning shows. This step has no automated test (view/JS only); the server-side HPP + warning is covered in Task 3 and Task 5.
 
-- [ ] **Step 6: Commit** — stop and report Task 4 ready for the user to commit.
+- [x] **Step 6: Commit** — stop and report Task 4 ready for the user to commit.
 
 ---
 
@@ -837,7 +837,7 @@ Run: `php artisan serve` (in a spare terminal), open `/admin/products/create`, c
 - Consumes: existing product/material update routes.
 - Produces: `update()` on both controllers preserves the DB `stock` regardless of request input. Also verifies Task 3's HPP snapshot + warning via HTTP.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/Feature/Admin/StockLockTest.php`:
 ```php
@@ -921,12 +921,12 @@ class StockLockTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --filter=StockLockTest`
 Expected: FAIL — product/material stock is overwritten to 9999.
 
-- [ ] **Step 3: Make product update ignore stock**
+- [x] **Step 3: Make product update ignore stock**
 
 In `app/Http/Controllers/Admin/ProductController.php` `update()`, remove `'stock'` from the `$product->fill([...])` array so it is never overwritten (leave `store()` as-is — initial stock allowed on create). The fill block becomes:
 ```php
@@ -941,7 +941,7 @@ In `app/Http/Controllers/Admin/ProductController.php` `update()`, remove `'stock
 ```
 Also remove `'stock'` from `rules()` for update — but `rules()` is shared with `store()` where stock IS allowed. Keep the rule (`'stock' => ['nullable','integer','min:0']`) so create still validates; update simply doesn't read it.
 
-- [ ] **Step 4: Make material update ignore stock**
+- [x] **Step 4: Make material update ignore stock**
 
 In `app/Http/Controllers/Admin/MaterialController.php`, change `update()` to exclude `stock`:
 ```php
@@ -956,7 +956,7 @@ In `app/Http/Controllers/Admin/MaterialController.php`, change `update()` to exc
     }
 ```
 
-- [ ] **Step 5: Lock the material stock field in the edit view**
+- [x] **Step 5: Lock the material stock field in the edit view**
 
 In `resources/views/admin/materials/edit.blade.php`, replace the stock input:
 ```blade
@@ -971,12 +971,12 @@ with a read-only display:
             </div>
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [x] **Step 6: Run test to verify it passes**
 
 Run: `php artisan test --filter=StockLockTest`
 Expected: PASS (3 tests).
 
-- [ ] **Step 7: Commit** — stop and report Task 5 ready for the user to commit.
+- [x] **Step 7: Commit** — stop and report Task 5 ready for the user to commit.
 
 ---
 
@@ -1000,7 +1000,7 @@ Expected: PASS (3 tests).
   - `Production::productionMaterials()` hasMany.
   - `Production::stageProgressPct(ProductionStage $stage): int`.
 
-- [ ] **Step 1: Write the failing test (extend the existing file)**
+- [x] **Step 1: Write the failing test (extend the existing file)**
 
 Add to `tests/Unit/ProductionStageFlowTest.php` (keep the Task 1 test; add imports for `Category`, `Product`, `Production`, `ProductionStage`, `User`):
 ```php
@@ -1054,12 +1054,12 @@ Add to `tests/Unit/ProductionStageFlowTest.php` (keep the Task 1 test; add impor
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --filter=ProductionStageFlowTest`
 Expected: FAIL — `input_qty` column / `gateQty()` missing.
 
-- [ ] **Step 3: Write migrations, models, helpers**
+- [x] **Step 3: Write migrations, models, helpers**
 
 `database/migrations/2026_07_06_000003_add_qty_and_machine_to_production_stages.php`:
 ```php
@@ -1194,12 +1194,12 @@ Modify `app/Models/Production.php` — add relation and helpers:
 ```
 Note: `stageUnlocked()` reads the loaded `stages` relation — callers must have `stages` loaded (the show controller and tests load it).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `php artisan test --filter=ProductionStageFlowTest`
 Expected: PASS (all tests incl. Task 1's).
 
-- [ ] **Step 5: Commit** — stop and report Task 6 ready for the user to commit.
+- [x] **Step 5: Commit** — stop and report Task 6 ready for the user to commit.
 
 ---
 
@@ -1216,7 +1216,7 @@ Expected: PASS (all tests incl. Task 1's).
   - `updateStage()` accepts `input_qty`, `output_qty`, `production_machine_id`, `action` (`start`|`save`|`finish`). Enforces `output_qty <= input_qty`, gate on start, and machine-category match.
   - On packing `finish`: sets `production.status='completed'`, `actual_qty = packing.output_qty`, credits `Product.stock`, writes `production_materials` and decrements `Material.stock` — **once** (guarded by status).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/Feature/Admin/ProductionFlowTest.php`:
 ```php
@@ -1325,12 +1325,12 @@ class ProductionFlowTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --filter=ProductionFlowTest`
 Expected: FAIL — current `updateStage` uses `start`/`finish` toggles without qty and no material consumption.
 
-- [ ] **Step 3: Set the first stage's input on store**
+- [x] **Step 3: Set the first stage's input on store**
 
 In `app/Http/Controllers/Admin/ProductionController.php` `store()`, replace the stage-seeding loop:
 ```php
@@ -1353,7 +1353,7 @@ with:
             }
 ```
 
-- [ ] **Step 4: Rewrite `updateStage`**
+- [x] **Step 4: Rewrite `updateStage`**
 
 Replace the whole `updateStage` method in `app/Http/Controllers/Admin/ProductionController.php` with:
 ```php
@@ -1463,17 +1463,17 @@ Replace the whole `updateStage` method in `app/Http/Controllers/Admin/Production
 
 Add the needed imports at the top of the controller if missing: `use App\Models\Material;` and `use App\Models\ProductionMachine;`.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `php artisan test --filter=ProductionFlowTest`
 Expected: PASS (3 tests).
 
-- [ ] **Step 6: Run the full suite for regressions**
+- [x] **Step 6: Run the full suite for regressions**
 
 Run: `php artisan test`
 Expected: PASS (all).
 
-- [ ] **Step 7: Commit** — stop and report Task 7 ready for the user to commit.
+- [x] **Step 7: Commit** — stop and report Task 7 ready for the user to commit.
 
 ---
 
@@ -1488,7 +1488,7 @@ Expected: PASS (all).
 - Consumes: `Production::gateQty/stageUnlocked/stageProgressPct` (Task 6), `MachineCategory` (Task 1).
 - Produces: `show()` passes `$machinesByStage` (map stage⇒collection of `id`⇒`name` for machines whose category maps to that stage) and estimated `$bahan` usage.
 
-- [ ] **Step 1: Provide machine + material data to `show()`**
+- [x] **Step 1: Provide machine + material data to `show()`**
 
 In `app/Http/Controllers/Admin/ProductionController.php` `show()`, replace the body:
 ```php
@@ -1524,7 +1524,7 @@ In `app/Http/Controllers/Admin/ProductionController.php` `show()`, replace the b
     }
 ```
 
-- [ ] **Step 2: Rewrite the "Tahap Produksi" card in `show.blade.php`**
+- [x] **Step 2: Rewrite the "Tahap Produksi" card in `show.blade.php`**
 
 Replace the entire `<x-ui.card title="Tahap Produksi"> ... </x-ui.card>` block with a per-stage form that shows input/output, machine dropdown, progress, and gate state:
 ```blade
@@ -1627,17 +1627,17 @@ Replace the entire `<x-ui.card title="Tahap Produksi"> ... </x-ui.card>` block w
         </x-ui.card>
 ```
 
-- [ ] **Step 3: Remove the batch-level machine select from `create.blade.php`**
+- [x] **Step 3: Remove the batch-level machine select from `create.blade.php`**
 
 Open `resources/views/admin/productions/create.blade.php` and delete the machine `<x-ui.select name="production_machine_id" ...>` field (machines are now chosen per stage). Leave the rest of the form (product, planned_qty, dates, notes) unchanged. The `create()` controller still passes `$machines`; that is now unused but harmless — optionally simplify `create()` to stop querying machines.
 
-- [ ] **Step 4: Smoke test the page**
+- [x] **Step 4: Smoke test the page**
 
 Run: `php artisan test --filter=ProductionFlowTest` (ensures controller data wiring didn't break routes/queries).
 Then manually: `php artisan migrate:fresh --seed`, open a production batch `/admin/productions/{id}`, confirm stages render, locked stages show the gate note, and the Bahan Terpakai panel lists recipe materials.
 Expected: PASS + page renders without errors.
 
-- [ ] **Step 5: Commit** — stop and report Task 8 ready for the user to commit.
+- [x] **Step 5: Commit** — stop and report Task 8 ready for the user to commit.
 
 ---
 
@@ -1651,11 +1651,11 @@ Expected: PASS + page renders without errors.
 - Consumes: everything above.
 - Produces: seeded `MachineCategory` rows linked to the 3 existing `ProductionMachine` rows; every seeded product has a correct `hpp`.
 
-- [ ] **Step 1: Read the current seeder to find where machines & products are created**
+- [x] **Step 1: Read the current seeder to find where machines & products are created**
 
 Run: `php artisan tinker --execute="echo 1;"` is not needed — open `database/seeders/DatabaseSeeder.php` and locate the `ProductionMachine::create(...)` calls and the product-creation loop.
 
-- [ ] **Step 2: Add machine categories and link machines**
+- [x] **Step 2: Add machine categories and link machines**
 
 In `database/seeders/DatabaseSeeder.php`, before the `ProductionMachine` rows are created, add:
 ```php
@@ -1672,7 +1672,7 @@ Then set `machine_category_id` on the three seeded machines (map the existing th
 ```
 (Preserve the existing names/codes/capacities already in the seeder — only add the `machine_category_id` line, distributing the three categories across the three machines.)
 
-- [ ] **Step 3: Backfill HPP after products + recipes are seeded**
+- [x] **Step 3: Backfill HPP after products + recipes are seeded**
 
 At the end of the seeder's `run()` (after products and their `ProductMaterial` recipes exist), add:
 ```php
@@ -1681,17 +1681,17 @@ At the end of the seeder's `run()` (after products and their `ProductMaterial` r
         });
 ```
 
-- [ ] **Step 4: Run the seeder end-to-end**
+- [x] **Step 4: Run the seeder end-to-end**
 
 Run: `php artisan migrate:fresh --seed`
 Expected: completes with no errors; `machine_categories` has 3 rows; products have non-zero `hpp` where they have a recipe.
 
-- [ ] **Step 5: Run the full test suite**
+- [x] **Step 5: Run the full test suite**
 
 Run: `php artisan test`
 Expected: PASS (all suites green).
 
-- [ ] **Step 6: Commit** — stop and report Task 9 ready for the user to commit.
+- [x] **Step 6: Commit** — stop and report Task 9 ready for the user to commit.
 
 ---
 

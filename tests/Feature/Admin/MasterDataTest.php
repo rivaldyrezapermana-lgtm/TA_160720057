@@ -97,7 +97,6 @@ class MasterDataTest extends TestCase
         $this->actingAs($this->admin())
             ->post(route('admin.products.store'), [
                 'name' => 'Gamis Navy',
-                'sku' => 'GAM-001',
                 'category_id' => $category->id,
                 'price' => 225000,
                 'stock' => 10,
@@ -108,23 +107,8 @@ class MasterDataTest extends TestCase
             ])
             ->assertRedirectToRoute('admin.products.index');
 
-        $this->assertDatabaseHas('products', ['sku' => 'GAM-001', 'is_active' => true]);
+        $this->assertDatabaseHas('products', ['name' => 'Gamis Navy', 'sku' => 'SKU-0001', 'is_active' => true]);
         $this->assertDatabaseHas('product_sizes', ['size' => 'M', 'stock' => 5]);
-    }
-
-    public function test_product_requires_a_unique_sku(): void
-    {
-        $category = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
-        Product::create([
-            'category_id' => $category->id,
-            'name' => 'Ada', 'sku' => 'DUP-1', 'price' => 1000, 'stock' => 1,
-        ]);
-
-        $this->actingAs($this->admin())
-            ->post(route('admin.products.store'), [
-                'name' => 'Baru', 'sku' => 'DUP-1', 'category_id' => $category->id, 'price' => 1000,
-            ])
-            ->assertSessionHasErrors('sku');
     }
 
     public function test_product_datatable_returns_json_rows(): void

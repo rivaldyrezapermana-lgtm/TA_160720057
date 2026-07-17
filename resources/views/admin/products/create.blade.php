@@ -11,7 +11,10 @@
     <x-ui.card title="Informasi Produk">
         <div class="grid md:grid-cols-2 gap-4">
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama Produk" required /></div>
-            <x-ui.input name="sku" label="SKU" required />
+            <div class="field">
+                <label class="label">SKU</label>
+                <input type="text" value="Dibuat otomatis saat disimpan" class="input bg-ink-50" readonly disabled>
+            </div>
             <x-ui.select name="category_id" label="Kategori" required :options="$categories->pluck('name','id')->toArray()" />
             <x-ui.input name="price" type="number" label="Harga (Rp)" required />
             <x-ui.input name="stock" type="number" label="Stok Awal" />

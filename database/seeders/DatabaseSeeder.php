@@ -101,13 +101,18 @@ class DatabaseSeeder extends Seeder
         // ---- Machine categories (mapped to production stages) ----------
         $catCut = \App\Models\MachineCategory::create(['name' => 'Mesin Potong', 'code' => 'CAT-CUT', 'stage' => 'cutting']);
         $catSew = \App\Models\MachineCategory::create(['name' => 'Mesin Jahit', 'code' => 'CAT-SEW', 'stage' => 'sewing']);
+        $catQc = \App\Models\MachineCategory::create(['name' => 'Alat QC & Finishing', 'code' => 'CAT-QC', 'stage' => 'qc']);
         $catPack = \App\Models\MachineCategory::create(['name' => 'Mesin Packing', 'code' => 'CAT-PACK', 'stage' => 'packing']);
 
         // ---- Production machines ---------------------------------------
         $machines = [
             [$catSew->id, 'Mesin Jahit Juki A', 'MCH-0001', 'active', 120, 'Lini jahit utama'],
             [$catCut->id, 'Mesin Potong Kain', 'MCH-0002', 'active', 300, 'Cutting otomatis'],
-            [$catPack->id, 'Mesin Obras', 'MCH-0003', 'maintenance', 150, 'Sedang perawatan berkala'],
+            [$catSew->id, 'Mesin Obras', 'MCH-0003', 'maintenance', 150, 'Sedang perawatan berkala'],
+            [$catCut->id, 'Mesin Potong Laser', 'MCH-0004', 'active', 250, 'Cadangan lini cutting'],
+            [$catSew->id, 'Mesin Jahit Juki B', 'MCH-0005', 'active', 110, 'Lini jahit kedua'],
+            [$catQc->id, 'Setrika Uap Industri', 'MCH-0006', 'active', 200, 'Finishing & pengecekan akhir'],
+            [$catPack->id, 'Mesin Sealer Plastik', 'MCH-0007', 'active', 400, 'Segel kemasan plastik'],
         ];
         foreach ($machines as $m) {
             ProductionMachine::create([

@@ -49,4 +49,35 @@ class Production extends Model
 
         return $prev !== null && (int) $prev->output_qty >= $this->gateQty();
     }
+
+    /** Upper bound for a stage's input: the batch target, capped by the previous stage's output. */
+    public function stageMaxInput(ProductionStage $stage): int
+    {
+        $order = ProductionStage::STAGES;
+        $idx = array_search($stage->stage, $order, true);
+        $planned = (int) $this->planned_qty;
+
+        if ($idx === false || $idx === 0) {
+            return $planned;
+        }
+
+        $prev = $this->stages->firstWhere('stage', $order[$idx - 1]);
+
+        return min($planned, (int) ($prev?->output_qty ?? 0));
+    }
+
+    /** Lower bound for a stage's output: what the next stage has already taken in. */
+    public function stageMinOutput(ProductionStage $stage): int
+    {
+        $order = ProductionStage::STAGES;
+        $idx = array_search($stage->stage, $order, true);
+
+        if ($idx === false || $idx === count($order) - 1) {
+            return 0;
+        }
+
+        $next = $this->stages->firstWhere('stage', $order[$idx + 1]);
+
+        return (int) ($next?->input_qty ?? 0);
+    }
 }

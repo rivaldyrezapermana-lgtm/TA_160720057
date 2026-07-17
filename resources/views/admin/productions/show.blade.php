@@ -32,6 +32,8 @@
                         $unlocked = $production->stageUnlocked($stage);
                         $pct = $production->stageProgressPct($stage);
                         $machines = $machinesByStage[$stage->stage] ?? [];
+                        $maxIn = $production->stageMaxInput($stage);
+                        $minOut = $production->stageMinOutput($stage);
                         $badge = match($stage->status) {
                             'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
                             'in_progress' => ['bg-ink-50 border-ink-200', 'Berlangsung'],
@@ -54,11 +56,15 @@
                                 @csrf @method('PATCH')
                                 <div class="field !mb-0">
                                     <label class="label text-xs">Input</label>
-                                    <input type="number" name="input_qty" min="0" value="{{ $stage->input_qty }}" class="input" {{ $production->status === 'completed' ? 'disabled' : '' }}>
+                                    <input type="number" name="input_qty" min="0" max="{{ $maxIn }}" value="{{ $stage->input_qty }}" class="input" {{ $production->status === 'completed' ? 'disabled' : '' }}>
+                                    <p class="text-[11px] text-ink-400 mt-0.5">Maks {{ $maxIn }} pcs</p>
                                 </div>
                                 <div class="field !mb-0">
                                     <label class="label text-xs">Output</label>
-                                    <input type="number" name="output_qty" min="0" value="{{ $stage->output_qty }}" class="input" {{ $production->status === 'completed' ? 'disabled' : '' }}>
+                                    <input type="number" name="output_qty" min="{{ $minOut }}" value="{{ $stage->output_qty }}" class="input" {{ $production->status === 'completed' ? 'disabled' : '' }}>
+                                    @if ($minOut > 0)
+                                        <p class="text-[11px] text-ink-400 mt-0.5">Min {{ $minOut }} pcs</p>
+                                    @endif
                                 </div>
                                 <div class="field !mb-0">
                                     <label class="label text-xs">Mesin</label>
@@ -76,6 +82,8 @@
                                         @elseif ($stage->status === 'in_progress')
                                             <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
                                             <button name="action" value="finish" class="btn-primary text-xs">Selesai</button>
+                                        @elseif ($stage->status === 'completed')
+                                            <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
                                         @endif
                                     @endif
                                 </div>

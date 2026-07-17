@@ -35,4 +35,15 @@ class Product extends Model
             ->get()
             ->sum(fn ($line) => (float) $line->qty_required * (float) ($line->material->unit_cost ?? 0));
     }
+
+    /** Next sequential SKU: highest existing SKU-<digits> + 1, zero-padded to 4. */
+    public static function nextSku(): string
+    {
+        $max = static::where('sku', 'like', 'SKU-%')
+            ->pluck('sku')
+            ->map(fn (string $sku) => preg_match('/^SKU-(\d+)$/', $sku, $m) ? (int) $m[1] : 0)
+            ->max() ?? 0;
+
+        return 'SKU-'.str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
+    }
 }

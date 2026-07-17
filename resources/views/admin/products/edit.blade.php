@@ -12,7 +12,11 @@
     <x-ui.card title="Informasi Produk">
         <div class="grid md:grid-cols-2 gap-4">
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama" :value="$product->name" required /></div>
-            <x-ui.input name="sku" label="SKU" :value="$product->sku" required />
+            <div class="field">
+                <label class="label">SKU</label>
+                <input type="text" value="{{ $product->sku }}" class="input bg-ink-50" readonly disabled>
+                <p class="field-help">SKU dibuat otomatis dan tidak bisa diubah.</p>
+            </div>
             <x-ui.select name="category_id" label="Kategori" required :selected="$product->category_id" :options="$categories->pluck('name','id')->toArray()" />
             <x-ui.input name="price" type="number" label="Harga (Rp)" :value="$product->price" required />
             <div class="field">

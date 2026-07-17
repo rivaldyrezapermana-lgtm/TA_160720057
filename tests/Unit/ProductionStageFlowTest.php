@@ -71,4 +71,29 @@ class ProductionStageFlowTest extends TestCase
         $prod->stages()->where('stage', 'design')->update(['output_qty' => 50]);
         $this->assertTrue($prod->fresh('stages')->stageUnlocked($sample));
     }
+
+    public function test_stage_max_input_is_capped_by_planned_and_previous_output(): void
+    {
+        $prod = $this->batch(100);
+        $design = $prod->stages->firstWhere('stage', 'design');
+        $this->assertSame(100, $prod->stageMaxInput($design)); // first stage: planned qty
+
+        $prod->stages()->where('stage', 'design')->update(['output_qty' => 60]);
+        $prod = $prod->fresh('stages');
+        $sample = $prod->stages->firstWhere('stage', 'sample');
+        $this->assertSame(60, $prod->stageMaxInput($sample)); // min(100, design output 60)
+    }
+
+    public function test_stage_min_output_follows_next_stage_input(): void
+    {
+        $prod = $this->batch(100);
+        $prod->stages()->where('stage', 'sample')->update(['input_qty' => 50]);
+        $prod = $prod->fresh('stages');
+
+        $design = $prod->stages->firstWhere('stage', 'design');
+        $packing = $prod->stages->firstWhere('stage', 'packing');
+
+        $this->assertSame(50, $prod->stageMinOutput($design)); // sample already took 50 in
+        $this->assertSame(0, $prod->stageMinOutput($packing)); // last stage: no floor
+    }
 }

@@ -136,6 +136,10 @@ class ProductionController extends Controller
 
     public function update(Request $request, Production $production)
     {
+        if ($production->status === 'completed') {
+            return back()->with('error', 'Batch sudah selesai. Data batch tidak bisa diubah lagi.');
+        }
+
         $data = $request->validate([
             'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             'planned_qty' => ['required', 'integer', 'min:1'],
@@ -145,6 +149,13 @@ class ProductionController extends Controller
             'status' => ['required', Rule::in(Production::STATUSES)],
             'notes' => ['nullable', 'string'],
         ]);
+
+        $minPlanned = (int) $production->stages()->max('input_qty');
+        if ((int) $data['planned_qty'] < $minPlanned) {
+            return back()->withErrors([
+                'planned_qty' => 'Target produksi tidak boleh lebih kecil dari input tahap yang sudah berjalan ('.$minPlanned.' pcs).',
+            ])->withInput();
+        }
 
         $production->fill([
             'production_machine_id' => $data['production_machine_id'] ?? null,
@@ -182,13 +193,22 @@ class ProductionController extends Controller
         $production->load(['stages', 'product.materials']);
         $stage = $production->stages->firstWhere('id', $stage->id);
 
+        if ($production->status === 'completed') {
+            return back()->with('error', 'Batch sudah selesai. Tahapan tidak bisa diubah lagi.');
+        }
+
         $action = $request->input('action', 'save');
 
+        $maxInput = $production->stageMaxInput($stage);
+        $minOutput = $production->stageMinOutput($stage);
+
         $data = $request->validate([
-            'input_qty' => ['nullable', 'integer', 'min:0'],
-            'output_qty' => ['nullable', 'integer', 'min:0', 'lte:input_qty'],
+            'input_qty' => ['nullable', 'integer', 'min:0', 'max:'.$maxInput],
+            'output_qty' => ['nullable', 'integer', 'min:'.$minOutput, 'lte:input_qty'],
             'production_machine_id' => ['nullable', 'exists:production_machines,id'],
         ], [
+            'input_qty.max' => 'Input maksimal '.$maxInput.' pcs (dibatasi target batch dan output tahap sebelumnya).',
+            'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena tahap berikutnya sudah menerima sebanyak itu.',
             'output_qty.lte' => 'Output tidak boleh melebihi input.',
         ]);
 

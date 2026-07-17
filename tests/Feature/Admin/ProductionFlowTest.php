@@ -100,4 +100,130 @@ class ProductionFlowTest extends TestCase
         $this->assertEquals(200, $kain->fresh()->stock);           // still 200
         $this->assertEquals(1, $prod->productionMaterials()->count());
     }
+
+    public function test_input_cannot_exceed_planned_target(): void
+    {
+        [$prod] = $this->batch();
+        $design = $prod->stages->firstWhere('stage', 'design');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $design]), [
+                'action' => 'save', 'input_qty' => 150, 'output_qty' => 0,
+            ])
+            ->assertSessionHasErrors('input_qty');
+
+        $this->assertEquals(100, $design->fresh()->input_qty); // unchanged
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $design]), [
+                'action' => 'save', 'input_qty' => 100, 'output_qty' => 0,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertEquals(100, $design->fresh()->input_qty);
+    }
+
+    public function test_input_cannot_exceed_previous_stage_output(): void
+    {
+        [$prod] = $this->batch();
+        $prod->stages()->where('stage', 'design')->update(['output_qty' => 60, 'status' => 'in_progress']);
+        $sample = $prod->stages()->where('stage', 'sample')->first();
+
+        // 70 > design's output of 60 → rejected.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $sample]), [
+                'action' => 'save', 'input_qty' => 70, 'output_qty' => 0,
+            ])
+            ->assertSessionHasErrors('input_qty');
+
+        // Exactly at the limit → accepted.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $sample]), [
+                'action' => 'save', 'input_qty' => 60, 'output_qty' => 0,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertEquals(60, $sample->fresh()->input_qty);
+    }
+
+    public function test_output_cannot_drop_below_next_stage_input(): void
+    {
+        [$prod] = $this->batch();
+        $prod->stages()->where('stage', 'design')->update(['output_qty' => 60, 'status' => 'in_progress']);
+        $prod->stages()->where('stage', 'sample')->update(['input_qty' => 50, 'status' => 'in_progress']);
+        $design = $prod->stages()->where('stage', 'design')->first();
+
+        // Sample already took in 50 → design's output can't be edited down to 40.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $design]), [
+                'action' => 'save', 'input_qty' => 100, 'output_qty' => 40,
+            ])
+            ->assertSessionHasErrors('output_qty');
+
+        $this->assertEquals(60, $design->fresh()->output_qty); // unchanged
+    }
+
+    public function test_completed_stage_can_still_be_edited_until_batch_completes(): void
+    {
+        [$prod] = $this->batch();
+        $prod->stages()->where('stage', 'design')->update(['input_qty' => 100, 'output_qty' => 90, 'status' => 'completed']);
+        $design = $prod->stages()->where('stage', 'design')->first();
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $design]), [
+                'action' => 'save', 'input_qty' => 100, 'output_qty' => 85,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertEquals(85, $design->fresh()->output_qty);
+        $this->assertEquals('completed', $design->fresh()->status); // save doesn't reopen it
+    }
+
+    public function test_stages_locked_after_batch_completed(): void
+    {
+        [$prod] = $this->batch();
+        $prod->stages()->update(['output_qty' => 100, 'input_qty' => 100, 'status' => 'in_progress']);
+        $packing = $prod->stages()->where('stage', 'packing')->first();
+
+        $this->actingAs($this->admin())->patch(route('admin.productions.stage', [$prod, $packing]), [
+            'action' => 'finish', 'input_qty' => 100, 'output_qty' => 100,
+        ]);
+        $this->assertEquals('completed', $prod->fresh()->status);
+
+        $design = $prod->stages()->where('stage', 'design')->first();
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $design]), [
+                'action' => 'save', 'input_qty' => 100, 'output_qty' => 50,
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertEquals(100, $design->fresh()->output_qty); // unchanged
+    }
+
+    public function test_completed_batch_cannot_be_edited(): void
+    {
+        [$prod] = $this->batch();
+        $prod->forceFill(['status' => 'completed'])->save();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'planned_qty' => 100, 'start_date' => now()->toDateString(), 'status' => 'in_progress',
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertEquals('completed', $prod->fresh()->status);
+    }
+
+    public function test_planned_qty_cannot_drop_below_recorded_stage_input(): void
+    {
+        [$prod] = $this->batch(); // design stage already has input_qty = 100
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'planned_qty' => 50, 'start_date' => now()->toDateString(), 'status' => 'in_progress',
+            ])
+            ->assertSessionHasErrors('planned_qty');
+
+        $this->assertEquals(100, $prod->fresh()->planned_qty);
+    }
 }
