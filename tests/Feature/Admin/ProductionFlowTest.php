@@ -27,7 +27,7 @@ class ProductionFlowTest extends TestCase
     /** A batch of 100 with a recipe of 3 Kain per unit and 20 starting product stock. */
     private function batch(): array
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
         $kain = Material::create(['name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'stock' => 500, 'min_stock' => 0, 'unit_cost' => 25000]);
         $product = Product::create([
             'category_id' => $cat->id, 'name' => 'Gamis A', 'sku' => 'GA-1',

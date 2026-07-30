@@ -34,7 +34,7 @@ class PaymentProofTest extends TestCase
 
     private function product(int $stock = 10): Product
     {
-        $category = Category::firstOrCreate(['slug' => 'gamis'], ['name' => 'Gamis']);
+        $category = Category::firstOrCreate(['name' => 'Gamis']);
 
         return Product::create([
             'category_id' => $category->id,

@@ -15,7 +15,7 @@ class StorefrontTest extends TestCase
     /** Create a product (with its category) for the storefront. */
     private function product(array $attributes = []): Product
     {
-        $category = Category::firstOrCreate(['slug' => 'gamis'], ['name' => 'Gamis']);
+        $category = Category::firstOrCreate(['name' => 'Gamis']);
 
         return Product::create(array_merge([
             'category_id' => $category->id,

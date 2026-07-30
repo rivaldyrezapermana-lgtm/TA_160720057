@@ -61,7 +61,6 @@ return [
 
     'attributes' => [
         'name' => 'Nama',
-        'slug' => 'Slug',
         'description' => 'Deskripsi',
         'sku' => 'SKU',
         'category_id' => 'Kategori',

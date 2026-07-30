@@ -16,7 +16,6 @@
             <tr>
                 <th>id</th>
                 <th>Nama</th>
-                <th>Slug</th>
                 <th>Deskripsi</th>
                 <th class="text-right">Jumlah Produk</th>
                 <th class="text-right">Aksi</th>
@@ -27,7 +26,6 @@
                 <tr>
                     <td class="font-medium">{{ $c->id}}</td>
                     <td class="font-medium">{{ $c->name }}</td>
-                    <td class="text-ink-500">{{ $c->slug }}</td>
                     <td class="text-ink-600">{{ $c->description }}</td>
                     <td class="text-right tabular-nums">{{ $c->products_count }}</td>
                     <td class="text-right">

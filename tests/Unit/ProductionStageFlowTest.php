@@ -25,7 +25,7 @@ class ProductionStageFlowTest extends TestCase
     private function batch(int $planned = 100): \App\Models\Production
     {
         $n = ++$this->batchSeq;
-        $cat = \App\Models\Category::create(['name' => "Gamis {$n}", 'slug' => "gamis-{$n}"]);
+        $cat = \App\Models\Category::create(['name' => "Gamis {$n}"]);
         $product = \App\Models\Product::create([
             'category_id' => $cat->id, 'name' => "Gamis A {$n}", 'sku' => "GA-{$n}",
             'price' => 100000, 'stock' => 0, 'is_active' => true,

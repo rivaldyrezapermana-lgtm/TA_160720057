@@ -23,7 +23,7 @@ class StockLockTest extends TestCase
 
     public function test_product_update_ignores_submitted_stock(): void
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
         $product = Product::create([
             'category_id' => $cat->id, 'name' => 'Gamis A', 'sku' => 'GA-1',
             'price' => 100000, 'stock' => 40, 'is_active' => true,
@@ -42,7 +42,7 @@ class StockLockTest extends TestCase
 
     public function test_product_update_below_hpp_flashes_warning(): void
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
         $kain = Material::create(['name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'stock' => 0, 'min_stock' => 0, 'unit_cost' => 25000]);
         $product = Product::create([
             'category_id' => $cat->id, 'name' => 'Gamis A', 'sku' => 'GA-1',

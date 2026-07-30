@@ -11,7 +11,6 @@
     <x-ui.card>
         <div class="space-y-4">
             <x-ui.input name="name" label="Nama Kategori" required />
-            <x-ui.input name="slug" label="Slug" placeholder="otomatis dari nama jika kosong" />
             <x-ui.textarea name="description" label="Deskripsi" />
         </div>
     </x-ui.card>

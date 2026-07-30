@@ -36,13 +36,13 @@ class MasterDataTest extends TestCase
             ->assertOk();
     }
 
-    public function test_category_can_be_created_with_an_auto_slug(): void
+    public function test_category_can_be_created(): void
     {
         $this->actingAs($this->admin())
             ->post(route('admin.categories.store'), ['name' => 'Gamis Anak'])
             ->assertRedirectToRoute('admin.categories.index');
 
-        $this->assertDatabaseHas('categories', ['name' => 'Gamis Anak', 'slug' => 'gamis-anak']);
+        $this->assertDatabaseHas('categories', ['name' => 'Gamis Anak']);
     }
 
     public function test_category_requires_a_name(): void
@@ -54,10 +54,10 @@ class MasterDataTest extends TestCase
 
     public function test_category_can_be_updated(): void
     {
-        $category = Category::create(['name' => 'Lama', 'slug' => 'lama']);
+        $category = Category::create(['name' => 'Lama']);
 
         $this->actingAs($this->admin())
-            ->put(route('admin.categories.update', $category), ['name' => 'Baru', 'slug' => 'baru'])
+            ->put(route('admin.categories.update', $category), ['name' => 'Baru'])
             ->assertRedirectToRoute('admin.categories.index');
 
         $this->assertDatabaseHas('categories', ['id' => $category->id, 'name' => 'Baru']);
@@ -65,7 +65,7 @@ class MasterDataTest extends TestCase
 
     public function test_category_can_be_deleted(): void
     {
-        $category = Category::create(['name' => 'Hapus', 'slug' => 'hapus']);
+        $category = Category::create(['name' => 'Hapus']);
 
         $this->actingAs($this->admin())
             ->delete(route('admin.categories.destroy', $category));
@@ -75,7 +75,7 @@ class MasterDataTest extends TestCase
 
     public function test_category_with_products_cannot_be_deleted(): void
     {
-        $category = Category::create(['name' => 'Dipakai', 'slug' => 'dipakai']);
+        $category = Category::create(['name' => 'Dipakai']);
         Product::create([
             'category_id' => $category->id,
             'name' => 'Produk', 'sku' => 'SKU-GUARD', 'price' => 1000, 'stock' => 1,
@@ -92,7 +92,7 @@ class MasterDataTest extends TestCase
 
     public function test_product_can_be_created_with_sizes(): void
     {
-        $category = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $category = Category::create(['name' => 'Gamis']);
 
         $this->actingAs($this->admin())
             ->post(route('admin.products.store'), [
@@ -113,7 +113,7 @@ class MasterDataTest extends TestCase
 
     public function test_product_datatable_returns_json_rows(): void
     {
-        $category = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $category = Category::create(['name' => 'Gamis']);
         Product::create([
             'category_id' => $category->id,
             'name' => 'P', 'sku' => 'P-1', 'price' => 1000, 'stock' => 1,
@@ -127,7 +127,7 @@ class MasterDataTest extends TestCase
 
     public function test_product_with_sales_history_cannot_be_deleted(): void
     {
-        $category = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $category = Category::create(['name' => 'Gamis']);
         $product = Product::create([
             'category_id' => $category->id,
             'name' => 'P', 'sku' => 'P-HIST', 'price' => 1000, 'stock' => 1,

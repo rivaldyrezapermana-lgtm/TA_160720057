@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
@@ -42,7 +40,7 @@ class CategoryController extends Controller
 
     public function update(Request $request, Category $category)
     {
-        $category->update($this->validated($request, $category));
+        $category->update($this->validated($request));
 
         return redirect()->route('admin.categories.index')
             ->with('success', 'Kategori berhasil diperbarui.');
@@ -62,18 +60,12 @@ class CategoryController extends Controller
     }
 
     /**
-     * Validate the request. The slug is taken from the form, or derived
-     * from the name when left blank.
+     * Validate the request.
      */
-    private function validated(Request $request, ?Category $category = null): array
+    private function validated(Request $request): array
     {
-        $request->merge([
-            'slug' => Str::slug($request->input('slug') ?: $request->input('name')),
-        ]);
-
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('categories', 'slug')->ignore($category)],
             'description' => ['nullable', 'string'],
         ]);
     }

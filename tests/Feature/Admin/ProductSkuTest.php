@@ -30,7 +30,7 @@ class ProductSkuTest extends TestCase
 
     public function test_store_generates_first_sku(): void
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
 
         $this->actingAs($this->admin())
             ->post(route('admin.products.store'), $this->payload($cat))
@@ -41,7 +41,7 @@ class ProductSkuTest extends TestCase
 
     public function test_store_continues_from_highest_existing_sku(): void
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
         Product::create(['category_id' => $cat->id, 'name' => 'Lama', 'sku' => 'SKU-0007', 'price' => 1000, 'stock' => 0]);
         // Non-matching SKU formats are ignored by the generator.
         Product::create(['category_id' => $cat->id, 'name' => 'Custom', 'sku' => 'GAM-999', 'price' => 1000, 'stock' => 0]);
@@ -54,7 +54,7 @@ class ProductSkuTest extends TestCase
 
     public function test_consecutive_stores_get_distinct_skus(): void
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
         $admin = $this->admin();
 
         $this->actingAs($admin)->post(route('admin.products.store'), $this->payload($cat, ['name' => 'Produk A']));
@@ -66,7 +66,7 @@ class ProductSkuTest extends TestCase
 
     public function test_update_cannot_change_sku(): void
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
         $product = Product::create(['category_id' => $cat->id, 'name' => 'Ada', 'sku' => 'SKU-0001', 'price' => 1000, 'stock' => 0]);
 
         $this->actingAs($this->admin())

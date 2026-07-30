@@ -14,7 +14,7 @@ class HppTest extends TestCase
 
     private function product(): Product
     {
-        $cat = Category::create(['name' => 'Gamis', 'slug' => 'gamis']);
+        $cat = Category::create(['name' => 'Gamis']);
 
         return Product::create([
             'category_id' => $cat->id, 'name' => 'Gamis A', 'sku' => 'GA-1',

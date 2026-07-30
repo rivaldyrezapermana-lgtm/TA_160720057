@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\MachineCategory;
 use App\Models\Material;
 use App\Models\Product;
 use App\Models\ProductionMachine;
@@ -13,7 +14,6 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
         // ---- Categories -----------------------------------------------
         $cats = ['Gamis', 'Koko', 'Tunik', 'Hijab'];
         foreach ($cats as $c) {
-            Category::create(['name' => $c, 'slug' => Str::slug($c), 'description' => $c.' Toko Labasa']);
+            Category::create(['name' => $c, 'description' => $c.' Toko Labasa']);
         }
 
         // ---- Products + sizes -----------------------------------------
@@ -99,10 +99,10 @@ class DatabaseSeeder extends Seeder
         }
 
         // ---- Machine categories (mapped to production stages) ----------
-        $catCut = \App\Models\MachineCategory::create(['name' => 'Mesin Potong', 'code' => 'CAT-CUT', 'stage' => 'cutting']);
-        $catSew = \App\Models\MachineCategory::create(['name' => 'Mesin Jahit', 'code' => 'CAT-SEW', 'stage' => 'sewing']);
-        $catQc = \App\Models\MachineCategory::create(['name' => 'Alat QC & Finishing', 'code' => 'CAT-QC', 'stage' => 'qc']);
-        $catPack = \App\Models\MachineCategory::create(['name' => 'Mesin Packing', 'code' => 'CAT-PACK', 'stage' => 'packing']);
+        $catCut = MachineCategory::create(['name' => 'Mesin Potong', 'code' => 'CAT-CUT', 'stage' => 'cutting']);
+        $catSew = MachineCategory::create(['name' => 'Mesin Jahit', 'code' => 'CAT-SEW', 'stage' => 'sewing']);
+        $catQc = MachineCategory::create(['name' => 'Alat QC & Finishing', 'code' => 'CAT-QC', 'stage' => 'qc']);
+        $catPack = MachineCategory::create(['name' => 'Mesin Packing', 'code' => 'CAT-PACK', 'stage' => 'packing']);
 
         // ---- Production machines ---------------------------------------
         $machines = [

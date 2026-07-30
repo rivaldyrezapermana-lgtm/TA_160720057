@@ -11,7 +11,6 @@
     <x-ui.card>
         <div class="space-y-4">
             <x-ui.input name="name" label="Nama Kategori" :value="$category->name" required />
-            <x-ui.input name="slug" label="Slug" :value="$category->slug" />
             <x-ui.textarea name="description" label="Deskripsi" :value="$category->description" />
         </div>
     </x-ui.card>
