@@ -175,6 +175,14 @@ class ProductionController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        // Fase sampel ditentukan saat batch dibuat, jadi target tidak boleh melintasi
+        // batas 1 pcs ↔ produksi massal.
+        if (((int) $production->planned_qty === 1) !== ((int) $data['planned_qty'] === 1)) {
+            return back()->withErrors([
+                'planned_qty' => 'Target tidak bisa diubah dari 1 pcs ke produksi massal (atau sebaliknya). Buat batch baru.',
+            ])->withInput();
+        }
+
         $minPlanned = (int) $production->stages()->max('input_qty');
         if ((int) $data['planned_qty'] < $minPlanned) {
             return back()->withErrors([

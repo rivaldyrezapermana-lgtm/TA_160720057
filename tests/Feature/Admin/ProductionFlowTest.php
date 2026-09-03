@@ -353,4 +353,30 @@ class ProductionFlowTest extends TestCase
 
         $this->assertSame(100, $prod->fresh()->planned_qty);
     }
+
+    public function test_planned_qty_cannot_cross_from_single_pcs_to_mass(): void
+    {
+        [$prod] = $this->batch(1);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'planned_qty' => 50, 'start_date' => now()->toDateString(), 'status' => 'in_progress',
+            ])
+            ->assertSessionHasErrors('planned_qty');
+
+        $this->assertSame(1, $prod->fresh()->planned_qty);
+    }
+
+    public function test_planned_qty_can_still_change_within_the_mass_range(): void
+    {
+        [$prod] = $this->batch(100);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'planned_qty' => 150, 'start_date' => now()->toDateString(), 'status' => 'in_progress',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame(150, $prod->fresh()->planned_qty);
+    }
 }
