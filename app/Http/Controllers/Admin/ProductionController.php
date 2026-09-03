@@ -122,9 +122,10 @@ class ProductionController extends Controller
         $production->load([
             'product.materials.material',
             'machine',
-            'stages' => fn ($q) => $q->orderBy('id'),
+            'stages' => fn ($q) => $q->orderBy('sort_order'),
             'stages.machine',
             'productionMaterials.material',
+            'sampleRevisions.user',
         ]);
 
         // Machines available per stage: those whose category maps to the stage.
@@ -137,12 +138,14 @@ class ProductionController extends Controller
                 ->toArray();
         }
 
-        // Estimated material usage from the recipe × planned qty (shown before completion).
+        // Estimated material usage: recipe × (target + sampel yang dibuat).
+        $units = (int) $production->planned_qty + $production->sampleUnits();
+
         $bahan = $production->product->materials->map(fn ($line) => [
             'name' => $line->material?->name ?? '—',
             'unit' => $line->material?->unit ?? '',
             'per_unit' => (int) $line->qty_required,
-            'est' => (int) $line->qty_required * (int) $production->planned_qty,
+            'est' => (int) $line->qty_required * $units,
         ]);
 
         return view('admin.productions.show', compact('production', 'machinesByStage', 'bahan'));

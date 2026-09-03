@@ -19,6 +19,13 @@
     </x-ui.card>
 
     <x-ui.card>
+        <p class="text-sm text-ink-600">
+            Target lebih dari 1 pcs akan membuat fase sampel: satu potong dikerjakan dan disetujui dulu
+            sebelum cutting massal boleh dimulai. Target 1 pcs langsung dikerjakan tanpa fase sampel.
+        </p>
+    </x-ui.card>
+
+    <x-ui.card>
         <x-ui.textarea name="notes" label="Catatan" />
     </x-ui.card>
 

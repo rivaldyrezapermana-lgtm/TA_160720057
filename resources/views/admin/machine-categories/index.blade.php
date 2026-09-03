@@ -22,7 +22,7 @@
 @push('scripts')
 <script>
 $(function() {
-    const labels = { design:'Desain', sample:'Sample', cutting:'Cutting', sewing:'Sewing', qc:'Quality Check', packing:'Packing' };
+    const labels = @json(collect(\App\Models\ProductionStage::STAGES)->mapWithKeys(fn ($s) => [$s => \App\Models\ProductionStage::stageLabel($s)]));
     $('#tbl-cats').DataTable({
         ajax: '{{ route("admin.datatables.machine-categories") }}',
         columns: [

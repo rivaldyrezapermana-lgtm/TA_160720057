@@ -6,7 +6,7 @@
 @endsection
 
 @section('content')
-@php $stageLabels = ['design'=>'Desain','sample'=>'Sample','cutting'=>'Cutting','sewing'=>'Sewing','qc'=>'Quality Check','packing'=>'Packing']; @endphp
+@php $stageLabels = collect(\App\Models\ProductionStage::STAGES)->mapWithKeys(fn ($s) => [$s => \App\Models\ProductionStage::stageLabel($s)])->toArray(); @endphp
 <form action="{{ route('admin.machine-categories.update', $category->id) }}" method="POST" class="max-w-2xl">
     @csrf @method('PUT')
     <x-ui.card>

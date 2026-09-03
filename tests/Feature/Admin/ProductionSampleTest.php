@@ -212,4 +212,36 @@ class ProductionSampleTest extends TestCase
             'production_id' => $prod->id, 'material_id' => $kain->id, 'qty_used' => 309,
         ]);
     }
+
+    public function test_batch_page_groups_stages_by_phase_and_lists_revisions(): void
+    {
+        $prod = $this->batch();
+        $this->finishSampleWork($prod);
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $this->sampleQc($prod)]), [
+                'action' => 'revise_sample', 'notes' => 'Panjang lengan kurang 2cm',
+            ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.productions.show', $prod))
+            ->assertOk()
+            ->assertSee('Tahap Sampel')
+            ->assertSee('Produksi Massal')
+            ->assertSee('Pembuatan Pola')
+            ->assertSee('QC Sampel')
+            ->assertSee('QC &amp; Packing', false)
+            ->assertSee('Panjang lengan kurang 2cm')
+            ->assertSee('Revisi ke-1');
+    }
+
+    public function test_single_pcs_batch_page_explains_there_is_no_sample_phase(): void
+    {
+        $prod = $this->batch(1);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.productions.show', $prod))
+            ->assertOk()
+            ->assertSee('produk ini sekaligus sampelnya')
+            ->assertDontSee('Tahap Sampel');
+    }
 }
