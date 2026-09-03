@@ -350,20 +350,24 @@ class ProductionController extends Controller
         ]);
 
         DB::transaction(function () use ($production, $data) {
-            $revisionNo = (int) $production->sample_revision_count + 1;
+            // Kunci baris batch dulu. Dua klik "Perlu revisi" beruntun tidak boleh
+            // menghitung nomor revisi yang sama dan menabrak unique constraint
+            // (production_id, revision_no) dengan error mentah.
+            $locked = Production::whereKey($production->getKey())->lockForUpdate()->firstOrFail();
+            $revisionNo = (int) $locked->sample_revision_count + 1;
 
-            $production->sampleRevisions()->create([
+            $locked->sampleRevisions()->create([
                 'revision_no' => $revisionNo,
                 'notes' => $data['notes'],
                 'user_id' => auth()->id(),
             ]);
 
-            $production->forceFill([
+            $locked->forceFill([
                 'sample_revision_count' => $revisionNo,
                 'sample_approved_at' => null,
             ])->save();
 
-            $production->stages()->where('phase', 'sample')->update([
+            $locked->stages()->where('phase', 'sample')->update([
                 'status' => 'pending',
                 'input_qty' => 1,
                 'output_qty' => 0,

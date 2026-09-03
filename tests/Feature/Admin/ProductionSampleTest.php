@@ -105,6 +105,20 @@ class ProductionSampleTest extends TestCase
         $this->assertNull($prod->fresh()->sample_approved_at);
     }
 
+    public function test_approval_is_rejected_on_the_mass_phase_qc_packing_stage(): void
+    {
+        $prod = $this->batch();
+        $this->finishSampleWork($prod);
+        $massQc = $prod->stages()->where('phase', 'mass')->where('stage', 'qc_packing')->firstOrFail();
+
+        // Nama tahapnya sama dengan QC sampel — yang membedakan hanya fasenya.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $massQc]), ['action' => 'approve_sample'])
+            ->assertSessionHas('error');
+
+        $this->assertNull($prod->fresh()->sample_approved_at);
+    }
+
     public function test_revision_requires_a_note(): void
     {
         $prod = $this->batch();
