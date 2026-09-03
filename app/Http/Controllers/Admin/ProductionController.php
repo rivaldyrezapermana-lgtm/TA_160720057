@@ -307,15 +307,11 @@ class ProductionController extends Controller
     /** Alasan sebuah tahap masih terkunci, dalam kalimat yang bisa dibaca operator. */
     private function lockReason(Production $production, ProductionStage $stage): string
     {
-        if ($stage->phase === 'mass' && $production->hasSamplePhase() && ! $production->sampleApproved()) {
-            return 'Sampel belum disetujui. Selesaikan dan setujui sampel sebelum memulai produksi massal.';
-        }
-
-        if ($stage->phase === 'mass') {
-            return 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.';
-        }
-
-        return 'Tahap sebelumnya belum selesai. Belum bisa dimulai.';
+        return match ($production->lockCause($stage)) {
+            'sample_not_approved' => 'Sampel belum disetujui. Selesaikan dan setujui sampel sebelum memulai produksi massal.',
+            'gate_50' => 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.',
+            default => 'Tahap sebelumnya belum selesai. Belum bisa dimulai.',
+        };
     }
 
     /**

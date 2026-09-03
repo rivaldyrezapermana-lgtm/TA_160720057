@@ -236,6 +236,22 @@ class ProductionStageFlowTest extends TestCase
         $this->assertSame(3, $prod->fresh()->sampleUnits());
     }
 
+    public function test_lock_cause_matches_the_gate_that_is_actually_blocking(): void
+    {
+        $mass = $this->batch(100);
+
+        $this->assertSame('previous_incomplete', $mass->lockCause($this->stage($mass, 'common', 'pola')));
+        $this->assertSame('previous_incomplete', $mass->lockCause($this->stage($mass, 'sample', 'sewing')));
+        $this->assertSame('sample_not_approved', $mass->lockCause($this->stage($mass, 'mass', 'cutting')));
+        $this->assertSame('gate_50', $mass->lockCause($this->stage($mass, 'mass', 'sewing')));
+
+        // Batch 1 pcs tidak punya fase sampel: cutting massal menunggu pola, bukan gate 50%.
+        $single = $this->batch(1);
+
+        $this->assertSame('previous_incomplete', $single->lockCause($this->stage($single, 'mass', 'cutting')));
+        $this->assertSame('gate_50', $single->lockCause($this->stage($single, 'mass', 'sewing')));
+    }
+
     public function test_qc_packing_label_depends_on_the_phase(): void
     {
         $prod = $this->batch(100);

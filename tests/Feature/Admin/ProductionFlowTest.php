@@ -115,6 +115,17 @@ class ProductionFlowTest extends TestCase
         $this->assertSame('in_progress', $prod->fresh()->status);
     }
 
+    public function test_single_pcs_batch_reports_the_real_reason_mass_cutting_is_locked(): void
+    {
+        [$prod] = $this->batch(1);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+
+        // Tidak ada fase sampel dan tidak ada gate 50% di sini — yang kurang adalah pola.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'start'])
+            ->assertSessionHas('error', 'Tahap sebelumnya belum selesai. Belum bisa dimulai.');
+    }
+
     public function test_pola_cannot_start_before_design_is_finished(): void
     {
         [$prod] = $this->batch();

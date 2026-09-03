@@ -146,4 +146,24 @@ class Production extends Model
 
         return (int) $next->input_qty;
     }
+
+    /**
+     * Sebab sebuah tahap masih terkunci: 'sample_not_approved', 'gate_50', atau
+     * 'previous_incomplete'. Cabangnya sengaja mengikuti stageUnlocked() supaya
+     * pesan yang dibaca operator tidak pernah menyimpang dari aturan gate.
+     */
+    public function lockCause(ProductionStage $stage): string
+    {
+        $prev = $this->previousStage($stage);
+
+        if ($prev === null || $stage->phase !== 'mass') {
+            return 'previous_incomplete';
+        }
+
+        if ($prev->phase !== 'mass') {
+            return $this->hasSamplePhase() ? 'sample_not_approved' : 'previous_incomplete';
+        }
+
+        return 'gate_50';
+    }
 }
