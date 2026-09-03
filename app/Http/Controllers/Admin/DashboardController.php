@@ -36,13 +36,15 @@ class DashboardController extends Controller
                     ? min(100, (int) round(($p->actual_qty / $p->planned_qty) * 100))
                     : 0;
 
-                $currentStage = $p->stages()->where('status', 'in_progress')->orderBy('id')->first()
-                    ?? $p->stages()->where('status', 'pending')->orderBy('id')->first();
+                $currentStage = $p->stages()->where('status', 'in_progress')->orderBy('sort_order')->first()
+                    ?? $p->stages()->where('status', 'pending')->orderBy('sort_order')->first();
 
                 return [
                     'code' => $p->code,
                     'product' => $p->product?->name ?? '—',
-                    'stage' => ucfirst($currentStage?->stage ?? '—'),
+                    'stage' => $currentStage
+                        ? ($currentStage->phase === 'sample' ? 'Sampel · ' : '').$currentStage->label()
+                        : '—',
                     'planned' => $p->planned_qty,
                     'actual' => $p->actual_qty,
                     'progress' => $progress,

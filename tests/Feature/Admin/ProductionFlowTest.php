@@ -96,9 +96,24 @@ class ProductionFlowTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'start'])
-            ->assertSessionHas('error');
+            ->assertSessionHas('error', 'Sampel belum disetujui. Selesaikan dan setujui sampel sebelum memulai produksi massal.');
 
         $this->assertSame('pending', $cutting->fresh()->status);
+    }
+
+    public function test_mass_sewing_reports_the_fifty_percent_gate_as_the_reason(): void
+    {
+        [$prod] = $this->batch(100);
+        $this->approveSample($prod);
+        $sewing = $this->stage($prod, 'mass', 'sewing');
+
+        // Cutting massal baru menghasilkan 10 dari 100 — di bawah ambang 50 pcs.
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['output_qty' => 10, 'status' => 'in_progress']);
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $sewing]), ['action' => 'start'])
+            ->assertSessionHas('error', 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.');
     }
 
     public function test_mass_cutting_starts_once_the_sample_is_approved(): void

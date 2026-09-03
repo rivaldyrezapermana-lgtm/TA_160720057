@@ -64,7 +64,14 @@ class Production extends Model
     /** Pcs sampel yang memakan bahan: sampel yang disetujui plus tiap putaran revisi. */
     public function sampleUnits(): int
     {
-        return $this->hasSamplePhase() ? 1 + (int) $this->sample_revision_count : 0;
+        // Dihitung dari baris tahap yang benar-benar ada, bukan dari planned_qty.
+        // Batch hasil migrasi punya target massal tapi tidak punya fase sampel —
+        // kainnya memang tidak pernah dipotong untuk sampel.
+        if (! $this->stages->contains('phase', 'sample')) {
+            return 0;
+        }
+
+        return 1 + (int) $this->sample_revision_count;
     }
 
     /** Half the planned quantity, rounded up — the handoff threshold. */

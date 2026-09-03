@@ -236,6 +236,15 @@ class ProductionStageFlowTest extends TestCase
         $this->assertSame(3, $prod->fresh()->sampleUnits());
     }
 
+    public function test_sample_units_is_zero_for_a_mass_batch_that_has_no_sample_stages(): void
+    {
+        // Bentuk batch hasil migrasi: target massal, tapi tidak ada baris fase sampel.
+        $prod = $this->batch(100);
+        $prod->stages()->where('phase', 'sample')->delete();
+
+        $this->assertSame(0, $prod->fresh('stages')->sampleUnits());
+    }
+
     public function test_lock_cause_matches_the_gate_that_is_actually_blocking(): void
     {
         $mass = $this->batch(100);

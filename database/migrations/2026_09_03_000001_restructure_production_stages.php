@@ -44,6 +44,14 @@ return new class extends Migration
         Schema::drop('production_stages');
         Schema::rename('production_stages_new', 'production_stages');
 
+        // Batch yang sudah ada dibuat sebelum fase sampel diperkenalkan, jadi tidak
+        // punya tahap QC sampel yang bisa menyetujuinya. Tanpa ini, cutting massalnya
+        // terkunci selamanya menunggu persetujuan yang tombolnya tidak pernah ada.
+        DB::table('productions')
+            ->where('planned_qty', '>', 1)
+            ->whereNull('sample_approved_at')
+            ->update(['sample_approved_at' => now()]);
+
         $this->remapMachineCategories([
             'design' => 'design',
             'cutting' => 'cutting',

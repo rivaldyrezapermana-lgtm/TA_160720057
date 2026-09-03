@@ -213,6 +213,19 @@ class ProductionSampleTest extends TestCase
         ]);
     }
 
+    public function test_sample_stage_rejects_a_quantity_other_than_one(): void
+    {
+        $prod = $this->batch();
+        $prod->stages()->where('phase', 'common')->update(['status' => 'completed']);
+        $cutting = $prod->stages()->where('phase', 'sample')->where('stage', 'cutting')->firstOrFail();
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
+                'action' => 'save', 'input_qty' => 5,
+            ])
+            ->assertSessionHasErrors('input_qty');
+    }
+
     public function test_batch_page_groups_stages_by_phase_and_lists_revisions(): void
     {
         $prod = $this->batch();

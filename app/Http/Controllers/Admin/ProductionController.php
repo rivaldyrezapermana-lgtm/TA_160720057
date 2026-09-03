@@ -261,6 +261,15 @@ class ProductionController extends Controller
                 'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena tahap berikutnya sudah menerima sebanyak itu.',
                 'output_qty.lte' => 'Output tidak boleh melebihi input.',
             ]);
+        } elseif ($stage->phase === 'sample') {
+            $data = $request->validate([
+                'input_qty' => ['nullable', 'integer', 'in:1'],
+                'output_qty' => ['nullable', 'integer', 'in:1'],
+                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
+            ], [
+                'input_qty.in' => 'Tahap sampel selalu 1 pcs.',
+                'output_qty.in' => 'Tahap sampel selalu 1 pcs.',
+            ]);
         } else {
             $data = $request->validate([
                 'production_machine_id' => ['nullable', 'exists:production_machines,id'],
