@@ -45,6 +45,11 @@ class Production extends Model
         return $this->hasMany(ProductionMaterial::class);
     }
 
+    public function sampleRevisions()
+    {
+        return $this->hasMany(ProductionSampleRevision::class)->orderByDesc('revision_no');
+    }
+
     /** Batch lebih dari 1 pcs wajib membuat sampel dulu. */
     public function hasSamplePhase(): bool
     {

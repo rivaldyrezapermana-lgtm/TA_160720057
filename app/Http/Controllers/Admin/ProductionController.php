@@ -224,6 +224,17 @@ class ProductionController extends Controller
         }
 
         $action = $request->input('action', 'save');
+
+        if (in_array($action, ['approve_sample', 'revise_sample'], true)) {
+            if ($stage->phase !== 'sample' || $stage->stage !== 'qc_packing') {
+                return back()->with('error', 'Aksi ini hanya berlaku untuk tahap QC Sampel.');
+            }
+
+            return $action === 'approve_sample'
+                ? $this->approveSample($production, $stage)
+                : $this->reviseSample($request, $production);
+        }
+
         $qtyEditable = $stage->carriesQty() && $stage->phase === 'mass';
 
         if ($qtyEditable) {
@@ -312,6 +323,56 @@ class ProductionController extends Controller
             'gate_50' => 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.',
             default => 'Tahap sebelumnya belum selesai. Belum bisa dimulai.',
         };
+    }
+
+    /** Sampel disetujui: fase massal terbuka. */
+    private function approveSample(Production $production, ProductionStage $sampleQc)
+    {
+        if ($sampleQc->status !== 'completed') {
+            return back()->with('error', 'Selesaikan tahap QC Sampel dulu sebelum menyetujui sampel.');
+        }
+
+        $production->forceFill(['sample_approved_at' => now()])->save();
+
+        return back()->with('success', 'Sampel disetujui. Produksi massal bisa dimulai.');
+    }
+
+    /**
+     * Sampel perlu diperbaiki: catat alasannya dan buka kembali seluruh tahap
+     * fase sampel supaya satu potong dibuat ulang.
+     */
+    private function reviseSample(Request $request, Production $production)
+    {
+        $data = $request->validate([
+            'notes' => ['required', 'string', 'max:1000'],
+        ], [
+            'notes.required' => 'Catatan revisi wajib diisi.',
+        ]);
+
+        DB::transaction(function () use ($production, $data) {
+            $revisionNo = (int) $production->sample_revision_count + 1;
+
+            $production->sampleRevisions()->create([
+                'revision_no' => $revisionNo,
+                'notes' => $data['notes'],
+                'user_id' => auth()->id(),
+            ]);
+
+            $production->forceFill([
+                'sample_revision_count' => $revisionNo,
+                'sample_approved_at' => null,
+            ])->save();
+
+            $production->stages()->where('phase', 'sample')->update([
+                'status' => 'pending',
+                'input_qty' => 1,
+                'output_qty' => 0,
+                'started_at' => null,
+                'finished_at' => null,
+            ]);
+        });
+
+        return back()->with('success', 'Sampel ditandai perlu revisi. Tahap sampel dibuka kembali.');
     }
 
     /**
