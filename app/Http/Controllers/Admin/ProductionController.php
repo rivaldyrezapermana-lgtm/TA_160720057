@@ -63,7 +63,7 @@ class ProductionController extends Controller
                 'product_id' => $data['product_id'],
                 'user_id' => auth()->id(),
                 'production_machine_id' => $data['production_machine_id'] ?? null,
-                'code' => $data['code'] ?: 'TMP',
+                'code' => ($data['code'] ?? null) ?: 'TMP',
                 'planned_qty' => $data['planned_qty'],
                 'actual_qty' => 0,
                 'start_date' => $data['start_date'],
@@ -76,13 +76,8 @@ class ProductionController extends Controller
                 $production->forceFill(['code' => 'PRD-'.now()->year.'-'.str_pad((string) $production->id, 4, '0', STR_PAD_LEFT)])->save();
             }
 
-            foreach (ProductionStage::STAGES as $i => $stage) {
-                $production->stages()->create([
-                    'stage' => $stage,
-                    'status' => 'pending',
-                    'input_qty' => $i === 0 ? (int) $data['planned_qty'] : 0,
-                    'output_qty' => 0,
-                ]);
+            foreach ($this->stageBlueprint((int) $data['planned_qty']) as $row) {
+                $production->stages()->create($row + ['status' => 'pending', 'output_qty' => 0]);
             }
 
             return $production;
@@ -90,6 +85,36 @@ class ProductionController extends Controller
 
         return redirect()->route('admin.productions.show', $production->id)
             ->with('success', 'Batch produksi dibuat.');
+    }
+
+    /**
+     * Susunan tahap sebuah batch. Fase sampel hanya ada kalau target lebih dari
+     * 1 pcs — batch 1 pcs memang produknya sekaligus sampelnya.
+     *
+     * @return list<array{phase: string, sort_order: int, stage: string, input_qty: int}>
+     */
+    private function stageBlueprint(int $plannedQty): array
+    {
+        $rows = [
+            ['phase' => 'common', 'stage' => 'design', 'input_qty' => 0],
+            ['phase' => 'common', 'stage' => 'pola', 'input_qty' => 0],
+        ];
+
+        if ($plannedQty > 1) {
+            $rows[] = ['phase' => 'sample', 'stage' => 'cutting', 'input_qty' => 1];
+            $rows[] = ['phase' => 'sample', 'stage' => 'sewing', 'input_qty' => 1];
+            $rows[] = ['phase' => 'sample', 'stage' => 'qc_packing', 'input_qty' => 1];
+        }
+
+        $rows[] = ['phase' => 'mass', 'stage' => 'cutting', 'input_qty' => $plannedQty];
+        $rows[] = ['phase' => 'mass', 'stage' => 'sewing', 'input_qty' => 0];
+        $rows[] = ['phase' => 'mass', 'stage' => 'qc_packing', 'input_qty' => 0];
+
+        foreach ($rows as $i => $row) {
+            $rows[$i]['sort_order'] = $i + 1;
+        }
+
+        return $rows;
     }
 
     public function show(Production $production)
@@ -183,9 +208,10 @@ class ProductionController extends Controller
     }
 
     /**
-     * Update a stage's input/output quantities and machine, honoring the 50%
-     * handoff gate. Finishing the final (packing) stage completes the batch:
-     * product stock is credited and recipe materials are consumed — exactly once.
+     * Update a stage's quantities and machine. Tahap fase massal tunduk pada gate
+     * 50%; tahap lain menunggu tahap sebelumnya selesai. Menyelesaikan QC & Packing
+     * fase massal menutup batch: stok produk bertambah dan bahan resep dipotong,
+     * tepat satu kali.
      */
     public function updateStage(Request $request, Production $production, ProductionStage $stage)
     {
@@ -198,19 +224,26 @@ class ProductionController extends Controller
         }
 
         $action = $request->input('action', 'save');
+        $qtyEditable = $stage->carriesQty() && $stage->phase === 'mass';
 
-        $maxInput = $production->stageMaxInput($stage);
-        $minOutput = $production->stageMinOutput($stage);
+        if ($qtyEditable) {
+            $maxInput = $production->stageMaxInput($stage);
+            $minOutput = $production->stageMinOutput($stage);
 
-        $data = $request->validate([
-            'input_qty' => ['nullable', 'integer', 'min:0', 'max:'.$maxInput],
-            'output_qty' => ['nullable', 'integer', 'min:'.$minOutput, 'lte:input_qty'],
-            'production_machine_id' => ['nullable', 'exists:production_machines,id'],
-        ], [
-            'input_qty.max' => 'Input maksimal '.$maxInput.' pcs (dibatasi target batch dan output tahap sebelumnya).',
-            'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena tahap berikutnya sudah menerima sebanyak itu.',
-            'output_qty.lte' => 'Output tidak boleh melebihi input.',
-        ]);
+            $data = $request->validate([
+                'input_qty' => ['nullable', 'integer', 'min:0', 'max:'.$maxInput],
+                'output_qty' => ['nullable', 'integer', 'min:'.$minOutput, 'lte:input_qty'],
+                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
+            ], [
+                'input_qty.max' => 'Input maksimal '.$maxInput.' pcs (dibatasi target batch dan output tahap sebelumnya).',
+                'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena tahap berikutnya sudah menerima sebanyak itu.',
+                'output_qty.lte' => 'Output tidak boleh melebihi input.',
+            ]);
+        } else {
+            $data = $request->validate([
+                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
+            ]);
+        }
 
         // Machine must belong to the category mapped to this stage.
         if (! empty($data['production_machine_id'])) {
@@ -220,17 +253,17 @@ class ProductionController extends Controller
             }
         }
 
-        // Gate check when starting a non-first stage.
         if ($action === 'start' && ! $production->stageUnlocked($stage)) {
-            return back()->with('error', 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.');
+            return back()->with('error', $this->lockReason($production, $stage));
         }
 
-        DB::transaction(function () use ($production, $stage, $action, $data) {
-            $stage->fill([
-                'input_qty' => $data['input_qty'] ?? $stage->input_qty,
-                'output_qty' => $data['output_qty'] ?? $stage->output_qty,
-                'production_machine_id' => $data['production_machine_id'] ?? $stage->production_machine_id,
-            ]);
+        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable) {
+            if ($qtyEditable) {
+                $stage->input_qty = $data['input_qty'] ?? $stage->input_qty;
+                $stage->output_qty = $data['output_qty'] ?? $stage->output_qty;
+            }
+
+            $stage->production_machine_id = $data['production_machine_id'] ?? $stage->production_machine_id;
 
             if ($action === 'start' && $stage->status === 'pending') {
                 $stage->status = 'in_progress';
@@ -243,15 +276,23 @@ class ProductionController extends Controller
             if ($action === 'finish') {
                 $stage->status = 'completed';
                 $stage->finished_at = now();
+
+                // Fase sampel selalu satu potong.
+                if ($stage->phase === 'sample') {
+                    $stage->input_qty = 1;
+                    $stage->output_qty = 1;
+                }
             }
 
             $stage->save();
 
-            if ($stage->stage === 'qc' && $action === 'finish' && ! in_array($production->status, ['completed'], true)) {
+            $isMassQc = $stage->phase === 'mass' && $stage->stage === 'qc_packing';
+
+            if ($isMassQc && $action === 'start' && $production->status !== 'completed') {
                 $production->forceFill(['status' => 'qc'])->save();
             }
 
-            if ($stage->stage === 'packing' && $action === 'finish' && $production->status !== 'completed') {
+            if ($isMassQc && $action === 'finish' && $production->status !== 'completed') {
                 $this->completeBatch($production, $stage);
             }
         });
@@ -263,13 +304,28 @@ class ProductionController extends Controller
         return back()->with('success', 'Tahap diperbarui.');
     }
 
+    /** Alasan sebuah tahap masih terkunci, dalam kalimat yang bisa dibaca operator. */
+    private function lockReason(Production $production, ProductionStage $stage): string
+    {
+        if ($stage->phase === 'mass' && $production->hasSamplePhase() && ! $production->sampleApproved()) {
+            return 'Sampel belum disetujui. Selesaikan dan setujui sampel sebelum memulai produksi massal.';
+        }
+
+        if ($stage->phase === 'mass') {
+            return 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.';
+        }
+
+        return 'Tahap sebelumnya belum selesai. Belum bisa dimulai.';
+    }
+
     /**
      * Finalize a batch: credit product stock and consume recipe materials.
+     * Sampel memakan bahan tapi tidak masuk stok jual.
      * Guarded by status so it can only run once.
      */
-    private function completeBatch(Production $production, ProductionStage $packing): void
+    private function completeBatch(Production $production, ProductionStage $qcPacking): void
     {
-        $actual = (int) $packing->output_qty;
+        $actual = (int) $qcPacking->output_qty;
 
         $production->forceFill([
             'status' => 'completed',
@@ -279,8 +335,10 @@ class ProductionController extends Controller
 
         Product::where('id', $production->product_id)->increment('stock', $actual);
 
+        $units = $actual + $production->sampleUnits();
+
         foreach ($production->product->materials as $line) {
-            $used = (int) $line->qty_required * $actual;
+            $used = (int) $line->qty_required * $units;
             if ($used <= 0) {
                 continue;
             }

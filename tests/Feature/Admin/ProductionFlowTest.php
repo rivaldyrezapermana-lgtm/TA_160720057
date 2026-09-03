@@ -15,7 +15,7 @@ class ProductionFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    private User $user;
+    private ?User $user = null;
 
     private function admin(): User
     {
@@ -24,180 +24,296 @@ class ProductionFlowTest extends TestCase
         ]);
     }
 
-    /** A batch of 100 with a recipe of 3 Kain per unit and 20 starting product stock. */
-    private function batch(): array
+    /**
+     * Batch dengan resep 3 m kain per pcs dan stok produk awal 20.
+     * Tahap dibuat lewat controller supaya strukturnya sama dengan produksi nyata.
+     *
+     * @return array{0: Production, 1: Product, 2: Material}
+     */
+    private function batch(int $planned = 100): array
     {
         $cat = Category::create(['name' => 'Gamis']);
-        $kain = Material::create(['name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'stock' => 500, 'min_stock' => 0, 'unit_cost' => 25000]);
+        $kain = Material::create([
+            'name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'stock' => 500, 'min_stock' => 0, 'unit_cost' => 25000,
+        ]);
         $product = Product::create([
             'category_id' => $cat->id, 'name' => 'Gamis A', 'sku' => 'GA-1',
             'price' => 100000, 'stock' => 20, 'is_active' => true,
         ]);
         $product->materials()->create(['material_id' => $kain->id, 'qty_required' => 3]);
 
-        $prod = Production::create([
-            'product_id' => $product->id, 'user_id' => $this->admin()->id, 'code' => 'PRD-T-1',
-            'planned_qty' => 100, 'actual_qty' => 0, 'start_date' => now()->toDateString(), 'status' => 'planned',
+        $this->actingAs($this->admin())->post(route('admin.productions.store'), [
+            'product_id' => $product->id,
+            'planned_qty' => $planned,
+            'start_date' => now()->toDateString(),
         ]);
-        foreach (ProductionStage::STAGES as $s) {
-            $prod->stages()->create(['stage' => $s, 'status' => 'pending', 'input_qty' => $s === 'design' ? 100 : 0, 'output_qty' => 0]);
-        }
 
-        return [$prod->fresh('stages'), $product, $kain];
+        return [Production::latest('id')->first()->fresh('stages'), $product, $kain];
+    }
+
+    private function stage(Production $p, string $phase, string $stage): ProductionStage
+    {
+        return $p->stages()->where('phase', $phase)->where('stage', $stage)->firstOrFail();
+    }
+
+    /** Loloskan fase persiapan dan sampel, lalu setujui sampelnya. */
+    private function approveSample(Production $p): void
+    {
+        $p->stages()->where('phase', '!=', 'mass')->update([
+            'status' => 'completed', 'output_qty' => 1,
+        ]);
+        $p->stages()->where('phase', 'common')->update(['output_qty' => 0]);
+        $p->forceFill(['sample_approved_at' => now()])->save();
+    }
+
+    public function test_store_creates_eight_phased_stages_for_a_mass_batch(): void
+    {
+        [$prod] = $this->batch(50);
+
+        $this->assertSame(
+            ['common:design', 'common:pola', 'sample:cutting', 'sample:sewing', 'sample:qc_packing',
+                'mass:cutting', 'mass:sewing', 'mass:qc_packing'],
+            $prod->stages->sortBy('sort_order')->map(fn ($s) => $s->phase.':'.$s->stage)->values()->all()
+        );
+        $this->assertSame(50, $this->stage($prod, 'mass', 'cutting')->input_qty);
+        $this->assertSame(1, $this->stage($prod, 'sample', 'cutting')->input_qty);
+    }
+
+    public function test_store_skips_the_sample_phase_for_a_single_pcs_batch(): void
+    {
+        [$prod] = $this->batch(1);
+
+        $this->assertSame(5, $prod->stages->count());
+        $this->assertSame(0, $prod->stages()->where('phase', 'sample')->count());
+        $this->assertSame(1, $this->stage($prod, 'mass', 'cutting')->input_qty);
+    }
+
+    public function test_mass_cutting_cannot_start_before_the_sample_is_approved(): void
+    {
+        [$prod] = $this->batch();
+        $prod->stages()->where('phase', '!=', 'mass')->update(['status' => 'completed', 'output_qty' => 1]);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'start'])
+            ->assertSessionHas('error');
+
+        $this->assertSame('pending', $cutting->fresh()->status);
+    }
+
+    public function test_mass_cutting_starts_once_the_sample_is_approved(): void
+    {
+        [$prod] = $this->batch();
+        $this->approveSample($prod);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'start'])
+            ->assertSessionHas('success');
+
+        $this->assertSame('in_progress', $cutting->fresh()->status);
+        $this->assertSame('in_progress', $prod->fresh()->status);
+    }
+
+    public function test_pola_cannot_start_before_design_is_finished(): void
+    {
+        [$prod] = $this->batch();
+        $pola = $this->stage($prod, 'common', 'pola');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $pola]), ['action' => 'start'])
+            ->assertSessionHas('error');
+
+        $this->assertSame('pending', $pola->fresh()->status);
+    }
+
+    public function test_finishing_a_sample_stage_records_one_pcs(): void
+    {
+        [$prod] = $this->batch();
+        $prod->stages()->where('phase', 'common')->update(['status' => 'completed']);
+        $cutting = $this->stage($prod, 'sample', 'cutting');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'start']);
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'finish']);
+
+        $this->assertSame('completed', $cutting->fresh()->status);
+        $this->assertSame(1, $cutting->fresh()->output_qty);
     }
 
     public function test_output_cannot_exceed_input(): void
     {
         [$prod] = $this->batch();
-        $design = $prod->stages->firstWhere('stage', 'design');
+        $this->approveSample($prod);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
 
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $design]), [
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
                 'action' => 'save', 'input_qty' => 100, 'output_qty' => 150,
             ])
             ->assertSessionHasErrors('output_qty');
     }
 
-    public function test_next_stage_cannot_start_before_gate(): void
-    {
-        [$prod] = $this->batch();
-        $sample = $prod->stages->firstWhere('stage', 'sample');
-
-        // design output still 0 → sample start rejected
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $sample]), ['action' => 'start'])
-            ->assertSessionHas('error');
-
-        $this->assertDatabaseHas('production_stages', ['id' => $sample->id, 'status' => 'pending']);
-    }
-
-    public function test_completing_packing_credits_stock_and_consumes_materials_once(): void
-    {
-        [$prod, $product, $kain] = $this->batch();
-        // Drive every stage output to 100 directly, then finish packing.
-        $prod->stages()->update(['output_qty' => 100, 'input_qty' => 100, 'status' => 'in_progress']);
-        $packing = $prod->stages()->where('stage', 'packing')->first();
-
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $packing]), [
-                'action' => 'finish', 'input_qty' => 100, 'output_qty' => 100,
-            ])
-            ->assertRedirect();
-
-        $this->assertEquals('completed', $prod->fresh()->status);
-        $this->assertEquals(100, $prod->fresh()->actual_qty);
-        $this->assertEquals(120, $product->fresh()->stock);        // 20 + 100
-        $this->assertEquals(200, $kain->fresh()->stock);           // 500 - 3*100
-        $this->assertDatabaseHas('production_materials', ['production_id' => $prod->id, 'material_id' => $kain->id, 'qty_used' => 300]);
-
-        // Idempotency: finishing again must not double-credit.
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $packing->fresh()]), [
-                'action' => 'finish', 'input_qty' => 100, 'output_qty' => 100,
-            ]);
-
-        $this->assertEquals(120, $product->fresh()->stock);        // still 120
-        $this->assertEquals(200, $kain->fresh()->stock);           // still 200
-        $this->assertEquals(1, $prod->productionMaterials()->count());
-    }
-
     public function test_input_cannot_exceed_planned_target(): void
     {
         [$prod] = $this->batch();
-        $design = $prod->stages->firstWhere('stage', 'design');
+        $this->approveSample($prod);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
 
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $design]), [
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
                 'action' => 'save', 'input_qty' => 150, 'output_qty' => 0,
             ])
             ->assertSessionHasErrors('input_qty');
 
-        $this->assertEquals(100, $design->fresh()->input_qty); // unchanged
-
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $design]), [
-                'action' => 'save', 'input_qty' => 100, 'output_qty' => 0,
-            ])
-            ->assertSessionHas('success');
-
-        $this->assertEquals(100, $design->fresh()->input_qty);
+        $this->assertSame(100, $cutting->fresh()->input_qty);
     }
 
     public function test_input_cannot_exceed_previous_stage_output(): void
     {
         [$prod] = $this->batch();
-        $prod->stages()->where('stage', 'design')->update(['output_qty' => 60, 'status' => 'in_progress']);
-        $sample = $prod->stages()->where('stage', 'sample')->first();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['output_qty' => 60, 'status' => 'in_progress']);
+        $sewing = $this->stage($prod, 'mass', 'sewing');
 
-        // 70 > design's output of 60 → rejected.
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $sample]), [
+            ->patch(route('admin.productions.stage', [$prod, $sewing]), [
                 'action' => 'save', 'input_qty' => 70, 'output_qty' => 0,
             ])
             ->assertSessionHasErrors('input_qty');
 
-        // Exactly at the limit → accepted.
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $sample]), [
+            ->patch(route('admin.productions.stage', [$prod, $sewing]), [
                 'action' => 'save', 'input_qty' => 60, 'output_qty' => 0,
             ])
             ->assertSessionHas('success');
 
-        $this->assertEquals(60, $sample->fresh()->input_qty);
+        $this->assertSame(60, $sewing->fresh()->input_qty);
     }
 
     public function test_output_cannot_drop_below_next_stage_input(): void
     {
         [$prod] = $this->batch();
-        $prod->stages()->where('stage', 'design')->update(['output_qty' => 60, 'status' => 'in_progress']);
-        $prod->stages()->where('stage', 'sample')->update(['input_qty' => 50, 'status' => 'in_progress']);
-        $design = $prod->stages()->where('stage', 'design')->first();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['output_qty' => 60, 'status' => 'in_progress']);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')
+            ->update(['input_qty' => 50, 'status' => 'in_progress']);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
 
-        // Sample already took in 50 → design's output can't be edited down to 40.
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $design]), [
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
                 'action' => 'save', 'input_qty' => 100, 'output_qty' => 40,
             ])
             ->assertSessionHasErrors('output_qty');
 
-        $this->assertEquals(60, $design->fresh()->output_qty); // unchanged
+        $this->assertSame(60, $cutting->fresh()->output_qty);
+    }
+
+    public function test_starting_mass_qc_packing_moves_the_batch_to_qc_status(): void
+    {
+        [$prod] = $this->batch();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->update(['input_qty' => 100, 'output_qty' => 100, 'status' => 'in_progress']);
+        $qc = $this->stage($prod, 'mass', 'qc_packing');
+        $qc->update(['status' => 'pending']);
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $qc]), [
+                'action' => 'start', 'input_qty' => 100, 'output_qty' => 0,
+            ]);
+
+        $this->assertSame('qc', $prod->fresh()->status);
+    }
+
+    public function test_finishing_mass_qc_packing_credits_stock_and_consumes_materials_once(): void
+    {
+        [$prod, $product, $kain] = $this->batch();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->update(['input_qty' => 100, 'output_qty' => 100, 'status' => 'in_progress']);
+        $qc = $this->stage($prod, 'mass', 'qc_packing');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $qc]), [
+                'action' => 'finish', 'input_qty' => 100, 'output_qty' => 100,
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('completed', $prod->fresh()->status);
+        $this->assertSame(100, $prod->fresh()->actual_qty);
+        $this->assertSame(120, $product->fresh()->stock);          // 20 + 100, sampel tidak masuk stok
+        $this->assertSame(197, $kain->fresh()->stock);             // 500 - 3*(100 + 1 sampel)
+        $this->assertDatabaseHas('production_materials', [
+            'production_id' => $prod->id, 'material_id' => $kain->id, 'qty_used' => 303,
+        ]);
+
+        // Idempoten: menyelesaikan lagi tidak boleh menambah dua kali.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $qc->fresh()]), [
+                'action' => 'finish', 'input_qty' => 100, 'output_qty' => 100,
+            ]);
+
+        $this->assertSame(120, $product->fresh()->stock);
+        $this->assertSame(197, $kain->fresh()->stock);
+        $this->assertSame(1, $prod->productionMaterials()->count());
+    }
+
+    public function test_single_pcs_batch_consumes_no_extra_sample_material(): void
+    {
+        [$prod, $product, $kain] = $this->batch(1);
+        $prod->stages()->where('phase', 'common')->update(['status' => 'completed']);
+        $prod->stages()->where('phase', 'mass')->update(['input_qty' => 1, 'output_qty' => 1, 'status' => 'in_progress']);
+        $qc = $this->stage($prod, 'mass', 'qc_packing');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $qc]), [
+                'action' => 'finish', 'input_qty' => 1, 'output_qty' => 1,
+            ]);
+
+        $this->assertSame(21, $product->fresh()->stock);   // 20 + 1
+        $this->assertSame(497, $kain->fresh()->stock);     // 500 - 3*1
     }
 
     public function test_completed_stage_can_still_be_edited_until_batch_completes(): void
     {
         [$prod] = $this->batch();
-        $prod->stages()->where('stage', 'design')->update(['input_qty' => 100, 'output_qty' => 90, 'status' => 'completed']);
-        $design = $prod->stages()->where('stage', 'design')->first();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['input_qty' => 100, 'output_qty' => 90, 'status' => 'completed']);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
 
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $design]), [
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
                 'action' => 'save', 'input_qty' => 100, 'output_qty' => 85,
             ])
             ->assertSessionHas('success');
 
-        $this->assertEquals(85, $design->fresh()->output_qty);
-        $this->assertEquals('completed', $design->fresh()->status); // save doesn't reopen it
+        $this->assertSame(85, $cutting->fresh()->output_qty);
+        $this->assertSame('completed', $cutting->fresh()->status);
     }
 
     public function test_stages_locked_after_batch_completed(): void
     {
         [$prod] = $this->batch();
-        $prod->stages()->update(['output_qty' => 100, 'input_qty' => 100, 'status' => 'in_progress']);
-        $packing = $prod->stages()->where('stage', 'packing')->first();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->update(['input_qty' => 100, 'output_qty' => 100, 'status' => 'in_progress']);
+        $qc = $this->stage($prod, 'mass', 'qc_packing');
 
-        $this->actingAs($this->admin())->patch(route('admin.productions.stage', [$prod, $packing]), [
+        $this->actingAs($this->admin())->patch(route('admin.productions.stage', [$prod, $qc]), [
             'action' => 'finish', 'input_qty' => 100, 'output_qty' => 100,
         ]);
-        $this->assertEquals('completed', $prod->fresh()->status);
+        $this->assertSame('completed', $prod->fresh()->status);
 
-        $design = $prod->stages()->where('stage', 'design')->first();
+        $cutting = $this->stage($prod, 'mass', 'cutting');
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $design]), [
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
                 'action' => 'save', 'input_qty' => 100, 'output_qty' => 50,
             ])
             ->assertSessionHas('error');
 
-        $this->assertEquals(100, $design->fresh()->output_qty); // unchanged
+        $this->assertSame(100, $cutting->fresh()->output_qty);
     }
 
     public function test_completed_batch_cannot_be_edited(): void
@@ -211,12 +327,12 @@ class ProductionFlowTest extends TestCase
             ])
             ->assertSessionHas('error');
 
-        $this->assertEquals('completed', $prod->fresh()->status);
+        $this->assertSame('completed', $prod->fresh()->status);
     }
 
     public function test_planned_qty_cannot_drop_below_recorded_stage_input(): void
     {
-        [$prod] = $this->batch(); // design stage already has input_qty = 100
+        [$prod] = $this->batch(); // mass cutting sudah punya input_qty = 100
 
         $this->actingAs($this->admin())
             ->put(route('admin.productions.update', $prod), [
@@ -224,6 +340,6 @@ class ProductionFlowTest extends TestCase
             ])
             ->assertSessionHasErrors('planned_qty');
 
-        $this->assertEquals(100, $prod->fresh()->planned_qty);
+        $this->assertSame(100, $prod->fresh()->planned_qty);
     }
 }
