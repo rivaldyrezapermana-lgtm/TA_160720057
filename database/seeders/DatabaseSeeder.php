@@ -101,8 +101,8 @@ class DatabaseSeeder extends Seeder
         // ---- Machine categories (mapped to production stages) ----------
         $catCut = MachineCategory::create(['name' => 'Mesin Potong', 'code' => 'CAT-CUT', 'stage' => 'cutting']);
         $catSew = MachineCategory::create(['name' => 'Mesin Jahit', 'code' => 'CAT-SEW', 'stage' => 'sewing']);
-        $catQc = MachineCategory::create(['name' => 'Alat QC & Finishing', 'code' => 'CAT-QC', 'stage' => 'qc']);
-        $catPack = MachineCategory::create(['name' => 'Mesin Packing', 'code' => 'CAT-PACK', 'stage' => 'packing']);
+        $catQc = MachineCategory::create(['name' => 'Alat QC & Finishing', 'code' => 'CAT-QC', 'stage' => 'qc_packing']);
+        $catPack = MachineCategory::create(['name' => 'Mesin Packing', 'code' => 'CAT-PACK', 'stage' => 'qc_packing']);
 
         // ---- Production machines ---------------------------------------
         $machines = [
