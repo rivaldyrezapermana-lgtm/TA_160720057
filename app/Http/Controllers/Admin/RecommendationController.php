@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\SalesHistory;
 use App\Services\FuzzyMamdaniService;
@@ -15,7 +16,7 @@ class RecommendationController extends Controller
 
     public function index()
     {
-        $products = Product::with(['salesHistories' => fn ($q) => $q->orderByDesc('year')->orderByDesc('month')])
+        $products = Product::with(['sizes', 'salesHistories' => fn ($q) => $q->orderByDesc('year')->orderByDesc('month')])
             ->orderBy('name')
             ->get()
             ->map(function (Product $product) {
@@ -24,6 +25,7 @@ class RecommendationController extends Controller
 
                 if (! $latest || empty($history)) {
                     $product->last_recommendation = 0;
+                    $product->size_breakdown = [];
                     $product->updated = '—';
 
                     return $product;
@@ -36,6 +38,10 @@ class RecommendationController extends Controller
                 );
 
                 $product->last_recommendation = (int) ($result['recommended_production'] ?? 0);
+                $product->size_breakdown = $this->fuzzy->distributeBySize(
+                    $product->last_recommendation,
+                    $this->sizeWeights($product),
+                );
                 $product->updated = $latest->updated_at?->translatedFormat('d M Y') ?? '—';
 
                 return $product;
@@ -86,6 +92,11 @@ class RecommendationController extends Controller
             (float) $data['demand'],
             (float) $data['stock'],
             $history,
+        );
+
+        $result['size_breakdown'] = $this->fuzzy->distributeBySize(
+            (int) $result['recommended_production'],
+            $this->sizeWeights($product),
         );
 
         if ($request->wantsJson() || $request->ajax()) {
@@ -139,6 +150,31 @@ class RecommendationController extends Controller
             'stock_end' => $h->stock_end,
             'produced' => $h->produced,
         ])->all();
+    }
+
+    /**
+     * Units sold per size (non-cancelled orders), keyed by the product's sizes
+     * in their stored order. Sizes with no sales weigh 0.
+     *
+     * @return array<string, float>
+     */
+    private function sizeWeights(Product $product): array
+    {
+        $sizes = $product->relationLoaded('sizes') ? $product->sizes : $product->sizes()->get();
+        if ($sizes->isEmpty()) {
+            return [];
+        }
+
+        $sold = OrderItem::where('product_id', $product->id)
+            ->whereNotNull('size')
+            ->whereHas('order', fn ($q) => $q->where('status', '!=', 'cancelled'))
+            ->selectRaw('size, SUM(qty) as total')
+            ->groupBy('size')
+            ->pluck('total', 'size');
+
+        return $sizes->sortBy('id')
+            ->mapWithKeys(fn ($s) => [$s->size => (float) ($sold[$s->size] ?? 0)])
+            ->all();
     }
 
     private function monthLabel(int $year, int $month): string

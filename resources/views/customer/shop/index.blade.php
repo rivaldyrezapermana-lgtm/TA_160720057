@@ -31,6 +31,23 @@
                         @endforeach
                     </div>
                 </div>
+                @if (! empty($sizes))
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-3">Ukuran</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label>
+                                <input type="radio" name="size" value="" {{ !request('size') ? 'checked' : '' }} class="peer sr-only">
+                                <span class="inline-flex items-center px-3 py-1 rounded-lg border border-ink-200 text-sm cursor-pointer peer-checked:bg-ink-900 peer-checked:text-white peer-checked:border-ink-900">Semua</span>
+                            </label>
+                            @foreach ($sizes as $s)
+                                <label>
+                                    <input type="radio" name="size" value="{{ $s }}" {{ request('size') === $s ? 'checked' : '' }} class="peer sr-only">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-lg border border-ink-200 text-sm cursor-pointer peer-checked:bg-ink-900 peer-checked:text-white peer-checked:border-ink-900">{{ $s }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
                 <button class="btn-primary w-full">Terapkan</button>
             </form>
         </aside>
@@ -69,6 +86,7 @@
                                     <span class="badge-amber">Stok terbatas</span>
                                 @endif
                             </div>
+                            <x-ui.size-chips :sizes="$p->sizes" />
                         </a>
                     @endforeach
                 </div>

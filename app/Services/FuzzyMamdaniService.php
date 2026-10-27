@@ -111,6 +111,49 @@ class FuzzyMamdaniService
         ];
     }
 
+    /**
+     * Split a crisp production total across sizes in proportion to $weights
+     * (units sold per size). Falls back to an even split when every weight is
+     * zero. Largest-remainder rounding keeps the parts summing to $total.
+     *
+     * @param  array<string, float>  $weights  size => weight, in display order
+     * @return array<int, array{size: string, share: float, qty: int}>
+     */
+    public function distributeBySize(int $total, array $weights): array
+    {
+        if (empty($weights)) return [];
+
+        $sum = array_sum($weights);
+        $shares = [];
+        foreach ($weights as $size => $w) {
+            $shares[$size] = $sum > 0 ? max(0, $w) / $sum : 1 / count($weights);
+        }
+
+        $qty = [];
+        $remainders = [];
+        foreach ($shares as $size => $share) {
+            $exact = $total * $share;
+            $qty[$size] = (int) floor($exact);
+            $remainders[$size] = $exact - $qty[$size];
+        }
+
+        // Hand the leftover units to the sizes with the largest fractional parts.
+        arsort($remainders);
+        $left = $total - array_sum($qty);
+        foreach (array_keys($remainders) as $size) {
+            if ($left <= 0) break;
+            $qty[$size]++;
+            $left--;
+        }
+
+        $rows = [];
+        foreach ($shares as $size => $share) {
+            $rows[] = ['size' => (string) $size, 'share' => round($share, 4), 'qty' => $qty[$size]];
+        }
+
+        return $rows;
+    }
+
     /** Descending linear membership: 1 at min, 0 at max. */
     private function descending(float $x, float $min, float $max): float
     {

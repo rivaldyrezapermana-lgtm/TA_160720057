@@ -74,6 +74,20 @@
                 </p>
             </div>
 
+            @if (! empty($result['size_breakdown']))
+                <x-ui.card title="Rekomendasi per Ukuran" subtitle="Total dibagi sesuai proporsi penjualan tiap ukuran (dibagi rata bila belum ada penjualan)" class="mb-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        @foreach ($result['size_breakdown'] as $row)
+                            <div class="border border-ink-100 rounded-lg p-3">
+                                <p class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Ukuran {{ $row['size'] }}</p>
+                                <p class="font-display text-2xl font-semibold tabular-nums mt-1">{{ number_format($row['qty']) }} <span class="text-sm font-normal text-ink-500">unit</span></p>
+                                <p class="text-xs text-ink-500 mt-1 tabular-nums">{{ number_format($row['share'] * 100, 1, ',', '.') }}%</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </x-ui.card>
+            @endif
+
             <x-ui.card title="Tahap 1 — Fuzzifikasi" subtitle="Derajat keanggotaan untuk variabel input">
                 <div class="space-y-4">
                     <div>

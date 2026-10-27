@@ -20,12 +20,19 @@
 
 <x-ui.card title="Rekomendasi Terbaru per Produk">
     <table class="table-clean">
-        <thead><tr><th>Produk</th><th class="text-right">Rekomendasi Terakhir</th><th>Diperbarui</th><th class="text-right">Aksi</th></tr></thead>
+        <thead><tr><th>Produk</th><th class="text-right">Rekomendasi Terakhir</th><th>Per Ukuran</th><th>Diperbarui</th><th class="text-right">Aksi</th></tr></thead>
         <tbody>
             @foreach ($products as $p)
                 <tr>
                     <td class="font-medium">{{ $p->name }}</td>
                     <td class="text-right tabular-nums font-display text-lg">{{ number_format($p->last_recommendation) }} <span class="text-xs text-ink-500">unit</span></td>
+                    <td class="text-sm text-ink-600 tabular-nums">
+                        @forelse ($p->size_breakdown as $row)
+                            <span class="whitespace-nowrap">{{ $row['size'] }}: {{ number_format($row['qty']) }}</span>@if (! $loop->last)<span class="text-ink-300"> · </span>@endif
+                        @empty
+                            <span class="text-ink-400">—</span>
+                        @endforelse
+                    </td>
                     <td class="text-ink-500">{{ $p->updated }}</td>
                     <td class="text-right">
                         <a href="{{ route('admin.recommendations.history', $p->id) }}" class="text-ink-600 hover:text-ink-900 text-sm">Riwayat</a>

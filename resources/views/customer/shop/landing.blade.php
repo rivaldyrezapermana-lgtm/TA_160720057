@@ -84,6 +84,7 @@
                     <p class="text-xs uppercase tracking-wider text-ink-500">{{ $p->category->name }}</p>
                     <p class="font-medium text-ink-900 mt-1 group-hover:underline underline-offset-2">{{ $p->name }}</p>
                     <p class="font-display text-lg font-semibold mt-1">Rp {{ number_format($p->price, 0, ',', '.') }}</p>
+                    <x-ui.size-chips :sizes="$p->sizes" />
                 </a>
             @endforeach
         </div>

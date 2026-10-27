@@ -20,6 +20,7 @@
                     <th>Kategori</th>
                     <th class="text-right">Harga</th>
                     <th class="text-right">Stok</th>
+                    <th>Ukuran</th>
                     <th>Status</th>
                     <th class="text-right">Aksi</th>
                 </tr>
@@ -40,6 +41,11 @@ $(function () {
             { data: 'category' },
             { data: 'price', className: 'text-right tabular-nums', render: d => 'Rp ' + d },
             { data: 'stock', className: 'text-right tabular-nums' },
+            { data: 'sizes', orderable: false, render: (sizes, type) => {
+                if (! sizes.length) return type === 'display' ? '<span class="text-ink-400">—</span>' : '';
+                if (type !== 'display') return sizes.map(s => s.size).join(' ');
+                return sizes.map(s => `<span class="inline-flex items-center gap-1 mr-1 mb-1 px-1.5 py-0.5 rounded border text-xs ${s.stock > 0 ? 'border-ink-200 text-ink-700' : 'border-ink-100 text-ink-300'}">${$('<span>').text(s.size).html()}<span class="tabular-nums text-ink-500">${s.stock}</span></span>`).join('');
+            } },
             { data: 'status', render: d => d === 'active'
                 ? '<span class="badge-green">Aktif</span>'
                 : '<span class="badge-gray">Nonaktif</span>'

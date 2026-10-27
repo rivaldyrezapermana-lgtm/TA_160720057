@@ -122,7 +122,7 @@ class MasterDataTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson(route('admin.datatables.products'))
             ->assertOk()
-            ->assertJsonStructure(['data' => [['id', 'sku', 'name', 'category', 'price', 'stock', 'status']]]);
+            ->assertJsonStructure(['data' => [['id', 'sku', 'name', 'category', 'price', 'stock', 'sizes', 'status']]]);
     }
 
     public function test_product_with_sales_history_cannot_be_deleted(): void

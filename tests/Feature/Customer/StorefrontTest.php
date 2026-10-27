@@ -102,4 +102,33 @@ class StorefrontTest extends TestCase
         $this->get(route('shop.show', $product))
             ->assertNotFound();
     }
+
+    public function test_shop_grid_shows_sizes_and_filters_by_size(): void
+    {
+        $withM = $this->product(['name' => 'Gamis Ada M']);
+        ProductSize::create(['product_id' => $withM->id, 'size' => 'M', 'stock' => 3]);
+        $soldOutM = $this->product(['name' => 'Gamis M Habis']);
+        ProductSize::create(['product_id' => $soldOutM->id, 'size' => 'M', 'stock' => 0]);
+        ProductSize::create(['product_id' => $soldOutM->id, 'size' => 'XL', 'stock' => 2]);
+
+        $this->get(route('shop.index'))
+            ->assertOk()
+            ->assertSee('Ukuran')
+            ->assertSee('line-through', false);
+
+        $this->get(route('shop.index', ['size' => 'M']))
+            ->assertOk()
+            ->assertSee('Gamis Ada M')
+            ->assertDontSee('Gamis M Habis');
+    }
+
+    public function test_landing_cards_show_sizes(): void
+    {
+        $product = $this->product(['name' => 'Gamis Unggulan']);
+        ProductSize::create(['product_id' => $product->id, 'size' => 'XXL', 'stock' => 4]);
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('XXL');
+    }
 }

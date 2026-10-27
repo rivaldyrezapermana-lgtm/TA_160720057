@@ -20,13 +20,14 @@ class ProductController extends Controller
     /** AJAX endpoint for DataTables. */
     public function data(Request $request)
     {
-        $rows = Product::with('category')->latest()->get()->map(fn (Product $product) => [
+        $rows = Product::with('category', 'sizes')->latest()->get()->map(fn (Product $product) => [
             'id' => $product->id,
             'sku' => $product->sku,
             'name' => $product->name,
             'category' => $product->category?->name ?? '—',
             'price' => number_format((float) $product->price, 0, ',', '.'),
             'stock' => $product->stock,
+            'sizes' => $product->sizes->sortBy('id')->map(fn ($s) => ['size' => $s->size, 'stock' => $s->stock])->values(),
             'status' => $product->is_active ? 'active' : 'inactive',
         ]);
 
