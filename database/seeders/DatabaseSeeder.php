@@ -14,6 +14,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class DatabaseSeeder extends Seeder
 {
@@ -34,10 +35,10 @@ class DatabaseSeeder extends Seeder
 
         // ---- Products + sizes -----------------------------------------
         $products = [
-            ['Gamis Anaya Navy', 1, 225000, 48],
-            ['Koko Modern Sage', 2, 180000, 32],
-            ['Tunik Basic Cream', 3, 145000, 21],
-            ['Hijab Pashmina Plain', 4, 50000, 86],
+            ['Gamis Anaya Navy', 1, 225000, 48, 'gamis-anaya-navy.svg'],
+            ['Koko Modern Sage', 2, 180000, 32, 'koko-modern-sage.svg'],
+            ['Tunik Basic Cream', 3, 145000, 21, 'tunik-basic-cream.svg'],
+            ['Hijab Pashmina Plain', 4, 50000, 86, 'hijab-pashmina-plain.svg'],
         ];
         foreach ($products as $i => $p) {
             $product = Product::create([
@@ -47,6 +48,7 @@ class DatabaseSeeder extends Seeder
                 'description' => $p[0].' — produk demo Toko Labasa.',
                 'price' => $p[2],
                 'stock' => $p[3],
+                'image' => $this->seedProductImage($p[4]),
                 'is_active' => true,
             ]);
             foreach (['S', 'M', 'L', 'XL'] as $j => $size) {
@@ -148,5 +150,26 @@ class DatabaseSeeder extends Seeder
         Product::with('materials.material')->get()->each(function (Product $product) {
             $product->forceFill(['hpp' => $product->computeHpp()])->save();
         });
+    }
+
+    /**
+     * Copy a committed seed image into the public disk so the storefront can serve it.
+     *
+     * storage/app/public is gitignored, so demo artwork lives in
+     * database/seeders/assets/products and is copied in at seed time. Returns the
+     * disk-relative path for products.image, or null when the asset is missing.
+     */
+    private function seedProductImage(string $file): ?string
+    {
+        $source = database_path('seeders/assets/products/'.$file);
+
+        if (! is_file($source)) {
+            return null;
+        }
+
+        $path = 'products/'.$file;
+        Storage::disk('public')->put($path, file_get_contents($source));
+
+        return $path;
     }
 }

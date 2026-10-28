@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img" aria-label="Gamis Anaya Navy">
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#334155"/>
+      <stop offset="0.55" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <pattern id="weave" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 4h8M4 0v8" stroke="#0f172a" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="800" height="1000" fill="url(#ground)"/>
+  <rect width="800" height="1000" fill="url(#weave)"/>
+  <ellipse cx="400" cy="884" rx="230" ry="26" fill="#0f172a" opacity="0.06"/>
+
+  <g fill="url(#cloth)">
+    <path id="g-sleeve" d="M286,292 c-32,12 -52,36 -58,68 l-28,166 c-3,15 8,28 23,28 h40 c14,0 26,-11 27,-25 l22,-224 z"/>
+    <use href="#g-sleeve" transform="matrix(-1 0 0 1 800 0)"/>
+    <path d="M400,244 c-26,0 -48,9 -64,24 l-52,22 c-18,8 -28,24 -30,44 l-40,486 c-2,18 12,34 30,34 h312 c18,0 32,-16 30,-34 l-40,-486 c-2,-20 -12,-36 -30,-44 l-52,-22 c-16,-15 -38,-24 -64,-24 z"/>
+  </g>
+
+  <path d="M400,246 c-24,0 -42,15 -42,34 c0,16 19,28 42,28 s42,-12 42,-28 c0,-19 -18,-34 -42,-34 z" fill="#e2e8f0"/>
+  <path d="M400,308 v546" stroke="#f8fafc" stroke-opacity="0.13" stroke-width="2"/>
+  <path d="M262,330 l-34,470 M538,330 l34,470" stroke="#f8fafc" stroke-opacity="0.08" stroke-width="2"/>
+  <path d="M248,846 h304" stroke="#f8fafc" stroke-opacity="0.16" stroke-width="2" stroke-dasharray="7 9"/>
+
+  <text x="400" y="946" text-anchor="middle" font-family="system-ui, sans-serif" font-size="27" font-weight="600" letter-spacing="9" fill="#475569">GAMIS</text>
+</svg>

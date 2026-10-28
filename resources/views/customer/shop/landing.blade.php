@@ -21,8 +21,10 @@
             </div>
         </div>
         <div class="relative">
-            <div class="aspect-[4/5] bg-ink-100 rounded-2xl flex items-center justify-center">
-                <span class="font-display text-7xl text-ink-300 italic">Labasa.</span>
+            <div class="aspect-[4/5] bg-ink-100 rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/hero.svg') }}"
+                     alt="Rak gantung workshop Labasa berisi gamis, koko, dan tunik"
+                     class="w-full h-full object-cover">
             </div>
             <div class="absolute -bottom-4 -left-4 bg-white border border-ink-100 rounded-xl p-4 shadow-sm">
                 <p class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Produksi sendiri</p>

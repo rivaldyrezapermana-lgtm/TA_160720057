@@ -13,7 +13,7 @@
     </div>
     <div class="p-5">
         <table id="tbl-productions" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Produk</th><th class="text-right">Plan</th><th class="text-right">Aktual</th><th>Mulai</th><th>Selesai</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Produk</th><th class="text-right">Plan</th><th class="text-right">Aktual</th><th>Ukuran</th><th>Mulai</th><th>Selesai</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -29,6 +29,7 @@ $(function() {
             { data: 'product' },
             { data: 'planned', className: 'text-right tabular-nums' },
             { data: 'actual', className: 'text-right tabular-nums' },
+            { data: 'sizes', orderable: false, className: 'text-sm text-ink-600', render: (d, type) => d ? $('<span>').text(d).html() : (type === 'display' ? '<span class="text-ink-400">—</span>' : '') },
             { data: 'start' },
             { data: 'end' },
             { data: 'status', render: d => {

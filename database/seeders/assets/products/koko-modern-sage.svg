@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img" aria-label="Koko Modern Sage">
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#10b981"/>
+      <stop offset="0.55" stop-color="#059669"/>
+      <stop offset="1" stop-color="#047857"/>
+    </linearGradient>
+    <pattern id="weave" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 4h8M4 0v8" stroke="#0f172a" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="800" height="1000" fill="url(#ground)"/>
+  <rect width="800" height="1000" fill="url(#weave)"/>
+  <ellipse cx="400" cy="822" rx="204" ry="24" fill="#0f172a" opacity="0.06"/>
+
+  <g fill="url(#cloth)">
+    <path id="k-sleeve" d="M286,292 c-32,12 -52,36 -58,68 l-26,150 c-3,15 8,28 23,28 h40 c14,0 26,-11 27,-25 l20,-208 z"/>
+    <use href="#k-sleeve" transform="matrix(-1 0 0 1 800 0)"/>
+    <path d="M400,244 c-26,0 -48,9 -64,24 l-52,22 c-18,8 -28,24 -30,44 l-26,426 c-1,17 12,32 30,32 h284 c18,0 31,-15 30,-32 l-26,-426 c-2,-20 -12,-36 -30,-44 l-52,-22 c-16,-15 -38,-24 -64,-24 z"/>
+  </g>
+
+  <path d="M400,250 c-22,0 -39,13 -39,30 c0,15 17,26 39,26 s39,-11 39,-26 c0,-17 -17,-30 -39,-30 z" fill="#e2e8f0"/>
+
+  <path d="M362,262 l38,52 l38,-52 l22,10 l-60,74 l-60,-74 z" fill="#ecfdf5" fill-opacity="0.32"/>
+  <path d="M400,314 v478" stroke="#ecfdf5" stroke-opacity="0.30" stroke-width="3"/>
+  <g fill="#ecfdf5" fill-opacity="0.55">
+    <circle cx="400" cy="384" r="6"/>
+    <circle cx="400" cy="452" r="6"/>
+    <circle cx="400" cy="520" r="6"/>
+  </g>
+  <path d="M262,340 l-24,412 M538,340 l24,412" stroke="#ecfdf5" stroke-opacity="0.14" stroke-width="2"/>
+  <path d="M262,782 h276" stroke="#ecfdf5" stroke-opacity="0.30" stroke-width="2" stroke-dasharray="7 9"/>
+
+  <text x="400" y="946" text-anchor="middle" font-family="system-ui, sans-serif" font-size="27" font-weight="600" letter-spacing="9" fill="#475569">KOKO</text>
+</svg>

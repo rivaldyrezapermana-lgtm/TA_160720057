@@ -15,11 +15,32 @@
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$production->status" /></div>
                 <div><p class="text-ink-500">Target</p><p class="font-medium tabular-nums">{{ $production->planned_qty }} pcs</p></div>
                 <div><p class="text-ink-500">Aktual</p><p class="font-medium tabular-nums">{{ $production->actual_qty }} pcs</p></div>
+                @if ($production->sample_size)
+                    <div><p class="text-ink-500">Ukuran Sampel</p><p class="font-medium">{{ $production->sample_size }}</p></div>
+                @endif
                 <div><p class="text-ink-500">Mulai</p><p class="font-medium">{{ $production->start_date?->translatedFormat('d M Y') ?? '-' }}</p></div>
                 <div><p class="text-ink-500">Estimasi Selesai</p><p class="font-medium">{{ $production->end_date?->translatedFormat('d M Y') ?? '-' }}</p></div>
                 <div class="md:col-span-2"><p class="text-ink-500">Catatan</p><p class="text-ink-800 mt-1">{{ $production->notes ?: '-' }}</p></div>
             </div>
         </x-ui.card>
+
+        @if ($production->sizes->isNotEmpty())
+            <x-ui.card title="Rincian per Ukuran" subtitle="{{ $production->status === 'completed' ? 'Hasil sudah masuk ke stok tiap ukuran' : 'Hasil diisi saat QC & Packing massal diselesaikan' }}">
+                <table class="table-clean">
+                    <thead><tr><th>Ukuran</th><th class="text-right">Target</th><th class="text-right">Hasil</th><th class="text-right">Capaian</th></tr></thead>
+                    <tbody>
+                        @foreach ($production->sizes as $row)
+                            <tr>
+                                <td class="font-medium">{{ $row->size }}</td>
+                                <td class="text-right tabular-nums">{{ $row->planned_qty }} pcs</td>
+                                <td class="text-right tabular-nums">{{ $production->status === 'completed' ? $row->actual_qty.' pcs' : '-' }}</td>
+                                <td class="text-right tabular-nums text-ink-500">{{ $production->status === 'completed' && $row->planned_qty > 0 ? round($row->actual_qty / $row->planned_qty * 100).'%' : '-' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </x-ui.card>
+        @endif
 
         @php
             $phaseMeta = [
@@ -41,6 +62,9 @@
         @foreach (['common', 'sample', 'mass'] as $phase)
             @continue (! isset($grouped[$phase]))
             <x-ui.card :title="$phaseMeta[$phase][0]" :subtitle="$phaseMeta[$phase][1]">
+                @if ($phase === 'sample' && $production->sample_size)
+                    <p class="text-xs text-ink-500 mb-3">Sampel dibuat dalam ukuran <span class="font-medium text-ink-800">{{ $production->sample_size }}</span>.</p>
+                @endif
                 @if ($phase === 'mass' && $production->hasSamplePhase() && ! $production->sampleApproved())
                     <p class="text-xs text-amber-600 mb-3">Terkunci sampai sampel disetujui.</p>
                 @endif
@@ -58,6 +82,9 @@
                             $maxIn = $production->stageMaxInput($stage);
                             $minOut = $production->stageMinOutput($stage);
                             $isSampleQc = $stage->phase === 'sample' && $stage->stage === 'qc_packing';
+                            // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
+                            $needsSizeOutput = $stage->phase === 'mass' && $stage->stage === 'qc_packing'
+                                && $stage->status === 'in_progress' && $production->sizes->count() > 1 && ! $locked;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
                                 'in_progress' => ['bg-ink-50 border-ink-200', 'Berlangsung'],
@@ -131,6 +158,20 @@
                                             @endif
                                         @endunless
                                     </div>
+                                    @if ($needsSizeOutput)
+                                        <div class="col-span-2 md:col-span-4 border-t border-ink-100 pt-3 mt-1">
+                                            <p class="text-xs text-ink-500 mb-2">Hasil per ukuran — wajib diisi saat menekan <em>Selesai</em>; totalnya harus sama dengan output.</p>
+                                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                @foreach ($production->sizes as $row)
+                                                    <div class="field !mb-0">
+                                                        <label class="label text-xs">{{ $row->size }} <span class="text-ink-400 font-normal">/ {{ $row->planned_qty }}</span></label>
+                                                        <input type="number" name="size_output[{{ $row->size }}]" min="0" max="{{ $row->planned_qty }}" value="{{ old('size_output.'.$row->size, $row->planned_qty) }}" class="input">
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                            @error('size_output')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                                        </div>
+                                    @endif
                                 </form>
 
                                 @if ($isSampleQc && $stage->status === 'completed' && ! $locked)

@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Production;
 use App\Models\ProductionMachine;
 use App\Models\ProductionStage;
+use App\Models\ProductSize;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ class ProductionController extends Controller
 
     public function data(Request $request)
     {
-        $rows = Production::with('product')
+        $rows = Production::with('product', 'sizes')
             ->latest()
             ->get()
             ->map(fn (Production $p) => [
@@ -30,6 +31,7 @@ class ProductionController extends Controller
                 'product' => $p->product?->name ?? '—',
                 'planned' => $p->planned_qty,
                 'actual' => $p->actual_qty,
+                'sizes' => $p->sizes->map(fn ($s) => $s->size.' '.$s->planned_qty)->implode(' · '),
                 'start' => optional($p->start_date)->translatedFormat('d M'),
                 'end' => optional($p->end_date)->translatedFormat('d M') ?? '-',
                 'status' => $p->status,
@@ -38,12 +40,19 @@ class ProductionController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        $products = Product::orderBy('name')->get(['id', 'name']);
+        $products = Product::with('sizes')->orderBy('name')->get(['id', 'name']);
         $machines = ProductionMachine::where('status', 'active')->orderBy('name')->get(['id', 'name']);
 
-        return view('admin.productions.create', compact('products', 'machines'));
+        // Ukuran tiap produk untuk form; ?product_id=&sizes[M]= datang dari halaman rekomendasi.
+        $productSizes = $products->mapWithKeys(fn (Product $p) => [
+            $p->id => $p->sizes->sortBy('id')->pluck('size')->values(),
+        ]);
+        $selectedProduct = old('product_id', $request->query('product_id'));
+        $prefillSizes = old('sizes', $request->query('sizes', []));
+
+        return view('admin.productions.create', compact('products', 'machines', 'productSizes', 'selectedProduct', 'prefillSizes'));
     }
 
     public function store(Request $request)
@@ -51,14 +60,24 @@ class ProductionController extends Controller
         $data = $request->validate([
             'product_id' => ['required', 'exists:products,id'],
             'production_machine_id' => ['nullable', 'exists:production_machines,id'],
-            'planned_qty' => ['required', 'integer', 'min:1'],
+            'planned_qty' => ['nullable', 'integer', 'min:1'],
+            'sizes' => ['nullable', 'array'],
+            'sizes.*' => ['nullable', 'integer', 'min:0'],
+            'sample_size' => ['nullable', 'string', 'max:10'],
             'code' => ['nullable', 'string', 'max:50'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $production = DB::transaction(function () use ($data) {
+        $product = Product::with('sizes')->findOrFail($data['product_id']);
+        $plan = $this->resolvePlan($product, $data);
+        if ($plan['error'] !== null) {
+            return back()->withErrors($plan['error'])->withInput();
+        }
+        $data['planned_qty'] = $plan['planned'];
+
+        $production = DB::transaction(function () use ($data, $plan) {
             $production = Production::create([
                 'product_id' => $data['product_id'],
                 'user_id' => auth()->id(),
@@ -70,7 +89,12 @@ class ProductionController extends Controller
                 'end_date' => $data['end_date'] ?? null,
                 'status' => 'planned',
                 'notes' => $data['notes'] ?? null,
+                'sample_size' => $plan['sample_size'],
             ]);
+
+            foreach ($plan['sizes'] as $size => $qty) {
+                $production->sizes()->create(['size' => $size, 'planned_qty' => $qty]);
+            }
 
             if (empty($data['code'])) {
                 $production->forceFill(['code' => 'PRD-'.now()->year.'-'.str_pad((string) $production->id, 4, '0', STR_PAD_LEFT)])->save();
@@ -85,6 +109,55 @@ class ProductionController extends Controller
 
         return redirect()->route('admin.productions.show', $production->id)
             ->with('success', 'Batch produksi dibuat.');
+    }
+
+    /**
+     * Target batch dari input form. Produk yang punya ukuran wajib dirinci per
+     * ukuran dan targetnya adalah jumlah rinciannya; produk tanpa ukuran memakai
+     * planned_qty apa adanya. Ukuran sampel default ke ukuran dengan target
+     * terbanyak.
+     *
+     * @return array{planned: int, sizes: array<string, int>, sample_size: ?string, error: ?array<string, string>}
+     */
+    private function resolvePlan(Product $product, array $data): array
+    {
+        $plan = ['planned' => 0, 'sizes' => [], 'sample_size' => null, 'error' => null];
+
+        if ($product->sizes->isEmpty()) {
+            if (empty($data['planned_qty'])) {
+                $plan['error'] = ['planned_qty' => 'Target Qty wajib diisi.'];
+            }
+            $plan['planned'] = (int) ($data['planned_qty'] ?? 0);
+
+            return $plan;
+        }
+
+        $input = $data['sizes'] ?? [];
+        foreach ($product->sizes->sortBy('id') as $s) {
+            $qty = (int) ($input[$s->size] ?? 0);
+            if ($qty > 0) {
+                $plan['sizes'][$s->size] = $qty;
+            }
+        }
+
+        $plan['planned'] = array_sum($plan['sizes']);
+        if ($plan['planned'] < 1) {
+            $plan['error'] = ['sizes' => 'Isi jumlah minimal untuk satu ukuran.'];
+
+            return $plan;
+        }
+
+        if ($plan['planned'] > 1) {
+            $sample = ($data['sample_size'] ?? null) ?: null;
+            if ($sample !== null && ! isset($plan['sizes'][$sample])) {
+                $plan['error'] = ['sample_size' => 'Ukuran sampel harus salah satu ukuran yang diproduksi.'];
+
+                return $plan;
+            }
+            $plan['sample_size'] = $sample ?? (string) array_search(max($plan['sizes']), $plan['sizes'], true);
+        }
+
+        return $plan;
     }
 
     /**
@@ -126,6 +199,7 @@ class ProductionController extends Controller
             'stages.machine',
             'productionMaterials.material',
             'sampleRevisions.user',
+            'sizes',
         ]);
 
         // Machines available per stage: those whose category maps to the stage.
@@ -153,7 +227,7 @@ class ProductionController extends Controller
 
     public function edit(Production $production)
     {
-        $production->load(['machine']);
+        $production->load(['machine', 'sizes', 'product.sizes']);
         $products = Product::orderBy('name')->get(['id', 'name']);
         $machines = ProductionMachine::where('status', 'active')
             ->orWhere('id', $production->production_machine_id)
@@ -170,13 +244,30 @@ class ProductionController extends Controller
 
         $data = $request->validate([
             'production_machine_id' => ['nullable', 'exists:production_machines,id'],
-            'planned_qty' => ['required', 'integer', 'min:1'],
+            'planned_qty' => ['nullable', 'integer', 'min:1'],
+            'sizes' => ['nullable', 'array'],
+            'sizes.*' => ['nullable', 'integer', 'min:0'],
+            'sample_size' => ['nullable', 'string', 'max:10'],
             'actual_qty' => ['nullable', 'integer', 'min:0'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['required', Rule::in(Production::STATUSES)],
             'notes' => ['nullable', 'string'],
         ]);
+
+        // Batch yang dibuat dengan rincian ukuran tetap dirinci per ukuran; batch
+        // lama (tanpa rincian) tetap memakai satu angka target.
+        $production->load('sizes', 'product.sizes');
+        $plan = null;
+        if ($production->sizes->isNotEmpty()) {
+            $plan = $this->resolvePlan($production->product, $data);
+            if ($plan['error'] !== null) {
+                return back()->withErrors($plan['error'])->withInput();
+            }
+            $data['planned_qty'] = $plan['planned'];
+        } elseif (empty($data['planned_qty'])) {
+            return back()->withErrors(['planned_qty' => 'Target Qty wajib diisi.'])->withInput();
+        }
 
         // Fase sampel ditentukan saat batch dibuat, jadi target tidak boleh melintasi
         // batas 1 pcs ↔ produksi massal.
@@ -193,15 +284,27 @@ class ProductionController extends Controller
             ])->withInput();
         }
 
-        $production->fill([
-            'production_machine_id' => $data['production_machine_id'] ?? null,
-            'planned_qty' => $data['planned_qty'],
-            'actual_qty' => $data['actual_qty'] ?? $production->actual_qty,
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'] ?? null,
-            'status' => $data['status'],
-            'notes' => $data['notes'] ?? null,
-        ])->save();
+        DB::transaction(function () use ($production, $data, $plan) {
+            $production->fill([
+                'production_machine_id' => $data['production_machine_id'] ?? null,
+                'planned_qty' => $data['planned_qty'],
+                'actual_qty' => $data['actual_qty'] ?? $production->actual_qty,
+                'start_date' => $data['start_date'],
+                'end_date' => $data['end_date'] ?? null,
+                'status' => $data['status'],
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            if ($plan !== null) {
+                $production->sample_size = $plan['sample_size'];
+                $production->sizes()->whereNotIn('size', array_keys($plan['sizes']))->delete();
+                foreach ($plan['sizes'] as $size => $qty) {
+                    $production->sizes()->updateOrCreate(['size' => $size], ['planned_qty' => $qty]);
+                }
+            }
+
+            $production->save();
+        });
 
         return redirect()->route('admin.productions.show', $production->id)
             ->with('success', 'Batch produksi diperbarui.');
@@ -288,7 +391,17 @@ class ProductionController extends Controller
             return back()->with('error', $this->lockReason($production, $stage));
         }
 
-        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable) {
+        // Menutup batch yang dirinci per ukuran: hasil QC harus dibagi ke tiap ukuran.
+        $sizeOutput = [];
+        $isMassQcFinish = $action === 'finish' && $stage->phase === 'mass' && $stage->stage === 'qc_packing';
+        if ($isMassQcFinish && $production->sizes()->exists()) {
+            $sizeOutput = $this->resolveSizeOutput($request, $production, (int) ($data['output_qty'] ?? $stage->output_qty));
+            if (is_string($sizeOutput)) {
+                return back()->withErrors(['size_output' => $sizeOutput])->withInput();
+            }
+        }
+
+        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizeOutput) {
             if ($qtyEditable) {
                 $stage->input_qty = $data['input_qty'] ?? $stage->input_qty;
                 $stage->output_qty = $data['output_qty'] ?? $stage->output_qty;
@@ -324,7 +437,7 @@ class ProductionController extends Controller
             }
 
             if ($isMassQc && $action === 'finish' && $production->status !== 'completed') {
-                $this->completeBatch($production, $stage);
+                $this->completeBatch($production, $stage, $sizeOutput);
             }
         });
 
@@ -333,6 +446,43 @@ class ProductionController extends Controller
         }
 
         return back()->with('success', 'Tahap diperbarui.');
+    }
+
+    /**
+     * Hasil akhir per ukuran saat QC & Packing massal selesai. Batch satu ukuran
+     * terisi otomatis; selebihnya tiap ukuran tidak boleh melebihi targetnya dan
+     * totalnya harus sama dengan output QC.
+     *
+     * @return array<string, int>|string rincian per ukuran, atau pesan error
+     */
+    private function resolveSizeOutput(Request $request, Production $production, int $output): array|string
+    {
+        $sizes = $production->sizes()->get();
+
+        if ($sizes->count() === 1) {
+            return [$sizes->first()->size => $output];
+        }
+
+        $request->validate([
+            'size_output' => ['nullable', 'array'],
+            'size_output.*' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $input = $request->input('size_output', []);
+        $result = [];
+        foreach ($sizes as $s) {
+            $qty = (int) ($input[$s->size] ?? 0);
+            if ($qty > $s->planned_qty) {
+                return 'Hasil ukuran '.$s->size.' tidak boleh melebihi targetnya ('.$s->planned_qty.' pcs).';
+            }
+            $result[$s->size] = $qty;
+        }
+
+        if (array_sum($result) !== $output) {
+            return 'Jumlah hasil per ukuran ('.array_sum($result).' pcs) harus sama dengan output QC & Packing ('.$output.' pcs).';
+        }
+
+        return $result;
     }
 
     /** Alasan sebuah tahap masih terkunci, dalam kalimat yang bisa dibaca operator. */
@@ -401,10 +551,13 @@ class ProductionController extends Controller
 
     /**
      * Finalize a batch: credit product stock and consume recipe materials.
+     * Hasil per ukuran masuk ke stok ukuran produk yang sama.
      * Sampel memakan bahan tapi tidak masuk stok jual.
      * Guarded by status so it can only run once.
+     *
+     * @param  array<string, int>  $sizeOutput
      */
-    private function completeBatch(Production $production, ProductionStage $qcPacking): void
+    private function completeBatch(Production $production, ProductionStage $qcPacking, array $sizeOutput = []): void
     {
         $actual = (int) $qcPacking->output_qty;
 
@@ -415,6 +568,15 @@ class ProductionController extends Controller
         ])->save();
 
         Product::where('id', $production->product_id)->increment('stock', $actual);
+
+        foreach ($sizeOutput as $size => $qty) {
+            $production->sizes()->where('size', $size)->update(['actual_qty' => $qty]);
+
+            if ($qty > 0) {
+                ProductSize::firstOrCreate(['product_id' => $production->product_id, 'size' => $size])
+                    ->increment('stock', $qty);
+            }
+        }
 
         $units = $actual + $production->sampleUnits();
 

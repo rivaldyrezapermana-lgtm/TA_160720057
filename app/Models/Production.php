@@ -9,6 +9,7 @@ class Production extends Model
     protected $fillable = [
         'product_id', 'user_id', 'production_machine_id', 'code', 'planned_qty', 'actual_qty',
         'start_date', 'end_date', 'status', 'notes', 'sample_approved_at', 'sample_revision_count',
+        'sample_size',
     ];
 
     protected $casts = [
@@ -43,6 +44,12 @@ class Production extends Model
     public function productionMaterials()
     {
         return $this->hasMany(ProductionMaterial::class);
+    }
+
+    /** Rincian target/hasil per ukuran, urut sesuai urutan ukuran produk. */
+    public function sizes()
+    {
+        return $this->hasMany(ProductionSize::class)->orderBy('id');
     }
 
     public function sampleRevisions()

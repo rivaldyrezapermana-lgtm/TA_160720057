@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img" aria-label="Hijab Pashmina Plain">
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#cbd5e1"/>
+      <stop offset="0.55" stop-color="#94a3b8"/>
+      <stop offset="1" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="cloth2" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#e2e8f0"/>
+      <stop offset="1" stop-color="#aab7c7"/>
+    </linearGradient>
+    <pattern id="weave" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 4h8M4 0v8" stroke="#0f172a" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="800" height="1000" fill="url(#ground)"/>
+  <rect width="800" height="1000" fill="url(#weave)"/>
+  <ellipse cx="400" cy="812" rx="188" ry="24" fill="#0f172a" opacity="0.06"/>
+
+  <path d="M474,228 c58,10 96,40 104,84 l38,470 c-24,20 -52,28 -84,22 l-46,-8 z" fill="url(#cloth2)"/>
+
+  <path d="M288,214 c42,-20 182,-20 224,0 l28,530 c-32,18 -64,24 -96,16 c-28,-8 -56,-8 -84,2 c-32,10 -62,4 -96,-16 z" fill="url(#cloth)"/>
+
+  <g stroke="#f8fafc" stroke-opacity="0.22" stroke-width="2" fill="none">
+    <path d="M344,232 l-14,516"/>
+    <path d="M400,224 v528"/>
+    <path d="M456,232 l14,516"/>
+  </g>
+
+  <path d="M288,214 c42,-20 182,-20 224,0" fill="none" stroke="#f8fafc" stroke-opacity="0.45" stroke-width="3"/>
+  <path d="M300,268 c40,-16 160,-16 200,0" fill="none" stroke="#f8fafc" stroke-opacity="0.18" stroke-width="2"/>
+
+  <text x="400" y="946" text-anchor="middle" font-family="system-ui, sans-serif" font-size="27" font-weight="600" letter-spacing="9" fill="#475569">HIJAB</text>
+</svg>

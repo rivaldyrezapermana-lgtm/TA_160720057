@@ -40,9 +40,9 @@ class ReportController extends Controller
         [$filename, $headers, $rows] = match ($type) {
             'production' => [
                 'laporan-produksi-'.now()->format('Y-m-d').'.csv',
-                ['Kode', 'Produk', 'Periode', 'Plan', 'Aktual', 'Pencapaian'],
+                ['Kode', 'Produk', 'Periode', 'Plan', 'Aktual', 'Per Ukuran (Aktual/Plan)', 'Pencapaian'],
                 $this->productionRows($request)
-                    ->map(fn ($r) => [$r['code'], $r['product'], $r['period'], $r['planned'], $r['actual'], $r['completion']]),
+                    ->map(fn ($r) => [$r['code'], $r['product'], $r['period'], $r['planned'], $r['actual'], $r['sizes'], $r['completion']]),
             ],
             'sales' => [
                 'laporan-penjualan-'.now()->format('Y-m-d').'.csv',
@@ -73,7 +73,7 @@ class ReportController extends Controller
 
     private function productionRows(Request $request)
     {
-        $query = Production::with('product')->latest('start_date');
+        $query = Production::with('product', 'sizes')->latest('start_date');
 
         if ($from = $request->query('from')) {
             $query->whereDate('start_date', '>=', $from);
@@ -93,6 +93,7 @@ class ReportController extends Controller
                 'period' => $p->start_date?->translatedFormat('M Y') ?? '—',
                 'planned' => $p->planned_qty,
                 'actual' => $p->actual_qty,
+                'sizes' => $p->sizes->map(fn ($s) => $s->size.' '.$s->actual_qty.'/'.$s->planned_qty)->implode(' · '),
                 'completion' => $completion,
             ];
         });

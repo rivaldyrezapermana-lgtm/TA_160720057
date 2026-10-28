@@ -85,6 +85,9 @@
                             </div>
                         @endforeach
                     </div>
+                    <div class="mt-4 flex justify-end">
+                        <a href="{{ route('admin.productions.create', ['product_id' => old('product_id'), 'sizes' => collect($result['size_breakdown'])->pluck('qty', 'size')->all()]) }}" class="btn-primary">Buat Batch Produksi</a>
+                    </div>
                 </x-ui.card>
             @endif
 

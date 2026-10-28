@@ -19,7 +19,7 @@
 
 <x-ui.card>
     <table class="table-clean">
-        <thead><tr><th>Kode</th><th>Produk</th><th>Periode</th><th class="text-right">Plan</th><th class="text-right">Aktual</th><th class="text-right">Pencapaian</th></tr></thead>
+        <thead><tr><th>Kode</th><th>Produk</th><th>Periode</th><th class="text-right">Plan</th><th class="text-right">Aktual</th><th>Per Ukuran <span class="font-normal normal-case">(aktual/plan)</span></th><th class="text-right">Pencapaian</th></tr></thead>
         <tbody>
             @foreach ($rows as $r)
                 <tr>
@@ -28,6 +28,7 @@
                     <td class="text-ink-500">{{ $r['period'] }}</td>
                     <td class="text-right tabular-nums">{{ $r['planned'] }}</td>
                     <td class="text-right tabular-nums">{{ $r['actual'] }}</td>
+                    <td class="text-sm text-ink-600 tabular-nums">{{ $r['sizes'] ?: '—' }}</td>
                     <td class="text-right tabular-nums font-medium">{{ $r['completion'] }}</td>
                 </tr>
             @endforeach
