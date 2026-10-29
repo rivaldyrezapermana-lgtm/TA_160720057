@@ -57,6 +57,25 @@ class Production extends Model
         return $this->hasMany(ProductionSampleRevision::class)->orderByDesc('revision_no');
     }
 
+    /** Sketsa desain yang diunggah di tahap Desain, urut sesuai waktu unggah. */
+    public function designSketches()
+    {
+        return $this->hasMany(ProductionDesignSketch::class)->orderBy('id');
+    }
+
+    /**
+     * Sketsa terkunci begitu tahap Desain selesai (cutting dan sewing sudah
+     * bekerja dari sketsa itu) atau batch sudah ditutup.
+     */
+    public function designSketchesLocked(): bool
+    {
+        if ($this->status === 'completed') {
+            return true;
+        }
+
+        return $this->stages()->where('stage', 'design')->where('status', 'completed')->exists();
+    }
+
     /** Batch lebih dari 1 pcs wajib membuat sampel dulu. */
     public function hasSamplePhase(): bool
     {

@@ -174,6 +174,45 @@
                                     @endif
                                 </form>
 
+                                @if ($stage->stage === 'design')
+                                    @php $sketchLocked = $locked || $stage->status === 'completed'; @endphp
+                                    <div class="mt-3 border-t border-ink-100 pt-3">
+                                        <p class="label text-xs">Sketsa Desain @unless ($sketchLocked)<span class="text-ink-400 font-normal">— wajib minimal satu sebelum tahap ini diselesaikan</span>@endunless</p>
+                                        @if ($production->designSketches->isNotEmpty())
+                                            <div class="grid grid-cols-3 md:grid-cols-5 gap-2 mb-2">
+                                                @foreach ($production->designSketches as $sketch)
+                                                    <div class="border border-ink-100 rounded-lg overflow-hidden bg-white">
+                                                        <a href="{{ Storage::disk('public')->url($sketch->path) }}" target="_blank" rel="noopener" title="{{ $sketch->original_name }}">
+                                                            <img src="{{ Storage::disk('public')->url($sketch->path) }}" alt="{{ $sketch->original_name }}" class="w-full aspect-square object-cover">
+                                                        </a>
+                                                        @unless ($sketchLocked)
+                                                            <form action="{{ route('admin.productions.sketches.destroy', [$production->id, $sketch->id]) }}" method="POST" class="px-2 py-1 text-right">
+                                                                @csrf @method('DELETE')
+                                                                <button class="text-[11px] text-red-600 hover:underline">Hapus</button>
+                                                            </form>
+                                                        @endunless
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @elseif ($sketchLocked)
+                                            <p class="text-xs text-ink-400">Tidak ada sketsa untuk batch ini.</p>
+                                        @else
+                                            <p class="text-xs text-ink-400 mb-2">Belum ada sketsa.</p>
+                                        @endif
+                                        @unless ($sketchLocked)
+                                            <form action="{{ route('admin.productions.sketches.store', $production->id) }}" method="POST" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+                                                @csrf
+                                                <input type="file" name="sketches[]" multiple accept="image/jpeg,image/png,image/webp" class="text-xs">
+                                                <button class="btn-secondary text-xs">Unggah Sketsa</button>
+                                            </form>
+                                            <p class="text-[11px] text-ink-400 mt-1">JPG, PNG, atau WebP, maksimal 2 MB per file.</p>
+                                            @if ($errors->has('sketches') || $errors->has('sketches.*'))
+                                                <p class="text-xs text-red-600 mt-1">{{ $errors->first('sketches') ?: $errors->first('sketches.*') }}</p>
+                                            @endif
+                                        @endunless
+                                    </div>
+                                @endif
+
                                 @if ($isSampleQc && $stage->status === 'completed' && ! $locked)
                                     <div class="mt-3 border-t border-ink-100 pt-3">
                                         @if ($production->sampleApproved())

@@ -11,6 +11,7 @@ use App\Models\ProductionStage;
 use App\Models\ProductSize;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProductionController extends Controller
@@ -200,6 +201,7 @@ class ProductionController extends Controller
             'productionMaterials.material',
             'sampleRevisions.user',
             'sizes',
+            'designSketches',
         ]);
 
         // Machines available per stage: those whose category maps to the stage.
@@ -316,6 +318,8 @@ class ProductionController extends Controller
             return back()->with('error', 'Batch yang sudah berjalan tidak bisa dihapus. Tandai sebagai cancelled.');
         }
 
+        // Baris sketsa ikut terhapus lewat cascade, tapi filenya harus dihapus sendiri.
+        Storage::disk('public')->delete($production->designSketches()->pluck('path')->all());
         $production->delete();
 
         return redirect()->route('admin.productions.index')->with('success', 'Batch dihapus.');
@@ -389,6 +393,10 @@ class ProductionController extends Controller
 
         if ($action === 'start' && ! $production->stageUnlocked($stage)) {
             return back()->with('error', $this->lockReason($production, $stage));
+        }
+
+        if ($action === 'finish' && $stage->stage === 'design' && ! $production->designSketches()->exists()) {
+            return back()->with('error', 'Unggah minimal satu sketsa desain sebelum menyelesaikan tahap Desain.');
         }
 
         // Menutup batch yang dirinci per ukuran: hasil QC harus dibagi ke tiap ukuran.

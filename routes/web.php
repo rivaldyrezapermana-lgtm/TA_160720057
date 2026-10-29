@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\ProductionController;
+use App\Http\Controllers\Admin\ProductionDesignSketchController;
 use App\Http\Controllers\Admin\ProductionMachineController;
 use App\Http\Controllers\Admin\RecommendationController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
@@ -129,6 +130,8 @@ Route::middleware(['auth', 'role:admin,karyawan'])
     Route::patch('purchases/{purchase}/cancel', [PurchaseController::class, 'cancel'])->name('purchases.cancel');
     Route::resource('productions', ProductionController::class);
     Route::patch('productions/{production}/stage/{stage}', [ProductionController::class, 'updateStage'])->name('productions.stage');
+    Route::post('productions/{production}/sketches', [ProductionDesignSketchController::class, 'store'])->name('productions.sketches.store');
+    Route::delete('productions/{production}/sketches/{sketch}', [ProductionDesignSketchController::class, 'destroy'])->name('productions.sketches.destroy');
 
     // Fuzzy Mamdani recommendation
     Route::prefix('recommendations')->name('recommendations.')->group(function () {
