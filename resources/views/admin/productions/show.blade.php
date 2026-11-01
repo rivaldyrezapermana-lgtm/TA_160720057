@@ -18,6 +18,23 @@
                 @if ($production->sample_size)
                     <div><p class="text-ink-500">Ukuran Sampel</p><p class="font-medium">{{ $production->sample_size }}</p></div>
                 @endif
+                @if ($production->hasSamplePhase())
+                    <div>
+                        <p class="text-ink-500">Sampel</p>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <p class="font-medium">
+                                @if ($production->sampleSource)
+                                    Pakai sampel {{ $production->sampleSource->code }}
+                                @elseif ($production->sampleApproved())
+                                    Disetujui
+                                @else
+                                    Belum disetujui
+                                @endif
+                            </p>
+                            <button type="button" onclick="openModal('modal-sampel')" class="btn-secondary text-xs">Cek Sampel</button>
+                        </div>
+                    </div>
+                @endif
                 <div><p class="text-ink-500">Mulai</p><p class="font-medium">{{ $production->start_date?->translatedFormat('d M Y') ?? '-' }}</p></div>
                 <div><p class="text-ink-500">Estimasi Selesai</p><p class="font-medium">{{ $production->end_date?->translatedFormat('d M Y') ?? '-' }}</p></div>
                 <div class="md:col-span-2"><p class="text-ink-500">Catatan</p><p class="text-ink-800 mt-1">{{ $production->notes ?: '-' }}</p></div>
@@ -63,7 +80,9 @@
             @continue (! isset($grouped[$phase]))
             <x-ui.card :title="$phaseMeta[$phase][0]" :subtitle="$phaseMeta[$phase][1]">
                 @if ($phase === 'sample' && $production->sample_size)
-                    <p class="text-xs text-ink-500 mb-3">Sampel dibuat dalam ukuran <span class="font-medium text-ink-800">{{ $production->sample_size }}</span>.</p>
+                    <p id="tahap-sampel" class="text-xs text-ink-500 mb-3 scroll-mt-24">Sampel dibuat dalam ukuran <span class="font-medium text-ink-800">{{ $production->sample_size }}</span>.</p>
+                @elseif ($phase === 'sample')
+                    <span id="tahap-sampel" class="scroll-mt-24"></span>
                 @endif
                 @if ($phase === 'mass' && $production->hasSamplePhase() && ! $production->sampleApproved())
                     <p class="text-xs text-amber-600 mb-3">Terkunci sampai sampel disetujui.</p>
@@ -79,7 +98,7 @@
                                 ? $production->stageProgressPct($stage)
                                 : ($stage->status === 'completed' ? 100 : 0);
                             $machines = $machinesByStage[$stage->stage] ?? [];
-                            $maxIn = $production->stageMaxInput($stage);
+                            $maxOut = $production->stageMaxOutput($stage);
                             $minOut = $production->stageMinOutput($stage);
                             $isSampleQc = $stage->phase === 'sample' && $stage->stage === 'qc_packing';
                             // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
@@ -115,16 +134,22 @@
                                     @csrf @method('PATCH')
                                     @if ($qtyEditable)
                                         <div class="field !mb-0">
-                                            <label class="label text-xs">Input</label>
-                                            <input type="number" name="input_qty" min="0" max="{{ $maxIn }}" value="{{ $stage->input_qty }}" class="input" {{ $locked ? 'disabled' : '' }}>
-                                            <p class="text-[11px] text-ink-400 mt-0.5">Maks {{ $maxIn }} pcs</p>
+                                            <label class="label text-xs">Input (sisa)</label>
+                                            <p class="input bg-ink-50 tabular-nums">{{ $stage->input_qty }} pcs</p>
+                                            <p class="text-[11px] text-ink-400 mt-0.5">Diterima {{ $maxOut }} pcs · berkurang otomatis saat output diisi</p>
                                         </div>
                                         <div class="field !mb-0">
-                                            <label class="label text-xs">Output</label>
-                                            <input type="number" name="output_qty" min="{{ $minOut }}" value="{{ $stage->output_qty }}" class="input" {{ $locked ? 'disabled' : '' }}>
-                                            @if ($minOut > 0)
-                                                <p class="text-[11px] text-ink-400 mt-0.5">Min {{ $minOut }} pcs</p>
-                                            @endif
+                                            <label class="label text-xs">Output (total)</label>
+                                            <input type="number" name="output_qty" min="{{ $minOut }}" max="{{ $maxOut }}" value="{{ $stage->output_qty }}" class="input" {{ $locked ? 'disabled' : '' }}>
+                                            <p class="text-[11px] text-ink-400 mt-0.5">
+                                                @if ($production->nextQtyStage($stage))
+                                                    Diteruskan ke {{ $production->nextQtyStage($stage)->label() }}
+                                                @else
+                                                    Masuk stok saat Selesai
+                                                @endif
+                                                @if ($minOut > 0) · min {{ $minOut }} pcs @endif
+                                            </p>
+                                            @error('output_qty')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
                                         </div>
                                     @elseif ($hasQty)
                                         <div class="field !mb-0 md:col-span-2">
@@ -312,4 +337,66 @@
         </x-ui.card>
     </div>
 </div>
+
+@if ($production->hasSamplePhase())
+    @php
+        $sampleQc = $production->stages->first(fn ($s) => $s->phase === 'sample' && $s->stage === 'qc_packing');
+        $sampleStatus = match (true) {
+            $production->sampleSource !== null => ['text-emerald-700', 'Pakai sampel '.$production->sampleSource->code],
+            $production->sampleApproved() => ['text-emerald-700', 'Disetujui '.$production->sample_approved_at->translatedFormat('d M Y')],
+            $sampleQc?->status === 'completed' => ['text-amber-600', 'Sudah jadi, menunggu dicek'],
+            $production->stages->contains(fn ($s) => $s->phase === 'sample' && $s->status !== 'pending') => ['text-ink-700', 'Sedang dibuat'],
+            default => ['text-ink-500', 'Belum dibuat'],
+        };
+        $canReuse = ! $locked && $existingSample !== null && $production->canReuseSample();
+    @endphp
+    <x-ui.modal id="modal-sampel" title="Cek Sampel — {{ $production->product?->name ?? $production->code }}" size="xl">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+            <div><p class="text-ink-500 text-xs">Batch</p><p class="font-medium">{{ $production->code }}</p></div>
+            <div><p class="text-ink-500 text-xs">Ukuran</p><p class="font-medium">{{ $production->sample_size ?? '—' }}</p></div>
+            <div><p class="text-ink-500 text-xs">Status</p><p class="font-medium {{ $sampleStatus[0] }}">{{ $sampleStatus[1] }}</p></div>
+            <div><p class="text-ink-500 text-xs">Revisi</p><p class="font-medium tabular-nums">{{ $production->sample_revision_count }} kali</p></div>
+        </div>
+
+        @if ($existingSample)
+            <div class="rounded-lg border px-4 py-3 mb-4 {{ $canReuse ? 'border-emerald-200 bg-emerald-50' : 'border-ink-100 bg-ink-50' }}">
+                <p class="text-sm text-ink-800">
+                    Produk ini sudah punya sampel dari batch <span class="font-medium">{{ $existingSample->code }}</span>
+                    @if ($existingSample->sample_approved_at)
+                        (disetujui {{ $existingSample->sample_approved_at->translatedFormat('d M Y') }}).
+                    @else
+                        (batch selesai).
+                    @endif
+                </p>
+                @if ($canReuse)
+                    <p class="text-xs text-ink-500 mt-1">Tidak perlu buat sampel lagi — tahap sampel batch ini dilewati dan langsung ke produksi massal setelah pola selesai.</p>
+                    <form action="{{ route('admin.productions.reuse-sample', $production->id) }}" method="POST" class="mt-2">
+                        @csrf
+                        <button class="btn-primary text-xs">Pakai sampel ini, langsung produksi massal</button>
+                    </form>
+                @elseif (! $production->sampleSource && ! $production->sampleApproved())
+                    <p class="text-xs text-ink-500 mt-1">Sampel batch ini sudah mulai dibuat, jadi lanjutkan di Tahap Sampel.</p>
+                @endif
+            </div>
+
+            <p class="label text-xs">Foto Desain {{ $existingSample->code }}</p>
+            @include('admin.productions.partials.sketch-grid', ['sketches' => $existingSample->designSketches])
+        @elseif (! $production->sampleApproved())
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 mb-4">
+                <p class="text-sm text-ink-800">Produk ini belum punya sampel. Buat sampel dulu (1 pcs) sebelum produksi massal.</p>
+                <a href="#tahap-sampel" onclick="closeModal('modal-sampel')" class="btn-primary text-xs mt-2 inline-flex">Ke Tahap Sampel</a>
+            </div>
+        @endif
+
+        @if (! $production->sampleSource)
+            <p class="label text-xs mt-4">Foto Desain Batch Ini</p>
+            @include('admin.productions.partials.sketch-grid', ['sketches' => $production->designSketches])
+        @endif
+
+        @if ($production->sampleRevisions->isNotEmpty())
+            <p class="label text-xs mt-4">Catatan Revisi Terakhir</p>
+            <p class="text-sm text-ink-700">{{ $production->sampleRevisions->first()->notes }}</p>
+        @endif
+    </x-ui.modal>
+@endif
 @endsection

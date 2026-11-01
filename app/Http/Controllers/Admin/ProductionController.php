@@ -224,7 +224,12 @@ class ProductionController extends Controller
             'est' => (int) $line->qty_required * $units,
         ]);
 
-        return view('admin.productions.show', compact('production', 'machinesByStage', 'bahan'));
+        // Untuk tombol Cek Sampel: sampel produk ini dari batch lain, kalau ada.
+        $production->load('sampleSource.designSketches');
+        $existingSample = $production->sampleSource
+            ?? ($production->sampleApproved() ? null : $production->existingSampleBatch()?->load('designSketches'));
+
+        return view('admin.productions.show', compact('production', 'machinesByStage', 'bahan', 'existingSample'));
     }
 
     public function edit(Production $production)
@@ -279,14 +284,23 @@ class ProductionController extends Controller
             ])->withInput();
         }
 
-        $minPlanned = (int) $production->stages()->max('input_qty');
+        // Cutting massal menerima seluruh target; yang sudah dipotong tidak bisa dibatalkan.
+        $massCutting = $production->stages()->where('phase', 'mass')->where('stage', 'cutting')->first();
+        $minPlanned = (int) ($massCutting?->output_qty ?? 0);
         if ((int) $data['planned_qty'] < $minPlanned) {
             return back()->withErrors([
-                'planned_qty' => 'Target produksi tidak boleh lebih kecil dari input tahap yang sudah berjalan ('.$minPlanned.' pcs).',
+                'planned_qty' => 'Target produksi tidak boleh lebih kecil dari jumlah yang sudah dipotong ('.$minPlanned.' pcs).',
             ])->withInput();
         }
 
-        DB::transaction(function () use ($production, $data, $plan) {
+        DB::transaction(function () use ($production, $data, $plan, $massCutting) {
+            // Sisa cutting massal mengikuti target baru.
+            if ($massCutting !== null) {
+                $massCutting->forceFill([
+                    'input_qty' => (int) $data['planned_qty'] - (int) $massCutting->output_qty,
+                ])->save();
+            }
+
             $production->fill([
                 'production_machine_id' => $data['production_machine_id'] ?? null,
                 'planned_qty' => $data['planned_qty'],
@@ -356,17 +370,17 @@ class ProductionController extends Controller
         $qtyEditable = $stage->carriesQty() && $stage->phase === 'mass';
 
         if ($qtyEditable) {
-            $maxInput = $production->stageMaxInput($stage);
+            // Input tahap massal tidak diketik: input = sisa yang belum dikerjakan,
+            // otomatis berkurang saat output bertambah dan diteruskan ke tahap berikutnya.
+            $maxOutput = $production->stageMaxOutput($stage);
             $minOutput = $production->stageMinOutput($stage);
 
             $data = $request->validate([
-                'input_qty' => ['nullable', 'integer', 'min:0', 'max:'.$maxInput],
-                'output_qty' => ['nullable', 'integer', 'min:'.$minOutput, 'lte:input_qty'],
+                'output_qty' => ['nullable', 'integer', 'min:'.$minOutput, 'max:'.$maxOutput],
                 'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ], [
-                'input_qty.max' => 'Input maksimal '.$maxInput.' pcs (dibatasi target batch dan output tahap sebelumnya).',
-                'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena tahap berikutnya sudah menerima sebanyak itu.',
-                'output_qty.lte' => 'Output tidak boleh melebihi input.',
+                'output_qty.max' => 'Output maksimal '.$maxOutput.' pcs (jumlah yang diterima tahap ini).',
+                'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena sisanya sudah dikerjakan tahap berikutnya.',
             ]);
         } elseif ($stage->phase === 'sample') {
             $data = $request->validate([
@@ -410,9 +424,20 @@ class ProductionController extends Controller
         }
 
         DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizeOutput) {
-            if ($qtyEditable) {
-                $stage->input_qty = $data['input_qty'] ?? $stage->input_qty;
-                $stage->output_qty = $data['output_qty'] ?? $stage->output_qty;
+            if ($qtyEditable && isset($data['output_qty'])) {
+                $delta = (int) $data['output_qty'] - (int) $stage->output_qty;
+
+                if ($delta !== 0) {
+                    $stage->input_qty = (int) $stage->input_qty - $delta;
+                    $stage->output_qty = (int) $data['output_qty'];
+
+                    // Output tahap ini menjadi input (sisa) tahap berikutnya.
+                    $next = $production->nextQtyStage($stage);
+                    if ($next !== null) {
+                        $next->input_qty = (int) $next->input_qty + $delta;
+                        $next->save();
+                    }
+                }
             }
 
             $stage->production_machine_id = $data['production_machine_id'] ?? $stage->production_machine_id;
@@ -501,6 +526,43 @@ class ProductionController extends Controller
             'gate_50' => 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.',
             default => 'Tahap sebelumnya belum selesai. Belum bisa dimulai.',
         };
+    }
+
+    /**
+     * Produk ini sudah punya sampel dari batch lain: lewati fase sampel batch ini
+     * dan langsung buka produksi massal. Tahap sampel dihapus (tidak ada kain yang
+     * dipotong untuk sampel) dan urutan tahap dirapatkan lagi.
+     */
+    public function reuseSample(Production $production)
+    {
+        $production->load('stages');
+
+        if ($production->status === 'completed') {
+            return back()->with('error', 'Batch sudah selesai.');
+        }
+
+        if (! $production->canReuseSample()) {
+            return back()->with('error', 'Fase sampel batch ini sudah berjalan, jadi tidak bisa memakai sampel lain.');
+        }
+
+        $source = $production->existingSampleBatch();
+        if ($source === null) {
+            return back()->with('error', 'Produk ini belum punya sampel. Buat sampel dulu di Tahap Sampel.');
+        }
+
+        DB::transaction(function () use ($production, $source) {
+            $production->stages()->where('phase', 'sample')->delete();
+
+            $production->stages()->orderBy('sort_order')->get()
+                ->each(fn (ProductionStage $s, int $i) => $s->forceFill(['sort_order' => $i + 1])->save());
+
+            $production->forceFill([
+                'sample_approved_at' => now(),
+                'sample_source_production_id' => $source->id,
+            ])->save();
+        });
+
+        return back()->with('success', 'Memakai sampel dari '.$source->code.'. Produksi massal bisa dimulai setelah pola selesai.');
     }
 
     /** Sampel disetujui: fase massal terbuka. */

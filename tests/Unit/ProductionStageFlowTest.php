@@ -187,24 +187,27 @@ class ProductionStageFlowTest extends TestCase
         $this->assertTrue($sewing($prod->fresh('stages')));
     }
 
-    public function test_mass_stage_max_input_is_capped_by_planned_and_previous_output(): void
+    public function test_mass_stage_max_output_is_what_the_stage_received(): void
     {
         $prod = $this->batch(100);
 
-        $this->assertSame(100, $prod->stageMaxInput($this->stage($prod, 'mass', 'cutting')));
+        $this->assertSame(100, $prod->stageMaxOutput($this->stage($prod, 'mass', 'cutting')));
 
-        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['output_qty' => 60]);
+        // Cutting sudah meneruskan 60 pcs: sisa 40, sewing menerima 60.
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['input_qty' => 40, 'output_qty' => 60]);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 60]);
         $prod = $prod->fresh('stages');
 
-        $this->assertSame(60, $prod->stageMaxInput($this->stage($prod, 'mass', 'sewing')));
+        $this->assertSame(100, $prod->stageMaxOutput($this->stage($prod, 'mass', 'cutting')));
+        $this->assertSame(60, $prod->stageMaxOutput($this->stage($prod, 'mass', 'sewing')));
     }
 
-    public function test_sample_stage_input_is_capped_at_one(): void
+    public function test_sample_stage_output_is_capped_at_one(): void
     {
         $prod = $this->batch(100);
 
-        $this->assertSame(1, $prod->stageMaxInput($this->stage($prod, 'sample', 'cutting')));
-        $this->assertSame(1, $prod->stageMaxInput($this->stage($prod, 'sample', 'qc_packing')));
+        $this->assertSame(1, $prod->stageMaxOutput($this->stage($prod, 'sample', 'cutting')));
+        $this->assertSame(1, $prod->stageMaxOutput($this->stage($prod, 'sample', 'qc_packing')));
     }
 
     public function test_stages_without_qty_report_zero_bounds(): void
@@ -213,14 +216,16 @@ class ProductionStageFlowTest extends TestCase
 
         $this->assertFalse($this->stage($prod, 'common', 'design')->carriesQty());
         $this->assertFalse($this->stage($prod, 'common', 'pola')->carriesQty());
-        $this->assertSame(0, $prod->stageMaxInput($this->stage($prod, 'common', 'pola')));
+        $this->assertSame(0, $prod->stageMaxOutput($this->stage($prod, 'common', 'pola')));
         $this->assertSame(0, $prod->stageMinOutput($this->stage($prod, 'common', 'design')));
     }
 
-    public function test_mass_stage_min_output_follows_the_next_stage_input(): void
+    public function test_mass_stage_min_output_is_what_the_next_stage_already_worked_on(): void
     {
         $prod = $this->batch(100);
-        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 50]);
+        // Cutting meneruskan 60; sewing sudah mengerjakan 50, sisanya 10.
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['input_qty' => 40, 'output_qty' => 60]);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 10, 'output_qty' => 50]);
         $prod = $prod->fresh('stages');
 
         $this->assertSame(50, $prod->stageMinOutput($this->stage($prod, 'mass', 'cutting')));

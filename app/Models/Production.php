@@ -9,7 +9,7 @@ class Production extends Model
     protected $fillable = [
         'product_id', 'user_id', 'production_machine_id', 'code', 'planned_qty', 'actual_qty',
         'start_date', 'end_date', 'status', 'notes', 'sample_approved_at', 'sample_revision_count',
-        'sample_size',
+        'sample_size', 'sample_source_production_id',
     ];
 
     protected $casts = [
@@ -87,6 +87,42 @@ class Production extends Model
         return $this->sample_approved_at !== null;
     }
 
+    /** Batch asal sampel, kalau batch ini memakai sampel yang sudah ada. */
+    public function sampleSource()
+    {
+        return $this->belongsTo(Production::class, 'sample_source_production_id');
+    }
+
+    /**
+     * Batch lain dari produk yang sama yang sampelnya sudah ada: sampelnya
+     * disetujui, atau batchnya sudah selesai (produk jadinya sekaligus bukti
+     * sampel). Yang terbaru dipakai.
+     */
+    public function existingSampleBatch(): ?Production
+    {
+        return static::query()
+            ->where('product_id', $this->product_id)
+            ->whereKeyNot($this->getKey())
+            ->where(fn ($q) => $q->whereNotNull('sample_approved_at')->orWhere('status', 'completed'))
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Fase sampel batch ini masih bisa dilewati: belum disetujui, belum ada
+     * tahap sampel yang dimulai, dan belum pernah direvisi.
+     */
+    public function canReuseSample(): bool
+    {
+        $sampleStages = $this->stages->where('phase', 'sample');
+
+        return $this->hasSamplePhase()
+            && ! $this->sampleApproved()
+            && $sampleStages->isNotEmpty()
+            && $sampleStages->every(fn (ProductionStage $s) => $s->status === 'pending')
+            && (int) $this->sample_revision_count === 0;
+    }
+
     /** Pcs sampel yang memakan bahan: sampel yang disetujui plus tiap putaran revisi. */
     public function sampleUnits(): int
     {
@@ -136,8 +172,10 @@ class Production extends Model
         }
 
         if ($stage->phase === 'mass' && $prev->phase !== 'mass') {
+            // Kalau sampel memakai batch lain, tahap sebelumnya adalah Pola —
+            // persetujuan saja tidak cukup, polanya harus selesai dulu.
             return $this->hasSamplePhase()
-                ? $this->sampleApproved()
+                ? $this->sampleApproved() && ($prev->phase === 'sample' || $prev->status === 'completed')
                 : $prev->status === 'completed';
         }
 
@@ -148,8 +186,27 @@ class Production extends Model
         return $prev->status === 'completed';
     }
 
-    /** Batas atas input tahap: target batch, dibatasi output tahap massal sebelumnya. */
-    public function stageMaxInput(ProductionStage $stage): int
+    /**
+     * Tahap massal berikutnya yang menerima output tahap ini, atau null kalau
+     * tahap ini yang terakhir (QC & Packing) atau bukan tahap massal.
+     */
+    public function nextQtyStage(ProductionStage $stage): ?ProductionStage
+    {
+        if ($stage->phase !== 'mass' || ! $stage->carriesQty()) {
+            return null;
+        }
+
+        $next = $this->nextStage($stage);
+
+        return ($next !== null && $next->phase === 'mass' && $next->carriesQty()) ? $next : null;
+    }
+
+    /**
+     * Jumlah pcs yang sudah diterima tahap. Di fase massal `input_qty` adalah
+     * sisa yang belum dikerjakan dan `output_qty` adalah total yang sudah
+     * diteruskan, jadi yang diterima = sisa + output.
+     */
+    public function stageReceived(ProductionStage $stage): int
     {
         if (! $stage->carriesQty()) {
             return 0;
@@ -159,30 +216,29 @@ class Production extends Model
             return 1;
         }
 
-        $prev = $this->previousStage($stage);
-        $planned = (int) $this->planned_qty;
-
-        if ($prev === null || $prev->phase !== 'mass' || ! $prev->carriesQty()) {
-            return $planned;
-        }
-
-        return min($planned, (int) $prev->output_qty);
+        return (int) $stage->input_qty + (int) $stage->output_qty;
     }
 
-    /** Batas bawah output tahap: jumlah yang sudah diterima tahap berikutnya di fase yang sama. */
+    /** Batas atas output tahap: semua pcs yang sudah diterima tahap itu. */
+    public function stageMaxOutput(ProductionStage $stage): int
+    {
+        return $this->stageReceived($stage);
+    }
+
+    /**
+     * Batas bawah output tahap massal. Menurunkan output menarik kembali pcs dari
+     * sisa tahap berikutnya, jadi tidak boleh melebihi sisa tersebut — pcs yang
+     * sudah dikerjakan tahap berikutnya tidak bisa ditarik.
+     */
     public function stageMinOutput(ProductionStage $stage): int
     {
-        if (! $stage->carriesQty() || $stage->phase === 'sample') {
+        $next = $this->nextQtyStage($stage);
+
+        if ($next === null) {
             return 0;
         }
 
-        $next = $this->nextStage($stage);
-
-        if ($next === null || $next->phase !== $stage->phase || ! $next->carriesQty()) {
-            return 0;
-        }
-
-        return (int) $next->input_qty;
+        return max(0, (int) $stage->output_qty - (int) $next->input_qty);
     }
 
     /**
@@ -199,6 +255,10 @@ class Production extends Model
         }
 
         if ($prev->phase !== 'mass') {
+            if ($prev->phase !== 'sample' && $prev->status !== 'completed') {
+                return 'previous_incomplete';
+            }
+
             return $this->hasSamplePhase() ? 'sample_not_approved' : 'previous_incomplete';
         }
 

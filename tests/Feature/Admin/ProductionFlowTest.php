@@ -181,7 +181,37 @@ class ProductionFlowTest extends TestCase
             ->assertSessionHasErrors('output_qty');
     }
 
-    public function test_input_cannot_exceed_planned_target(): void
+    public function test_output_reduces_input_and_becomes_the_next_stage_input(): void
+    {
+        [$prod] = $this->batch();
+        $this->approveSample($prod);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['status' => 'in_progress']);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+        $sewing = $this->stage($prod, 'mass', 'sewing');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'output_qty' => 60])
+            ->assertSessionHas('success');
+
+        $this->assertSame([40, 60], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame(60, $sewing->fresh()->input_qty);
+
+        // Output diisi total, bukan tambahan: 70 berarti 10 pcs lagi diteruskan.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'output_qty' => 70]);
+
+        $this->assertSame([30, 70], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame(70, $sewing->fresh()->input_qty);
+
+        // Koreksi turun mengembalikan pcs ke sisa cutting.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'output_qty' => 65]);
+
+        $this->assertSame([35, 65], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame(65, $sewing->fresh()->input_qty);
+    }
+
+    public function test_mass_input_cannot_be_typed_manually(): void
     {
         [$prod] = $this->batch();
         $this->approveSample($prod);
@@ -189,53 +219,31 @@ class ProductionFlowTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'input_qty' => 150, 'output_qty' => 0,
+                'action' => 'save', 'input_qty' => 5, 'output_qty' => 0,
             ])
-            ->assertSessionHasErrors('input_qty');
+            ->assertSessionHas('success');
 
         $this->assertSame(100, $cutting->fresh()->input_qty);
     }
 
-    public function test_input_cannot_exceed_previous_stage_output(): void
+    public function test_output_cannot_drop_below_what_the_next_stage_already_worked_on(): void
     {
         [$prod] = $this->batch();
         $this->approveSample($prod);
         $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
-            ->update(['output_qty' => 60, 'status' => 'in_progress']);
-        $sewing = $this->stage($prod, 'mass', 'sewing');
-
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $sewing]), [
-                'action' => 'save', 'input_qty' => 70, 'output_qty' => 0,
-            ])
-            ->assertSessionHasErrors('input_qty');
-
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $sewing]), [
-                'action' => 'save', 'input_qty' => 60, 'output_qty' => 0,
-            ])
-            ->assertSessionHas('success');
-
-        $this->assertSame(60, $sewing->fresh()->input_qty);
-    }
-
-    public function test_output_cannot_drop_below_next_stage_input(): void
-    {
-        [$prod] = $this->batch();
-        $this->approveSample($prod);
-        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
-            ->update(['output_qty' => 60, 'status' => 'in_progress']);
+            ->update(['input_qty' => 40, 'output_qty' => 60, 'status' => 'in_progress']);
         $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')
-            ->update(['input_qty' => 50, 'status' => 'in_progress']);
+            ->update(['input_qty' => 10, 'output_qty' => 50, 'status' => 'in_progress']);
         $cutting = $this->stage($prod, 'mass', 'cutting');
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'input_qty' => 100, 'output_qty' => 40,
+                'action' => 'save', 'output_qty' => 40,
             ])
             ->assertSessionHasErrors('output_qty');
 
         $this->assertSame(60, $cutting->fresh()->output_qty);
+        $this->assertSame(10, $this->stage($prod, 'mass', 'sewing')->input_qty);
     }
 
     public function test_starting_mass_qc_packing_moves_the_batch_to_qc_status(): void
@@ -307,16 +315,19 @@ class ProductionFlowTest extends TestCase
         [$prod] = $this->batch();
         $this->approveSample($prod);
         $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
-            ->update(['input_qty' => 100, 'output_qty' => 90, 'status' => 'completed']);
+            ->update(['input_qty' => 10, 'output_qty' => 90, 'status' => 'completed']);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 90]);
         $cutting = $this->stage($prod, 'mass', 'cutting');
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'input_qty' => 100, 'output_qty' => 85,
+                'action' => 'save', 'output_qty' => 85,
             ])
             ->assertSessionHas('success');
 
         $this->assertSame(85, $cutting->fresh()->output_qty);
+        $this->assertSame(15, $cutting->fresh()->input_qty);
+        $this->assertSame(85, $this->stage($prod, 'mass', 'sewing')->input_qty);
         $this->assertSame('completed', $cutting->fresh()->status);
     }
 
@@ -356,9 +367,11 @@ class ProductionFlowTest extends TestCase
         $this->assertSame('completed', $prod->fresh()->status);
     }
 
-    public function test_planned_qty_cannot_drop_below_recorded_stage_input(): void
+    public function test_planned_qty_cannot_drop_below_what_was_already_cut(): void
     {
-        [$prod] = $this->batch(); // mass cutting sudah punya input_qty = 100
+        [$prod] = $this->batch();
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['input_qty' => 40, 'output_qty' => 60]);
 
         $this->actingAs($this->admin())
             ->put(route('admin.productions.update', $prod), [
@@ -367,6 +380,15 @@ class ProductionFlowTest extends TestCase
             ->assertSessionHasErrors('planned_qty');
 
         $this->assertSame(100, $prod->fresh()->planned_qty);
+
+        // Target turun ke 80: sisa cutting ikut jadi 80 - 60 = 20.
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'planned_qty' => 80, 'start_date' => now()->toDateString(), 'status' => 'in_progress',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame(20, $this->stage($prod, 'mass', 'cutting')->input_qty);
     }
 
     public function test_planned_qty_cannot_cross_from_single_pcs_to_mass(): void
@@ -393,5 +415,29 @@ class ProductionFlowTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertSame(150, $prod->fresh()->planned_qty);
+    }
+
+    public function test_show_page_has_a_sample_viewer_and_read_only_mass_input(): void
+    {
+        [$prod] = $this->batch();
+        $this->approveSample($prod);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.productions.show', $prod))
+            ->assertOk()
+            ->assertSee('Cek Sampel')
+            ->assertSee('id="modal-sampel"', false)
+            ->assertSee('Input (sisa)')
+            ->assertDontSee('name="input_qty"', false);
+    }
+
+    public function test_single_pcs_batch_has_no_sample_viewer(): void
+    {
+        [$prod] = $this->batch(1);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.productions.show', $prod))
+            ->assertOk()
+            ->assertDontSee('Cek Sampel');
     }
 }
