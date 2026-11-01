@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Production;
 use App\Models\ProductionStage;
+use App\Models\ProductionStageSize;
 use App\Models\ProductSize;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,12 +52,36 @@ class ProductionSizeTest extends TestCase
         return $p->stages()->where('phase', $phase)->where('stage', $stage)->firstOrFail();
     }
 
-    /** Lompati persiapan, sampel, dan dua tahap massal pertama; QC massal sedang berjalan. */
+    /**
+     * Batch lama (tanpa rincian per ukuran di tahap): lompati persiapan, sampel,
+     * dan dua tahap massal pertama; QC massal sedang berjalan.
+     */
     private function readyForMassQc(Production $p, int $qty): ProductionStage
     {
+        ProductionStageSize::whereIn('production_stage_id', $p->stages()->pluck('id'))->delete();
         $p->stages()->where('phase', '!=', 'mass')->update(['status' => 'completed', 'output_qty' => 1]);
         $p->forceFill(['sample_approved_at' => now()])->save();
         $p->stages()->where('phase', 'mass')->update(['input_qty' => $qty, 'output_qty' => $qty, 'status' => 'in_progress']);
+
+        return $this->stage($p, 'mass', 'qc_packing');
+    }
+
+    /** Batch berukuran: cutting & sewing selesai penuh tiap ukuran; QC massal berjalan. */
+    private function readyForSizedQc(Production $p, array $sizes): ProductionStage
+    {
+        $p->stages()->where('phase', '!=', 'mass')->update(['status' => 'completed', 'output_qty' => 1]);
+        $p->forceFill(['sample_approved_at' => now()])->save();
+
+        foreach ($p->stages()->where('phase', 'mass')->with('sizeRows')->get() as $stage) {
+            $isQc = $stage->stage === 'qc_packing';
+            foreach ($stage->sizeRows as $row) {
+                $row->update(['input_qty' => $isQc ? $sizes[$row->size] : 0, 'output_qty' => $isQc ? 0 : $sizes[$row->size]]);
+            }
+            $stage->load('sizeRows');
+            $stage->syncTotalsFromSizes();
+            $stage->status = 'in_progress';
+            $stage->save();
+        }
 
         return $this->stage($p, 'mass', 'qc_packing');
     }
@@ -153,12 +178,11 @@ class ProductionSizeTest extends TestCase
         $product = $this->product();
         $this->store($product, ['sizes' => ['S' => 10, 'M' => 30]]);
         $prod = Production::latest('id')->first();
-        $qc = $this->readyForMassQc($prod, 38);
+        $qc = $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $qc]), [
-                'action' => 'finish', 'input_qty' => 38, 'output_qty' => 38,
-                'size_output' => ['S' => 9, 'M' => 29],
+                'action' => 'finish', 'size_qty' => ['S' => 9, 'M' => 29],
             ])
             ->assertSessionHasNoErrors();
 
@@ -177,11 +201,11 @@ class ProductionSizeTest extends TestCase
         $product = $this->product();
         $this->store($product, ['sizes' => ['M' => 20]]);
         $prod = Production::latest('id')->first();
-        $qc = $this->readyForMassQc($prod, 18);
+        $qc = $this->readyForSizedQc($prod, ['M' => 20]);
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $qc]), [
-                'action' => 'finish', 'input_qty' => 18, 'output_qty' => 18,
+                'action' => 'finish', 'size_qty' => ['M' => 18],
             ])
             ->assertSessionHasNoErrors();
 
@@ -247,9 +271,109 @@ class ProductionSizeTest extends TestCase
     {
         $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
         $prod = Production::latest('id')->first();
+        $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
+
+        $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
+            ->assertOk()->assertSee('size_qty[S]', false)->assertDontSee('size_output[S]', false);
+    }
+
+    public function test_legacy_batch_still_asks_for_size_output_during_mass_qc(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
         $this->readyForMassQc($prod, 40);
 
         $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
             ->assertOk()->assertSee('size_output[S]', false);
+    }
+
+    public function test_store_creates_per_size_rows_for_each_mass_stage(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+
+        $this->assertSame(['S' => 10, 'M' => 30], $this->stage($prod, 'mass', 'cutting')->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(['S' => 0, 'M' => 0], $this->stage($prod, 'mass', 'sewing')->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(0, ProductionStageSize::whereIn('production_stage_id', $prod->stages()->where('phase', '!=', 'mass')->pluck('id'))->count());
+    }
+
+    public function test_per_size_output_flows_into_the_same_size_of_the_next_stage(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $prod->stages()->where('phase', '!=', 'mass')->update(['status' => 'completed']);
+        $prod->forceFill(['sample_approved_at' => now()])->save();
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+        $cutting->update(['status' => 'in_progress']);
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
+                'action' => 'save', 'size_qty' => ['S' => 4, 'M' => 25],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $cutting = $cutting->fresh('sizeRows');
+        $sewing = $this->stage($prod, 'mass', 'sewing')->load('sizeRows');
+        $this->assertSame(['S' => 6, 'M' => 5], $cutting->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(['S' => 4, 'M' => 25], $cutting->sizeRows->pluck('output_qty', 'size')->all());
+        $this->assertSame([11, 29], [$cutting->input_qty, $cutting->output_qty]);
+        $this->assertSame(['S' => 4, 'M' => 25], $sewing->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(29, $sewing->input_qty);
+    }
+
+    public function test_per_size_output_cannot_exceed_what_the_size_received(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $qc = $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $qc]), [
+                'action' => 'finish', 'size_qty' => ['S' => 12, 'M' => 26],
+            ])
+            ->assertSessionHasErrors('size_qty');
+
+        $this->assertNotSame('completed', $prod->fresh()->status);
+    }
+
+    public function test_per_size_output_cannot_drop_below_what_the_next_stage_already_used(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
+        // Sewing S meneruskan 10 ke QC; QC sudah mengerjakan 8, jadi sewing S minimal 8.
+        $this->stage($prod, 'mass', 'qc_packing')->sizeRows()->where('size', 'S')->update(['input_qty' => 2, 'output_qty' => 8]);
+        $sewing = $this->stage($prod, 'mass', 'sewing');
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $sewing]), [
+                'action' => 'save', 'size_qty' => ['S' => 7, 'M' => 30],
+            ])
+            ->assertSessionHasErrors('size_qty');
+    }
+
+    public function test_update_adjusts_the_remaining_cutting_per_size(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+        $cutting->sizeRows()->where('size', 'M')->update(['input_qty' => 20, 'output_qty' => 10]);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'sizes' => ['M' => 15, 'L' => 5], 'start_date' => now()->toDateString(), 'status' => 'planned',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $cutting = $cutting->fresh('sizeRows');
+        $this->assertSame(['M' => 5, 'L' => 5], $cutting->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(10, $cutting->input_qty);
+        $this->assertSame(['M', 'L'], $this->stage($prod, 'mass', 'sewing')->sizeRows->pluck('size')->all());
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'sizes' => ['M' => 8, 'L' => 5], 'start_date' => now()->toDateString(), 'status' => 'planned',
+            ])
+            ->assertSessionHasErrors('sizes');
     }
 }

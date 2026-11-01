@@ -102,14 +102,64 @@ class ProductionController extends Controller
             }
 
             foreach ($this->stageBlueprint((int) $data['planned_qty']) as $row) {
-                $production->stages()->create($row + ['status' => 'pending', 'output_qty' => 0]);
+                $stage = $production->stages()->create($row + ['status' => 'pending', 'output_qty' => 0]);
+
+                // Tahap massal dirinci per ukuran: cutting menerima target tiap ukuran.
+                if ($stage->phase === 'mass' && $stage->carriesQty()) {
+                    foreach ($plan['sizes'] as $size => $qty) {
+                        $stage->sizeRows()->create([
+                            'size' => $size,
+                            'input_qty' => $stage->stage === 'cutting' ? $qty : 0,
+                            'output_qty' => 0,
+                        ]);
+                    }
+                }
             }
 
             return $production;
         });
 
-        return redirect()->route('admin.productions.show', $production->id)
-            ->with('success', 'Batch produksi dibuat.');
+        $show = route('admin.productions.show', $production->id);
+
+        if (! $production->hasSamplePhase()) {
+            return redirect($show)->with('success', 'Batch produksi dibuat.');
+        }
+
+        // Cek sampel: produk yang sudah punya sampel langsung ke produksi massal,
+        // yang belum mulai dari tahap sampel.
+        $source = $production->existingSampleBatch();
+        if ($source !== null) {
+            $this->applyReusedSample($production, $source);
+
+            return redirect($show.'#produksi-massal')->with('success',
+                'Batch produksi dibuat. Memakai sampel dari '.$source->code.' — langsung produksi massal setelah pola selesai.');
+        }
+
+        return redirect($show.'#tahap-sampel')->with('success',
+            'Batch produksi dibuat. Produk ini belum punya sampel, jadi mulai dari Tahap Sampel.');
+    }
+
+    /** Tombol Cek Sampel di form buat batch: info sampel produk yang dipilih (JSON). */
+    public function sampleStatus(Request $request)
+    {
+        $request->validate(['product_id' => ['required', 'exists:products,id']]);
+
+        $source = Production::sampleBatchFor((int) $request->query('product_id'));
+
+        if ($source === null) {
+            return response()->json(['has_sample' => false]);
+        }
+
+        $source->load('designSketches');
+
+        return response()->json([
+            'has_sample' => true,
+            'code' => $source->code,
+            'url' => route('admin.productions.show', $source->id),
+            'approved_at' => $source->sample_approved_at?->translatedFormat('d M Y'),
+            'sketches' => $source->designSketches
+                ->map(fn ($s) => Storage::disk('public')->url($s->path))->values(),
+        ]);
     }
 
     /**
@@ -198,6 +248,7 @@ class ProductionController extends Controller
             'machine',
             'stages' => fn ($q) => $q->orderBy('sort_order'),
             'stages.machine',
+            'stages.sizeRows',
             'productionMaterials.material',
             'sampleRevisions.user',
             'sizes',
@@ -293,9 +344,25 @@ class ProductionController extends Controller
             ])->withInput();
         }
 
-        DB::transaction(function () use ($production, $data, $plan, $massCutting) {
-            // Sisa cutting massal mengikuti target baru.
-            if ($massCutting !== null) {
+        // Per ukuran: target ukuran tidak boleh di bawah yang sudah dipotong untuk ukuran itu.
+        $massCutting?->load('sizeRows');
+        $sizedCutting = $plan !== null && $massCutting !== null && $massCutting->sizeRows->isNotEmpty();
+        if ($sizedCutting) {
+            foreach ($massCutting->sizeRows as $row) {
+                $newQty = (int) ($plan['sizes'][$row->size] ?? 0);
+                if ($newQty < (int) $row->output_qty) {
+                    return back()->withErrors([
+                        'sizes' => 'Target ukuran '.$row->size.' tidak boleh lebih kecil dari yang sudah dipotong ('.$row->output_qty.' pcs).',
+                    ])->withInput();
+                }
+            }
+        }
+
+        DB::transaction(function () use ($production, $data, $plan, $massCutting, $sizedCutting) {
+            if ($sizedCutting) {
+                $this->resizeMassStages($production, $plan['sizes']);
+            } elseif ($massCutting !== null) {
+                // Sisa cutting massal mengikuti target baru.
                 $massCutting->forceFill([
                     'input_qty' => (int) $data['planned_qty'] - (int) $massCutting->output_qty,
                 ])->save();
@@ -326,6 +393,35 @@ class ProductionController extends Controller
             ->with('success', 'Batch produksi diperbarui.');
     }
 
+    /**
+     * Target per ukuran berubah: sisa cutting tiap ukuran = target baru − yang
+     * sudah dipotong. Ukuran baru mendapat baris di semua tahap massal; ukuran
+     * yang dihapus (belum pernah dipotong) dibuang dari semua tahap massal.
+     *
+     * @param  array<string, int>  $sizes
+     */
+    private function resizeMassStages(Production $production, array $sizes): void
+    {
+        $stages = $production->stages()->where('phase', 'mass')
+            ->whereIn('stage', ProductionStage::QTY_STAGES)->with('sizeRows')->get();
+
+        foreach ($stages as $stage) {
+            $stage->sizeRows()->whereNotIn('size', array_keys($sizes))->delete();
+
+            foreach ($sizes as $size => $qty) {
+                $row = $stage->sizeRows()->firstOrNew(['size' => $size], ['input_qty' => 0, 'output_qty' => 0]);
+                if ($stage->stage === 'cutting') {
+                    $row->input_qty = $qty - (int) $row->output_qty;
+                }
+                $row->save();
+            }
+
+            $stage->load('sizeRows');
+            $stage->syncTotalsFromSizes();
+            $stage->save();
+        }
+    }
+
     public function destroy(Production $production)
     {
         if (! in_array($production->status, ['planned', 'cancelled'], true)) {
@@ -348,7 +444,7 @@ class ProductionController extends Controller
     public function updateStage(Request $request, Production $production, ProductionStage $stage)
     {
         abort_unless($stage->production_id === $production->id, 404);
-        $production->load(['stages', 'product.materials']);
+        $production->load(['stages.sizeRows', 'product.materials']);
         $stage = $production->stages->firstWhere('id', $stage->id);
 
         if ($production->status === 'completed') {
@@ -368,8 +464,36 @@ class ProductionController extends Controller
         }
 
         $qtyEditable = $stage->carriesQty() && $stage->phase === 'mass';
+        $sizedStage = $qtyEditable && $stage->sizeRows->isNotEmpty();
+        $sizeQty = [];
 
-        if ($qtyEditable) {
+        if ($sizedStage) {
+            // Output diisi per ukuran; totalnya dihitung dari rincian.
+            $data = $request->validate([
+                'size_qty' => ['nullable', 'array'],
+                'size_qty.*' => ['nullable', 'integer', 'min:0'],
+                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
+            ]);
+
+            if ($request->has('size_qty')) {
+                foreach ($production->stageSizeLimits($stage) as $size => $limit) {
+                    $row = $stage->sizeRows->firstWhere('size', $size);
+                    $qty = (int) ($data['size_qty'][$size] ?? $row->output_qty);
+
+                    if ($qty > $limit['max']) {
+                        return back()->withErrors([
+                            'size_qty' => 'Output ukuran '.$size.' maksimal '.$limit['max'].' pcs (jumlah yang diterima tahap ini).',
+                        ])->withInput();
+                    }
+                    if ($qty < $limit['min']) {
+                        return back()->withErrors([
+                            'size_qty' => 'Output ukuran '.$size.' minimal '.$limit['min'].' pcs karena sisanya sudah dikerjakan tahap berikutnya.',
+                        ])->withInput();
+                    }
+                    $sizeQty[$size] = $qty;
+                }
+            }
+        } elseif ($qtyEditable) {
             // Input tahap massal tidak diketik: input = sisa yang belum dikerjakan,
             // otomatis berkurang saat output bertambah dan diteruskan ke tahap berikutnya.
             $maxOutput = $production->stageMaxOutput($stage);
@@ -416,15 +540,48 @@ class ProductionController extends Controller
         // Menutup batch yang dirinci per ukuran: hasil QC harus dibagi ke tiap ukuran.
         $sizeOutput = [];
         $isMassQcFinish = $action === 'finish' && $stage->phase === 'mass' && $stage->stage === 'qc_packing';
-        if ($isMassQcFinish && $production->sizes()->exists()) {
+        if ($isMassQcFinish && ! $sizedStage && $production->sizes()->exists()) {
             $sizeOutput = $this->resolveSizeOutput($request, $production, (int) ($data['output_qty'] ?? $stage->output_qty));
             if (is_string($sizeOutput)) {
                 return back()->withErrors(['size_output' => $sizeOutput])->withInput();
             }
         }
 
-        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizeOutput) {
-            if ($qtyEditable && isset($data['output_qty'])) {
+        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput) {
+            if ($sizedStage) {
+                $next = $production->nextQtyStage($stage);
+
+                foreach ($sizeQty as $size => $qty) {
+                    $row = $stage->sizeRows->firstWhere('size', $size);
+                    $delta = $qty - (int) $row->output_qty;
+                    if ($delta === 0) {
+                        continue;
+                    }
+
+                    $row->input_qty = (int) $row->input_qty - $delta;
+                    $row->output_qty = $qty;
+                    $row->save();
+
+                    // Output ukuran ini menjadi sisa ukuran yang sama di tahap berikutnya.
+                    if ($next !== null) {
+                        $nextRow = $next->sizeRows->firstWhere('size', $size)
+                            ?? $next->sizeRows()->create(['size' => $size, 'input_qty' => 0, 'output_qty' => 0]);
+                        $nextRow->input_qty = (int) $nextRow->input_qty + $delta;
+                        $nextRow->save();
+                    }
+                }
+
+                $stage->load('sizeRows');
+                $stage->syncTotalsFromSizes();
+                if ($next !== null) {
+                    $next->load('sizeRows');
+                    $next->syncTotalsFromSizes();
+                    $next->save();
+                }
+
+                // Hasil QC per ukuran langsung menjadi stok per ukuran.
+                $sizeOutput = $stage->sizeRows->pluck('output_qty', 'size')->map(fn ($q) => (int) $q)->all();
+            } elseif ($qtyEditable && isset($data['output_qty'])) {
                 $delta = (int) $data['output_qty'] - (int) $stage->output_qty;
 
                 if ($delta !== 0) {
@@ -550,6 +707,52 @@ class ProductionController extends Controller
             return back()->with('error', 'Produk ini belum punya sampel. Buat sampel dulu di Tahap Sampel.');
         }
 
+        $this->applyReusedSample($production, $source);
+
+        return back()->with('success', 'Memakai sampel dari '.$source->code.'. Produksi massal bisa dimulai setelah pola selesai.');
+    }
+
+    /**
+     * Tombol Cek Sampel: langsung bertindak sesuai kondisi sampel.
+     * - Sampel batch ini sudah ada/disetujui → ke Produksi Massal.
+     * - Produk punya sampel dari batch lain dan fase sampel belum dimulai →
+     *   pakai sampel itu (lewati fase sampel) lalu ke Produksi Massal.
+     * - Selain itu (belum ada sampel, atau sampel batch ini sedang dibuat) → ke Tahap Sampel.
+     */
+    public function checkSample(Production $production)
+    {
+        $production->load('stages');
+        $show = route('admin.productions.show', $production);
+
+        if ($production->status === 'completed') {
+            return redirect($show)->with('error', 'Batch sudah selesai.');
+        }
+
+        if (! $production->hasSamplePhase() || $production->sampleApproved()) {
+            return redirect($show.'#produksi-massal')
+                ->with('success', 'Sampel sudah ada. Lanjutkan produksi massal.');
+        }
+
+        if (! $production->canReuseSample()) {
+            return redirect($show.'#tahap-sampel')
+                ->with('success', 'Sampel batch ini sedang dibuat. Lanjutkan di Tahap Sampel.');
+        }
+
+        $source = $production->existingSampleBatch();
+        if ($source === null) {
+            return redirect($show.'#tahap-sampel')
+                ->with('success', 'Produk ini belum punya sampel. Silakan buat sampel di Tahap Sampel.');
+        }
+
+        $this->applyReusedSample($production, $source);
+
+        return redirect($show.'#produksi-massal')
+            ->with('success', 'Produk ini sudah punya sampel dari '.$source->code.'. Tahap sampel dilewati — langsung produksi massal setelah pola selesai.');
+    }
+
+    /** Hapus tahap sampel batch ini, rapatkan urutan, dan tandai sampelnya dari batch lain. */
+    private function applyReusedSample(Production $production, Production $source): void
+    {
         DB::transaction(function () use ($production, $source) {
             $production->stages()->where('phase', 'sample')->delete();
 
@@ -561,8 +764,6 @@ class ProductionController extends Controller
                 'sample_source_production_id' => $source->id,
             ])->save();
         });
-
-        return back()->with('success', 'Memakai sampel dari '.$source->code.'. Produksi massal bisa dimulai setelah pola selesai.');
     }
 
     /** Sampel disetujui: fase massal terbuka. */

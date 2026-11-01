@@ -37,11 +37,16 @@
         </div>
     </x-ui.card>
 
-    <x-ui.card>
-        <p class="text-sm text-ink-600">
-            Target lebih dari 1 pcs akan membuat fase sampel: satu potong dikerjakan dan disetujui dulu
-            sebelum cutting massal boleh dimulai. Target 1 pcs langsung dikerjakan tanpa fase sampel.
-        </p>
+    <x-ui.card title="Sampel">
+        <div class="flex flex-wrap items-start gap-4">
+            <button type="button" id="btn-cek-sampel" class="btn-secondary">Cek Sampel</button>
+            <div id="sample-result" class="flex-1 min-w-[16rem] text-sm text-ink-600">
+                Pilih produk lalu klik Cek Sampel. Kalau produk sudah punya sampel, batch langsung ke produksi massal.
+                Kalau belum, batch mulai dari tahap sampel (1 pcs dibuat dan disetujui dulu).
+            </div>
+        </div>
+        <div id="sample-sketches" class="hidden mt-4 grid grid-cols-3 md:grid-cols-6 gap-2"></div>
+        <p class="text-xs text-ink-400 mt-3">Target 1 pcs langsung dikerjakan tanpa fase sampel.</p>
     </x-ui.card>
 
     <x-ui.card>
@@ -104,7 +109,50 @@ $(function () {
         }
     }
 
-    $('#product_id').on('change', renderSizes);
+    function resetSample() {
+        $('#sample-result').attr('class', 'flex-1 min-w-[16rem] text-sm text-ink-600')
+            .text('Klik Cek Sampel untuk melihat apakah produk ini sudah punya sampel.');
+        $('#sample-sketches').addClass('hidden').empty();
+    }
+
+    $('#btn-cek-sampel').on('click', function () {
+        const productId = $('#product_id').val();
+        const $result = $('#sample-result');
+        if (!productId) {
+            $result.attr('class', 'flex-1 min-w-[16rem] text-sm text-red-600').text('Pilih produk dulu.');
+            return;
+        }
+
+        $result.attr('class', 'flex-1 min-w-[16rem] text-sm text-ink-500').text('Mengecek…');
+        $.get(@json(route('admin.productions.sample-status')), { product_id: productId })
+            .done(function (res) {
+                const $sketches = $('#sample-sketches').empty();
+                if (!res.has_sample) {
+                    $result.attr('class', 'flex-1 min-w-[16rem] text-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-ink-800')
+                        .html('<span class="font-medium">Belum ada sampel.</span> Batch ini akan mulai dari <span class="font-medium">Tahap Sampel</span>.');
+                    $sketches.addClass('hidden');
+                    return;
+                }
+
+                const when = res.approved_at ? 'disetujui ' + res.approved_at : 'batch selesai';
+                $result.attr('class', 'flex-1 min-w-[16rem] text-sm rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-ink-800')
+                    .empty()
+                    .append($('<span class="font-medium">').text('Sudah ada sampel dari '))
+                    .append($('<a target="_blank" class="font-medium underline">').attr('href', res.url).text(res.code))
+                    .append(document.createTextNode(' (' + when + '). Tahap sampel dilewati — batch langsung ke Produksi Massal setelah pola selesai.'));
+
+                res.sketches.forEach(function (url) {
+                    $sketches.append($('<a target="_blank" rel="noopener" class="block border border-ink-100 rounded overflow-hidden">').attr('href', url)
+                        .append($('<img class="w-full aspect-square object-contain bg-ink-50">').attr('src', url)));
+                });
+                $sketches.toggleClass('hidden', res.sketches.length === 0);
+            })
+            .fail(function () {
+                $result.attr('class', 'flex-1 min-w-[16rem] text-sm text-red-600').text('Gagal mengecek sampel. Coba lagi.');
+            });
+    });
+
+    $('#product_id').on('change', function () { renderSizes(); resetSample(); });
     $('#size-inputs').on('input', '.size-qty', updateTotal);
     renderSizes();
 });

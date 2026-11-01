@@ -31,7 +31,13 @@
                                     Belum disetujui
                                 @endif
                             </p>
-                            <button type="button" onclick="openModal('modal-sampel')" class="btn-secondary text-xs">Cek Sampel</button>
+                            @if ($production->status !== 'completed')
+                                <form action="{{ route('admin.productions.check-sample', $production->id) }}" method="POST">
+                                    @csrf
+                                    <button class="btn-secondary text-xs" title="Belum ada sampel → ke Tahap Sampel. Sudah ada → langsung Produksi Massal.">Cek Sampel</button>
+                                </form>
+                            @endif
+                            <button type="button" onclick="openModal('modal-sampel')" class="text-xs text-ink-500 hover:text-ink-800 underline">Detail</button>
                         </div>
                     </div>
                 @endif
@@ -84,6 +90,9 @@
                 @elseif ($phase === 'sample')
                     <span id="tahap-sampel" class="scroll-mt-24"></span>
                 @endif
+                @if ($phase === 'mass')
+                    <span id="produksi-massal" class="scroll-mt-24"></span>
+                @endif
                 @if ($phase === 'mass' && $production->hasSamplePhase() && ! $production->sampleApproved())
                     <p class="text-xs text-amber-600 mb-3">Terkunci sampai sampel disetujui.</p>
                 @endif
@@ -102,7 +111,9 @@
                             $minOut = $production->stageMinOutput($stage);
                             $isSampleQc = $stage->phase === 'sample' && $stage->stage === 'qc_packing';
                             // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
-                            $needsSizeOutput = $stage->phase === 'mass' && $stage->stage === 'qc_packing'
+                            $sizedStage = $qtyEditable && $stage->sizeRows->isNotEmpty();
+                            $sizeLimits = $sizedStage ? $production->stageSizeLimits($stage) : [];
+                            $needsSizeOutput = ! $sizedStage && $stage->phase === 'mass' && $stage->stage === 'qc_packing'
                                 && $stage->status === 'in_progress' && $production->sizes->count() > 1 && ! $locked;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
@@ -132,7 +143,20 @@
                             @else
                                 <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                     @csrf @method('PATCH')
-                                    @if ($qtyEditable)
+                                    @if ($sizedStage)
+                                        <div class="field !mb-0 md:col-span-2">
+                                            <label class="label text-xs">Jumlah</label>
+                                            <p class="text-sm text-ink-700 tabular-nums">Sisa {{ $stage->input_qty }} · Output {{ $stage->output_qty }} pcs</p>
+                                            <p class="text-[11px] text-ink-400 mt-0.5">
+                                                Diisi per ukuran di bawah ·
+                                                @if ($production->nextQtyStage($stage))
+                                                    diteruskan ke {{ $production->nextQtyStage($stage)->label() }}
+                                                @else
+                                                    masuk stok per ukuran saat Selesai
+                                                @endif
+                                            </p>
+                                        </div>
+                                    @elseif ($qtyEditable)
                                         <div class="field !mb-0">
                                             <label class="label text-xs">Input (sisa)</label>
                                             <p class="input bg-ink-50 tabular-nums">{{ $stage->input_qty }} pcs</p>
@@ -183,6 +207,37 @@
                                             @endif
                                         @endunless
                                     </div>
+                                    @if ($sizedStage)
+                                        <div class="col-span-2 md:col-span-4 border-t border-ink-100 pt-3 mt-1">
+                                            <table class="w-full text-sm">
+                                                <thead>
+                                                    <tr class="text-xs text-ink-500">
+                                                        <th class="text-left font-normal py-1">Ukuran</th>
+                                                        <th class="text-right font-normal py-1">Diterima</th>
+                                                        <th class="text-right font-normal py-1">Sisa</th>
+                                                        <th class="text-right font-normal py-1 w-32">Output (total)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($stage->sizeRows as $row)
+                                                        @php $lim = $sizeLimits[$row->size]; @endphp
+                                                        <tr class="border-t border-ink-100">
+                                                            <td class="py-1.5 font-medium">{{ $row->size }}</td>
+                                                            <td class="py-1.5 text-right tabular-nums text-ink-500">{{ $lim['received'] }}</td>
+                                                            <td class="py-1.5 text-right tabular-nums">{{ $row->input_qty }}</td>
+                                                            <td class="py-1.5 text-right">
+                                                                <input type="number" name="size_qty[{{ $row->size }}]" min="{{ $lim['min'] }}" max="{{ $lim['max'] }}"
+                                                                    value="{{ old('size_qty.'.$row->size, $row->output_qty) }}"
+                                                                    class="input !py-1 text-right tabular-nums" {{ $locked || $stage->status === 'pending' ? 'disabled' : '' }}>
+                                                                @if ($lim['min'] > 0)<p class="text-[11px] text-ink-400">min {{ $lim['min'] }}</p>@endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                            @error('size_qty')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                                        </div>
+                                    @endif
                                     @if ($needsSizeOutput)
                                         <div class="col-span-2 md:col-span-4 border-t border-ink-100 pt-3 mt-1">
                                             <p class="text-xs text-ink-500 mb-2">Hasil per ukuran — wajib diisi saat menekan <em>Selesai</em>; totalnya harus sama dengan output.</p>

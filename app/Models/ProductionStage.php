@@ -36,6 +36,19 @@ class ProductionStage extends Model
         return $this->belongsTo(ProductionMachine::class, 'production_machine_id');
     }
 
+    /** Rincian per ukuran (hanya tahap massal pada batch berukuran). */
+    public function sizeRows()
+    {
+        return $this->hasMany(ProductionStageSize::class)->orderBy('id');
+    }
+
+    /** Samakan total tahap dengan jumlah rincian per ukurannya. */
+    public function syncTotalsFromSizes(): void
+    {
+        $this->input_qty = (int) $this->sizeRows->sum('input_qty');
+        $this->output_qty = (int) $this->sizeRows->sum('output_qty');
+    }
+
     public function carriesQty(): bool
     {
         return in_array($this->stage, self::QTY_STAGES, true);

@@ -128,9 +128,11 @@ Route::middleware(['auth', 'role:admin,karyawan'])
     Route::resource('purchases', PurchaseController::class);
     Route::patch('purchases/{purchase}/receive', [PurchaseController::class, 'receive'])->name('purchases.receive');
     Route::patch('purchases/{purchase}/cancel', [PurchaseController::class, 'cancel'])->name('purchases.cancel');
+    Route::get('productions/sample-status', [ProductionController::class, 'sampleStatus'])->name('productions.sample-status');
     Route::resource('productions', ProductionController::class);
     Route::patch('productions/{production}/stage/{stage}', [ProductionController::class, 'updateStage'])->name('productions.stage');
     Route::post('productions/{production}/reuse-sample', [ProductionController::class, 'reuseSample'])->name('productions.reuse-sample');
+    Route::post('productions/{production}/check-sample', [ProductionController::class, 'checkSample'])->name('productions.check-sample');
     Route::post('productions/{production}/sketches', [ProductionDesignSketchController::class, 'store'])->name('productions.sketches.store');
     Route::delete('productions/{production}/sketches/{sketch}', [ProductionDesignSketchController::class, 'destroy'])->name('productions.sketches.destroy');
 

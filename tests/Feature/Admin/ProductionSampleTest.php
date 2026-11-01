@@ -273,8 +273,8 @@ class ProductionSampleTest extends TestCase
     public function test_batch_reuses_an_approved_sample_and_skips_the_sample_phase(): void
     {
         $first = $this->batch();
-        $first->forceFill(['sample_approved_at' => now()])->save();
         $second = $this->secondBatch($first);
+        $first->forceFill(['sample_approved_at' => now()])->save();
 
         $this->actingAs($this->admin())
             ->post(route('admin.productions.reuse-sample', $second))
@@ -294,8 +294,8 @@ class ProductionSampleTest extends TestCase
     public function test_reused_sample_still_waits_for_the_pattern_before_mass_cutting(): void
     {
         $first = $this->batch();
-        $first->forceFill(['sample_approved_at' => now()])->save();
         $second = $this->secondBatch($first);
+        $first->forceFill(['sample_approved_at' => now()])->save();
         $this->actingAs($this->admin())->post(route('admin.productions.reuse-sample', $second));
         $cutting = $second->stages()->where('phase', 'mass')->where('stage', 'cutting')->firstOrFail();
 
@@ -325,8 +325,8 @@ class ProductionSampleTest extends TestCase
     public function test_cannot_reuse_once_this_batch_started_its_own_sample(): void
     {
         $first = $this->batch();
-        $first->forceFill(['status' => 'completed'])->save();
         $second = $this->secondBatch($first);
+        $first->forceFill(['status' => 'completed'])->save();
         $second->stages()->where('phase', 'sample')->where('stage', 'cutting')->update(['status' => 'in_progress']);
 
         $this->actingAs($this->admin())
@@ -345,12 +345,111 @@ class ProductionSampleTest extends TestCase
             ->assertSee('Produk ini belum punya sampel')
             ->assertDontSee('Pakai sampel ini');
 
-        $first->forceFill(['sample_approved_at' => now()])->save();
         $second = $this->secondBatch($first);
+        $first->forceFill(['sample_approved_at' => now()])->save();
 
         $this->actingAs($this->admin())->get(route('admin.productions.show', $second))
             ->assertOk()
             ->assertSee('Produk ini sudah punya sampel dari batch')
             ->assertSee('Pakai sampel ini, langsung produksi massal');
+    }
+
+    public function test_check_sample_goes_to_the_sample_phase_when_the_product_has_none(): void
+    {
+        $prod = $this->batch();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.productions.check-sample', $prod))
+            ->assertRedirect(route('admin.productions.show', $prod).'#tahap-sampel')
+            ->assertSessionHas('success', 'Produk ini belum punya sampel. Silakan buat sampel di Tahap Sampel.');
+
+        $this->assertSame(3, $prod->stages()->where('phase', 'sample')->count());
+        $this->assertNull($prod->fresh()->sample_approved_at);
+    }
+
+    public function test_check_sample_reuses_an_existing_sample_and_goes_to_mass_production(): void
+    {
+        $first = $this->batch();
+        $second = $this->secondBatch($first);
+        $first->forceFill(['sample_approved_at' => now()])->save();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.productions.check-sample', $second))
+            ->assertRedirect(route('admin.productions.show', $second).'#produksi-massal')
+            ->assertSessionHas('success');
+
+        $second = $second->fresh('stages');
+        $this->assertSame($first->id, $second->sample_source_production_id);
+        $this->assertSame(0, $second->stages->where('phase', 'sample')->count());
+    }
+
+    public function test_check_sample_goes_to_mass_production_when_already_approved(): void
+    {
+        $prod = $this->batch();
+        $prod->forceFill(['sample_approved_at' => now()])->save();
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.productions.check-sample', $prod))
+            ->assertRedirect(route('admin.productions.show', $prod).'#produksi-massal');
+    }
+
+    public function test_check_sample_continues_this_batch_sample_once_it_has_started(): void
+    {
+        $first = $this->batch();
+        $second = $this->secondBatch($first);
+        $first->forceFill(['status' => 'completed'])->save();
+        $second->stages()->where('phase', 'sample')->where('stage', 'cutting')->update(['status' => 'in_progress']);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.productions.check-sample', $second))
+            ->assertRedirect(route('admin.productions.show', $second).'#tahap-sampel');
+
+        $this->assertSame(3, $second->stages()->where('phase', 'sample')->count());
+    }
+
+    public function test_new_batch_goes_to_mass_production_when_the_product_already_has_a_sample(): void
+    {
+        $first = $this->batch();
+        $first->forceFill(['sample_approved_at' => now()])->save();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.store'), [
+            'product_id' => $first->product_id, 'planned_qty' => 50, 'start_date' => now()->toDateString(),
+        ])->assertRedirectContains('#produksi-massal');
+
+        $second = Production::latest('id')->first()->fresh('stages');
+        $this->assertSame($first->id, $second->sample_source_production_id);
+        $this->assertNotNull($second->sample_approved_at);
+        $this->assertSame(0, $second->stages->where('phase', 'sample')->count());
+    }
+
+    public function test_new_batch_starts_at_the_sample_phase_when_the_product_has_no_sample(): void
+    {
+        $cat = Category::create(['name' => 'Koko']);
+        $product = Product::create([
+            'category_id' => $cat->id, 'name' => 'Koko A', 'sku' => 'KA-1', 'price' => 1, 'stock' => 0, 'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin())->post(route('admin.productions.store'), [
+            'product_id' => $product->id, 'planned_qty' => 20, 'start_date' => now()->toDateString(),
+        ])->assertRedirectContains('#tahap-sampel');
+
+        $prod = Production::latest('id')->first();
+        $this->assertSame(3, $prod->stages()->where('phase', 'sample')->count());
+        $this->assertNull($prod->sample_approved_at);
+    }
+
+    public function test_sample_status_endpoint_reports_the_existing_sample(): void
+    {
+        $first = $this->batch();
+
+        $this->actingAs($this->admin())
+            ->getJson(route('admin.productions.sample-status', ['product_id' => $first->product_id]))
+            ->assertOk()->assertJson(['has_sample' => false]);
+
+        $first->forceFill(['sample_approved_at' => now()])->save();
+
+        $this->actingAs($this->admin())
+            ->getJson(route('admin.productions.sample-status', ['product_id' => $first->product_id]))
+            ->assertOk()->assertJson(['has_sample' => true, 'code' => $first->code]);
     }
 }

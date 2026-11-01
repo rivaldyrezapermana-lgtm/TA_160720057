@@ -100,9 +100,15 @@ class Production extends Model
      */
     public function existingSampleBatch(): ?Production
     {
+        return static::sampleBatchFor((int) $this->product_id, $this->getKey());
+    }
+
+    /** Batch terbaru produk ini yang sampelnya sudah ada (dipakai juga sebelum batch dibuat). */
+    public static function sampleBatchFor(int $productId, ?int $exceptId = null): ?Production
+    {
         return static::query()
-            ->where('product_id', $this->product_id)
-            ->whereKeyNot($this->getKey())
+            ->where('product_id', $productId)
+            ->when($exceptId !== null, fn ($q) => $q->whereKeyNot($exceptId))
             ->where(fn ($q) => $q->whereNotNull('sample_approved_at')->orWhere('status', 'completed'))
             ->latest('id')
             ->first();
@@ -239,6 +245,33 @@ class Production extends Model
         }
 
         return max(0, (int) $stage->output_qty - (int) $next->input_qty);
+    }
+
+    /**
+     * Batas output per ukuran sebuah tahap massal berukuran, aturannya sama dengan
+     * total: maks = yang diterima ukuran itu, min = output yang sudah dikerjakan
+     * tahap berikutnya untuk ukuran yang sama.
+     *
+     * @return array<string, array{received: int, min: int, max: int}>
+     */
+    public function stageSizeLimits(ProductionStage $stage): array
+    {
+        $next = $this->nextQtyStage($stage);
+        $nextRows = $next?->sizeRows->keyBy('size');
+        $limits = [];
+
+        foreach ($stage->sizeRows as $row) {
+            $received = (int) $row->input_qty + (int) $row->output_qty;
+            $nextInput = (int) ($nextRows?->get($row->size)?->input_qty ?? 0);
+
+            $limits[$row->size] = [
+                'received' => $received,
+                'min' => $next === null ? 0 : max(0, (int) $row->output_qty - $nextInput),
+                'max' => $received,
+            ];
+        }
+
+        return $limits;
     }
 
     /**
