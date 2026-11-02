@@ -78,7 +78,14 @@ class ProductionController extends Controller
         }
         $data['planned_qty'] = $plan['planned'];
 
-        $production = DB::transaction(function () use ($data, $plan) {
+        // Cek sampel sebelum batch dibuat: produk yang sudah punya sampel tidak
+        // diberi fase sampel sama sekali, sehingga batch tidak pernah tersimpan
+        // setengah jadi dengan Tahap Sampel.
+        $source = (int) $data['planned_qty'] > 1
+            ? Production::sampleBatchFor((int) $data['product_id'])
+            : null;
+
+        $production = DB::transaction(function () use ($data, $plan, $source) {
             $production = Production::create([
                 'product_id' => $data['product_id'],
                 'user_id' => auth()->id(),
@@ -93,6 +100,13 @@ class ProductionController extends Controller
                 'sample_size' => $plan['sample_size'],
             ]);
 
+            if ($source !== null) {
+                $production->forceFill([
+                    'sample_approved_at' => now(),
+                    'sample_source_production_id' => $source->id,
+                ])->save();
+            }
+
             foreach ($plan['sizes'] as $size => $qty) {
                 $production->sizes()->create(['size' => $size, 'planned_qty' => $qty]);
             }
@@ -101,7 +115,7 @@ class ProductionController extends Controller
                 $production->forceFill(['code' => 'PRD-'.now()->year.'-'.str_pad((string) $production->id, 4, '0', STR_PAD_LEFT)])->save();
             }
 
-            foreach ($this->stageBlueprint((int) $data['planned_qty']) as $row) {
+            foreach ($this->stageBlueprint((int) $data['planned_qty'], $source === null) as $row) {
                 $stage = $production->stages()->create($row + ['status' => 'pending', 'output_qty' => 0]);
 
                 // Tahap massal dirinci per ukuran: cutting menerima target tiap ukuran.
@@ -125,12 +139,7 @@ class ProductionController extends Controller
             return redirect($show)->with('success', 'Batch produksi dibuat.');
         }
 
-        // Cek sampel: produk yang sudah punya sampel langsung ke produksi massal,
-        // yang belum mulai dari tahap sampel.
-        $source = $production->existingSampleBatch();
         if ($source !== null) {
-            $this->applyReusedSample($production, $source);
-
             return redirect($show.'#produksi-massal')->with('success',
                 'Batch produksi dibuat. Memakai sampel dari '.$source->code.' — langsung produksi massal setelah pola selesai.');
         }
@@ -213,18 +222,19 @@ class ProductionController extends Controller
 
     /**
      * Susunan tahap sebuah batch. Fase sampel hanya ada kalau target lebih dari
-     * 1 pcs — batch 1 pcs memang produknya sekaligus sampelnya.
+     * 1 pcs — batch 1 pcs memang produknya sekaligus sampelnya — dan produknya
+     * belum punya sampel dari batch lain.
      *
      * @return list<array{phase: string, sort_order: int, stage: string, input_qty: int}>
      */
-    private function stageBlueprint(int $plannedQty): array
+    private function stageBlueprint(int $plannedQty, bool $withSample = true): array
     {
         $rows = [
             ['phase' => 'common', 'stage' => 'design', 'input_qty' => 0],
             ['phase' => 'common', 'stage' => 'pola', 'input_qty' => 0],
         ];
 
-        if ($plannedQty > 1) {
+        if ($plannedQty > 1 && $withSample) {
             $rows[] = ['phase' => 'sample', 'stage' => 'cutting', 'input_qty' => 1];
             $rows[] = ['phase' => 'sample', 'stage' => 'sewing', 'input_qty' => 1];
             $rows[] = ['phase' => 'sample', 'stage' => 'qc_packing', 'input_qty' => 1];
