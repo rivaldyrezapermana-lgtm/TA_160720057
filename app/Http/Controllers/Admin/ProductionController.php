@@ -505,26 +505,20 @@ class ProductionController extends Controller
                             'size_qty' => 'Output ukuran '.$size.' maksimal '.$limit['max'].' pcs (jumlah yang diterima tahap ini).',
                         ])->withInput();
                     }
-                    if ($qty < $limit['min']) {
-                        return back()->withErrors([
-                            'size_qty' => 'Output ukuran '.$size.' minimal '.$limit['min'].' pcs karena sisanya sudah dikerjakan tahap berikutnya.',
-                        ])->withInput();
-                    }
                     $sizeQty[$size] = $qty;
                 }
             }
         } elseif ($qtyEditable) {
             // Input tahap massal tidak diketik: input = sisa yang belum dikerjakan,
             // otomatis berkurang saat output bertambah dan diteruskan ke tahap berikutnya.
+            // Tidak ada batas minimal: output yang diturunkan ikut menurunkan tahap berikutnya.
             $maxOutput = $production->stageMaxOutput($stage);
-            $minOutput = $production->stageMinOutput($stage);
 
             $data = $request->validate([
-                'output_qty' => ['nullable', 'integer', 'min:'.$minOutput, 'max:'.$maxOutput],
+                'output_qty' => ['nullable', 'integer', 'min:0', 'max:'.$maxOutput],
                 'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ], [
                 'output_qty.max' => 'Output maksimal '.$maxOutput.' pcs (jumlah yang diterima tahap ini).',
-                'output_qty.min' => 'Output minimal '.$minOutput.' pcs karena sisanya sudah dikerjakan tahap berikutnya.',
             ]);
         } elseif ($stage->phase === 'sample') {
             $data = $request->validate([
@@ -572,54 +566,28 @@ class ProductionController extends Controller
             }
         }
 
-        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput) {
+        // Tahap berikutnya yang outputnya ikut diturunkan, untuk pesan ke operator.
+        $adjusted = [];
+
+        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput, &$adjusted) {
             if ($sizedStage) {
-                $next = $production->nextQtyStage($stage);
-
                 foreach ($sizeQty as $size => $qty) {
-                    $row = $stage->sizeRows->firstWhere('size', $size);
-                    $delta = $qty - (int) $row->output_qty;
-                    if ($delta === 0) {
-                        continue;
-                    }
-
-                    $row->input_qty = (int) $row->input_qty - $delta;
-                    $row->output_qty = $qty;
-                    $row->save();
-
-                    // Output ukuran ini menjadi sisa ukuran yang sama di tahap berikutnya.
-                    if ($next !== null) {
-                        $nextRow = $next->sizeRows->firstWhere('size', $size)
-                            ?? $next->sizeRows()->create(['size' => $size, 'input_qty' => 0, 'output_qty' => 0]);
-                        $nextRow->input_qty = (int) $nextRow->input_qty + $delta;
-                        $nextRow->save();
-                    }
+                    $this->setSizeOutput($production, $stage, $size, $qty, $adjusted);
                 }
 
-                $stage->load('sizeRows');
-                $stage->syncTotalsFromSizes();
-                if ($next !== null) {
-                    $next->load('sizeRows');
-                    $next->syncTotalsFromSizes();
-                    $next->save();
+                // Total tiap tahap massal mengikuti rincian ukurannya.
+                for ($s = $stage; $s !== null; $s = $production->nextQtyStage($s)) {
+                    $s->load('sizeRows');
+                    $s->syncTotalsFromSizes();
+                    if ($s !== $stage) {
+                        $s->save();
+                    }
                 }
 
                 // Hasil QC per ukuran langsung menjadi stok per ukuran.
                 $sizeOutput = $stage->sizeRows->pluck('output_qty', 'size')->map(fn ($q) => (int) $q)->all();
             } elseif ($qtyEditable && isset($data['output_qty'])) {
-                $delta = (int) $data['output_qty'] - (int) $stage->output_qty;
-
-                if ($delta !== 0) {
-                    $stage->input_qty = (int) $stage->input_qty - $delta;
-                    $stage->output_qty = (int) $data['output_qty'];
-
-                    // Output tahap ini menjadi input (sisa) tahap berikutnya.
-                    $next = $production->nextQtyStage($stage);
-                    if ($next !== null) {
-                        $next->input_qty = (int) $next->input_qty + $delta;
-                        $next->save();
-                    }
-                }
+                $this->setStageOutput($production, $stage, (int) $data['output_qty'], $adjusted);
             }
 
             $stage->production_machine_id = $stage->usesMachine()
@@ -662,7 +630,82 @@ class ProductionController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        return back()->with('success', 'Tahap diperbarui.');
+        $message = 'Tahap diperbarui.';
+        if ($adjusted !== []) {
+            $message .= ' Output '.implode(' dan ', array_values($adjusted)).' ikut disesuaikan supaya tidak melebihi yang diterima.';
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Set output (total) tahap massal; selisihnya menjadi sisa tahap berikutnya.
+     * Kalau sisa tahap berikutnya jadi minus — output diturunkan di bawah yang
+     * sudah dikerjakan tahap berikutnya — output tahap itu ikut diturunkan ke
+     * jumlah yang sekarang diterimanya, berantai sampai tahap terakhir.
+     *
+     * @param  array<int, string>  $adjusted  tahap yang ikut diturunkan (id => label)
+     */
+    private function setStageOutput(Production $production, ProductionStage $stage, int $output, array &$adjusted): void
+    {
+        $delta = $output - (int) $stage->output_qty;
+        if ($delta === 0) {
+            return;
+        }
+
+        $stage->input_qty = (int) $stage->input_qty - $delta;
+        $stage->output_qty = $output;
+
+        $next = $production->nextQtyStage($stage);
+        if ($next === null) {
+            return;
+        }
+
+        $next->input_qty = (int) $next->input_qty + $delta;
+        if ($next->input_qty < 0) {
+            $adjusted[$next->id] = $next->label();
+            $this->setStageOutput($production, $next, max(0, (int) $next->output_qty + (int) $next->input_qty), $adjusted);
+        }
+        $next->save();
+    }
+
+    /**
+     * Sama dengan setStageOutput(), tetapi untuk satu ukuran: output ukuran ini
+     * menjadi sisa ukuran yang sama di tahap berikutnya, dan penurunannya ikut
+     * menurunkan ukuran itu di tahap-tahap berikutnya bila perlu.
+     *
+     * @param  array<int, string>  $adjusted  tahap yang ikut diturunkan (id => label)
+     */
+    private function setSizeOutput(Production $production, ProductionStage $stage, string $size, int $qty, array &$adjusted): void
+    {
+        $row = $stage->sizeRows->firstWhere('size', $size);
+        $delta = $qty - (int) $row->output_qty;
+        if ($delta === 0) {
+            return;
+        }
+
+        $row->input_qty = (int) $row->input_qty - $delta;
+        $row->output_qty = $qty;
+        $row->save();
+
+        $next = $production->nextQtyStage($stage);
+        if ($next === null) {
+            return;
+        }
+
+        $nextRow = $next->sizeRows->firstWhere('size', $size);
+        if ($nextRow === null) {
+            $nextRow = $next->sizeRows()->create(['size' => $size, 'input_qty' => 0, 'output_qty' => 0]);
+            $next->sizeRows->push($nextRow);
+        }
+
+        $nextRow->input_qty = (int) $nextRow->input_qty + $delta;
+        $nextRow->save();
+
+        if ($nextRow->input_qty < 0) {
+            $adjusted[$next->id] = $next->label();
+            $this->setSizeOutput($production, $next, $size, max(0, (int) $nextRow->output_qty + (int) $nextRow->input_qty), $adjusted);
+        }
     }
 
     /**

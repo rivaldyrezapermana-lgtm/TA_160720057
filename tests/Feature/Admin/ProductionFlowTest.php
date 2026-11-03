@@ -226,7 +226,48 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(100, $cutting->fresh()->input_qty);
     }
 
-    public function test_output_cannot_drop_below_what_the_next_stage_already_worked_on(): void
+    public function test_lowering_output_below_what_the_next_stage_worked_on_lowers_the_following_stages(): void
+    {
+        [$prod] = $this->batch();
+        $this->approveSample($prod);
+        // Cutting meneruskan 60; sewing sudah mengerjakan 50 dan meneruskannya ke QC; QC mengerjakan 20.
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['input_qty' => 40, 'output_qty' => 60, 'status' => 'in_progress']);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')
+            ->update(['input_qty' => 10, 'output_qty' => 50, 'status' => 'in_progress']);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'qc_packing')
+            ->update(['input_qty' => 30, 'output_qty' => 20, 'status' => 'in_progress']);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+
+        // Angka bebas, tanpa batas minimal: sewing ikut turun ke 40, QC tidak perlu turun.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
+                'action' => 'save', 'output_qty' => 40,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Tahap diperbarui. Output Sewing ikut disesuaikan supaya tidak melebihi yang diterima.');
+
+        $sewing = $this->stage($prod, 'mass', 'sewing');
+        $qc = $this->stage($prod, 'mass', 'qc_packing');
+        $this->assertSame([60, 40], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame([0, 40], [$sewing->input_qty, $sewing->output_qty]);
+        $this->assertSame([20, 20], [$qc->input_qty, $qc->output_qty]);
+
+        // Turun lagi sampai di bawah yang dikerjakan QC: penyesuaian berlanjut ke QC.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
+                'action' => 'save', 'output_qty' => 15,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $sewing = $sewing->fresh();
+        $qc = $qc->fresh();
+        $this->assertSame([85, 15], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame([0, 15], [$sewing->input_qty, $sewing->output_qty]);
+        $this->assertSame([0, 15], [$qc->input_qty, $qc->output_qty]);
+    }
+
+    public function test_show_page_sets_no_minimum_on_stage_output(): void
     {
         [$prod] = $this->batch();
         $this->approveSample($prod);
@@ -234,16 +275,11 @@ class ProductionFlowTest extends TestCase
             ->update(['input_qty' => 40, 'output_qty' => 60, 'status' => 'in_progress']);
         $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')
             ->update(['input_qty' => 10, 'output_qty' => 50, 'status' => 'in_progress']);
-        $cutting = $this->stage($prod, 'mass', 'cutting');
 
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'output_qty' => 40,
-            ])
-            ->assertSessionHasErrors('output_qty');
-
-        $this->assertSame(60, $cutting->fresh()->output_qty);
-        $this->assertSame(10, $this->stage($prod, 'mass', 'sewing')->input_qty);
+        $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
+            ->assertOk()
+            ->assertDontSee('min="50"', false)
+            ->assertDontSee('min 50 pcs');
     }
 
     public function test_starting_mass_qc_packing_moves_the_batch_to_qc_status(): void

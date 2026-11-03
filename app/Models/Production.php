@@ -240,43 +240,20 @@ class Production extends Model
     }
 
     /**
-     * Batas bawah output tahap massal. Menurunkan output menarik kembali pcs dari
-     * sisa tahap berikutnya, jadi tidak boleh melebihi sisa tersebut — pcs yang
-     * sudah dikerjakan tahap berikutnya tidak bisa ditarik.
-     */
-    public function stageMinOutput(ProductionStage $stage): int
-    {
-        $next = $this->nextQtyStage($stage);
-
-        if ($next === null) {
-            return 0;
-        }
-
-        return max(0, (int) $stage->output_qty - (int) $next->input_qty);
-    }
-
-    /**
      * Batas output per ukuran sebuah tahap massal berukuran, aturannya sama dengan
-     * total: maks = yang diterima ukuran itu, min = output yang sudah dikerjakan
-     * tahap berikutnya untuk ukuran yang sama.
+     * total: maks = yang diterima ukuran itu. Tidak ada batas minimal — output
+     * yang diturunkan ikut menurunkan ukuran yang sama di tahap berikutnya.
      *
-     * @return array<string, array{received: int, min: int, max: int}>
+     * @return array<string, array{received: int, max: int}>
      */
     public function stageSizeLimits(ProductionStage $stage): array
     {
-        $next = $this->nextQtyStage($stage);
-        $nextRows = $next?->sizeRows->keyBy('size');
         $limits = [];
 
         foreach ($stage->sizeRows as $row) {
             $received = (int) $row->input_qty + (int) $row->output_qty;
-            $nextInput = (int) ($nextRows?->get($row->size)?->input_qty ?? 0);
 
-            $limits[$row->size] = [
-                'received' => $received,
-                'min' => $next === null ? 0 : max(0, (int) $row->output_qty - $nextInput),
-                'max' => $received,
-            ];
+            $limits[$row->size] = ['received' => $received, 'max' => $received];
         }
 
         return $limits;

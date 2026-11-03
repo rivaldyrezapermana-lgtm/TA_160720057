@@ -217,19 +217,6 @@ class ProductionStageFlowTest extends TestCase
         $this->assertFalse($this->stage($prod, 'common', 'design')->carriesQty());
         $this->assertFalse($this->stage($prod, 'common', 'pola')->carriesQty());
         $this->assertSame(0, $prod->stageMaxOutput($this->stage($prod, 'common', 'pola')));
-        $this->assertSame(0, $prod->stageMinOutput($this->stage($prod, 'common', 'design')));
-    }
-
-    public function test_mass_stage_min_output_is_what_the_next_stage_already_worked_on(): void
-    {
-        $prod = $this->batch(100);
-        // Cutting meneruskan 60; sewing sudah mengerjakan 50, sisanya 10.
-        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['input_qty' => 40, 'output_qty' => 60]);
-        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 10, 'output_qty' => 50]);
-        $prod = $prod->fresh('stages');
-
-        $this->assertSame(50, $prod->stageMinOutput($this->stage($prod, 'mass', 'cutting')));
-        $this->assertSame(0, $prod->stageMinOutput($this->stage($prod, 'mass', 'qc_packing')));
     }
 
     public function test_sample_units_counts_the_sample_plus_every_revision(): void

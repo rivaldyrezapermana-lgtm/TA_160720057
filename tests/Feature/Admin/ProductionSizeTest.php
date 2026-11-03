@@ -417,12 +417,12 @@ class ProductionSizeTest extends TestCase
         $this->assertNotSame('completed', $prod->fresh()->status);
     }
 
-    public function test_per_size_output_cannot_drop_below_what_the_next_stage_already_used(): void
+    public function test_lowering_a_size_below_what_the_next_stage_used_lowers_that_size_there_too(): void
     {
         $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
         $prod = Production::latest('id')->first();
         $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
-        // Sewing S meneruskan 10 ke QC; QC sudah mengerjakan 8, jadi sewing S minimal 8.
+        // Sewing S meneruskan 10 ke QC; QC sudah mengerjakan 8 di antaranya.
         $this->stage($prod, 'mass', 'qc_packing')->sizeRows()->where('size', 'S')->update(['input_qty' => 2, 'output_qty' => 8]);
         $sewing = $this->stage($prod, 'mass', 'sewing');
 
@@ -430,7 +430,17 @@ class ProductionSizeTest extends TestCase
             ->patch(route('admin.productions.stage', [$prod, $sewing]), [
                 'action' => 'save', 'size_qty' => ['S' => 7, 'M' => 30],
             ])
-            ->assertSessionHasErrors('size_qty');
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Tahap diperbarui. Output QC & Packing ikut disesuaikan supaya tidak melebihi yang diterima.');
+
+        $sewing = $sewing->fresh('sizeRows');
+        $qc = $this->stage($prod, 'mass', 'qc_packing')->load('sizeRows');
+        $this->assertSame(['S' => 3, 'M' => 0], $sewing->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(['S' => 7, 'M' => 30], $sewing->sizeRows->pluck('output_qty', 'size')->all());
+        $this->assertSame(['S' => 0, 'M' => 30], $qc->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(['S' => 7, 'M' => 0], $qc->sizeRows->pluck('output_qty', 'size')->all());
+        $this->assertSame([30, 7], [$qc->input_qty, $qc->output_qty]);
+        $this->assertSame([3, 37], [$sewing->input_qty, $sewing->output_qty]);
     }
 
     public function test_update_adjusts_the_remaining_cutting_per_size(): void

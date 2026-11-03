@@ -114,7 +114,6 @@
                                 : ($stage->status === 'completed' ? 100 : 0);
                             $machines = $machinesByStage[$stage->stage] ?? [];
                             $maxOut = $production->stageMaxOutput($stage);
-                            $minOut = $production->stageMinOutput($stage);
                             $isSampleQc = $stage->phase === 'sample' && $stage->stage === 'qc_packing';
                             // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
                             $sizedStage = $qtyEditable && $stage->sizeRows->isNotEmpty();
@@ -170,14 +169,13 @@
                                         </div>
                                         <div class="field !mb-0">
                                             <label class="label text-xs">Output (total)</label>
-                                            <input type="number" name="output_qty" min="{{ $minOut }}" max="{{ $maxOut }}" value="{{ $stage->output_qty }}" class="input" {{ $locked ? 'disabled' : '' }}>
+                                            <input type="number" name="output_qty" min="0" max="{{ $maxOut }}" value="{{ $stage->output_qty }}" class="input" {{ $locked ? 'disabled' : '' }}>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
                                                 @if ($production->nextQtyStage($stage))
                                                     Diteruskan ke {{ $production->nextQtyStage($stage)->label() }}
                                                 @else
                                                     Masuk stok saat Selesai
                                                 @endif
-                                                @if ($minOut > 0) · min {{ $minOut }} pcs @endif
                                             </p>
                                             @error('output_qty')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
                                         </div>
@@ -234,10 +232,9 @@
                                                             <td class="py-1.5 text-right tabular-nums text-ink-500">{{ $lim['received'] }}</td>
                                                             <td class="py-1.5 text-right tabular-nums">{{ $row->input_qty }}</td>
                                                             <td class="py-1.5 text-right">
-                                                                <input type="number" name="size_qty[{{ $row->size }}]" min="{{ $lim['min'] }}" max="{{ $lim['max'] }}"
+                                                                <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $lim['max'] }}"
                                                                     value="{{ old('size_qty.'.$row->size, $row->output_qty) }}"
                                                                     class="input !py-1 text-right tabular-nums" {{ $locked || $stage->status === 'pending' ? 'disabled' : '' }}>
-                                                                @if ($lim['min'] > 0)<p class="text-[11px] text-ink-400">min {{ $lim['min'] }}</p>@endif
                                                             </td>
                                                         </tr>
                                                     @endforeach
