@@ -284,14 +284,29 @@ class ProductionSampleTest extends TestCase
         $this->assertSame($first->id, $second->sample_source_production_id);
         $this->assertNotNull($second->sample_approved_at);
         $this->assertSame(0, $second->sampleUnits());   // tidak ada kain untuk sampel
+        // Desain dan pola ikut sampelnya, jadi Persiapan juga tidak ada.
         $this->assertSame(
-            ['common:design', 'common:pola', 'mass:cutting', 'mass:sewing', 'mass:qc_packing'],
+            ['mass:cutting', 'mass:sewing', 'mass:qc_packing'],
             $second->stages->sortBy('sort_order')->map(fn ($s) => $s->phase.':'.$s->stage)->values()->all()
         );
-        $this->assertSame([1, 2, 3, 4, 5], $second->stages->sortBy('sort_order')->pluck('sort_order')->values()->all());
+        $this->assertSame([1, 2, 3], $second->stages->sortBy('sort_order')->pluck('sort_order')->values()->all());
     }
 
-    public function test_reused_sample_still_waits_for_the_pattern_before_mass_cutting(): void
+    public function test_reusing_a_sample_drops_preparation_even_after_design_was_finished(): void
+    {
+        $first = $this->batch();
+        $second = $this->secondBatch($first);
+        $first->forceFill(['sample_approved_at' => now()])->save();
+        $second->stages()->where('phase', 'common')->update(['status' => 'completed']);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.productions.reuse-sample', $second))
+            ->assertSessionHas('success');
+
+        $this->assertSame(0, $second->stages()->where('phase', 'common')->count());
+    }
+
+    public function test_reused_sample_opens_mass_cutting_right_away(): void
     {
         $first = $this->batch();
         $second = $this->secondBatch($first);
@@ -301,13 +316,22 @@ class ProductionSampleTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$second, $cutting]), ['action' => 'start'])
-            ->assertSessionHas('error', 'Tahap sebelumnya belum selesai. Belum bisa dimulai.');
+            ->assertSessionHas('success');
+    }
 
-        $second->stages()->where('phase', 'common')->update(['status' => 'completed']);
+    public function test_reused_sample_batch_page_has_no_preparation_card(): void
+    {
+        $first = $this->batch();
+        $first->forceFill(['sample_approved_at' => now()])->save();
+        $second = $this->secondBatch($first);
 
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$second, $cutting]), ['action' => 'start'])
-            ->assertSessionHas('success');
+            ->get(route('admin.productions.show', $second))
+            ->assertOk()
+            ->assertSee('Produksi Massal')
+            ->assertSee('Desain dan pola mengikuti sampel '.$first->code)
+            ->assertDontSee('Persiapan')
+            ->assertDontSee('Pembuatan Pola');
     }
 
     public function test_cannot_reuse_when_the_product_has_no_sample_yet(): void
@@ -419,7 +443,11 @@ class ProductionSampleTest extends TestCase
         $second = Production::latest('id')->first()->fresh('stages');
         $this->assertSame($first->id, $second->sample_source_production_id);
         $this->assertNotNull($second->sample_approved_at);
-        $this->assertSame(0, $second->stages->where('phase', 'sample')->count());
+        $this->assertSame(
+            ['mass:cutting', 'mass:sewing', 'mass:qc_packing'],
+            $second->stages->sortBy('sort_order')->map(fn ($s) => $s->phase.':'.$s->stage)->values()->all()
+        );
+        $this->assertSame([1, 2, 3], $second->stages->sortBy('sort_order')->pluck('sort_order')->values()->all());
     }
 
     public function test_new_batch_starts_at_the_sample_phase_when_the_product_has_no_sample(): void

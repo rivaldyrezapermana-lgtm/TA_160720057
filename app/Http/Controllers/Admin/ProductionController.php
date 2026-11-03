@@ -115,7 +115,7 @@ class ProductionController extends Controller
                 $production->forceFill(['code' => 'PRD-'.now()->year.'-'.str_pad((string) $production->id, 4, '0', STR_PAD_LEFT)])->save();
             }
 
-            foreach ($this->stageBlueprint((int) $data['planned_qty'], $source === null) as $row) {
+            foreach ($this->stageBlueprint((int) $data['planned_qty'], $source !== null) as $row) {
                 $stage = $production->stages()->create($row + ['status' => 'pending', 'output_qty' => 0]);
 
                 // Tahap massal dirinci per ukuran: cutting menerima target tiap ukuran.
@@ -141,7 +141,7 @@ class ProductionController extends Controller
 
         if ($source !== null) {
             return redirect($show.'#produksi-massal')->with('success',
-                'Batch produksi dibuat. Memakai sampel dari '.$source->code.' — langsung produksi massal setelah pola selesai.');
+                'Batch produksi dibuat. Memakai sampel dari '.$source->code.' — langsung produksi massal.');
         }
 
         return redirect($show.'#tahap-sampel')->with('success',
@@ -222,19 +222,22 @@ class ProductionController extends Controller
 
     /**
      * Susunan tahap sebuah batch. Fase sampel hanya ada kalau target lebih dari
-     * 1 pcs — batch 1 pcs memang produknya sekaligus sampelnya — dan produknya
-     * belum punya sampel dari batch lain.
+     * 1 pcs — batch 1 pcs memang produknya sekaligus sampelnya. Batch yang memakai
+     * sampel dari batch lain tidak punya Persiapan maupun fase sampel: desain dan
+     * pola hanya dikerjakan saat membuat sampel, jadi langsung produksi massal.
      *
      * @return list<array{phase: string, sort_order: int, stage: string, input_qty: int}>
      */
-    private function stageBlueprint(int $plannedQty, bool $withSample = true): array
+    private function stageBlueprint(int $plannedQty, bool $reusesSample = false): array
     {
-        $rows = [
-            ['phase' => 'common', 'stage' => 'design', 'input_qty' => 0],
-            ['phase' => 'common', 'stage' => 'pola', 'input_qty' => 0],
-        ];
+        $rows = [];
 
-        if ($plannedQty > 1 && $withSample) {
+        if (! $reusesSample) {
+            $rows[] = ['phase' => 'common', 'stage' => 'design', 'input_qty' => 0];
+            $rows[] = ['phase' => 'common', 'stage' => 'pola', 'input_qty' => 0];
+        }
+
+        if ($plannedQty > 1 && ! $reusesSample) {
             $rows[] = ['phase' => 'sample', 'stage' => 'cutting', 'input_qty' => 1];
             $rows[] = ['phase' => 'sample', 'stage' => 'sewing', 'input_qty' => 1];
             $rows[] = ['phase' => 'sample', 'stage' => 'qc_packing', 'input_qty' => 1];
@@ -696,9 +699,10 @@ class ProductionController extends Controller
     }
 
     /**
-     * Produk ini sudah punya sampel dari batch lain: lewati fase sampel batch ini
-     * dan langsung buka produksi massal. Tahap sampel dihapus (tidak ada kain yang
-     * dipotong untuk sampel) dan urutan tahap dirapatkan lagi.
+     * Produk ini sudah punya sampel dari batch lain: lewati Persiapan dan fase
+     * sampel batch ini dan langsung buka produksi massal. Tahap-tahap itu dihapus
+     * (desain, pola, dan kain sampel sudah ada di batch sampelnya) dan urutan
+     * tahap dirapatkan lagi.
      */
     public function reuseSample(Production $production)
     {
@@ -719,7 +723,7 @@ class ProductionController extends Controller
 
         $this->applyReusedSample($production, $source);
 
-        return back()->with('success', 'Memakai sampel dari '.$source->code.'. Produksi massal bisa dimulai setelah pola selesai.');
+        return back()->with('success', 'Memakai sampel dari '.$source->code.'. Produksi massal bisa langsung dimulai.');
     }
 
     /**
@@ -757,14 +761,14 @@ class ProductionController extends Controller
         $this->applyReusedSample($production, $source);
 
         return redirect($show.'#produksi-massal')
-            ->with('success', 'Produk ini sudah punya sampel dari '.$source->code.'. Tahap sampel dilewati — langsung produksi massal setelah pola selesai.');
+            ->with('success', 'Produk ini sudah punya sampel dari '.$source->code.'. Persiapan dan tahap sampel dilewati — langsung produksi massal.');
     }
 
-    /** Hapus tahap sampel batch ini, rapatkan urutan, dan tandai sampelnya dari batch lain. */
+    /** Hapus Persiapan dan tahap sampel batch ini, rapatkan urutan, dan tandai sampelnya dari batch lain. */
     private function applyReusedSample(Production $production, Production $source): void
     {
         DB::transaction(function () use ($production, $source) {
-            $production->stages()->where('phase', 'sample')->delete();
+            $production->stages()->whereIn('phase', ['common', 'sample'])->delete();
 
             $production->stages()->orderBy('sort_order')->get()
                 ->each(fn (ProductionStage $s, int $i) => $s->forceFill(['sort_order' => $i + 1])->save());

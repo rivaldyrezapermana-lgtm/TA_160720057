@@ -178,8 +178,10 @@ class Production extends Model
         }
 
         if ($stage->phase === 'mass' && $prev->phase !== 'mass') {
-            // Kalau sampel memakai batch lain, tahap sebelumnya adalah Pola —
-            // persetujuan saja tidak cukup, polanya harus selesai dulu.
+            // Batch lama yang memakai sampel batch lain masih punya Pola sebagai
+            // tahap sebelumnya — persetujuan saja tidak cukup, polanya harus
+            // selesai dulu. Batch baru yang memakai sampel tidak punya Persiapan,
+            // jadi cutting massal adalah tahap pertama dan langsung terbuka.
             return $this->hasSamplePhase()
                 ? $this->sampleApproved() && ($prev->phase === 'sample' || $prev->status === 'completed')
                 : $prev->status === 'completed';

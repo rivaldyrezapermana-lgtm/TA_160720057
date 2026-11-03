@@ -7,12 +7,12 @@ Panduan ini menjelaskan kapan sebuah batch produksi harus membuat sampel, dan ka
 | Kondisi produk | Tahap yang dilalui batch |
 | --- | --- |
 | **Belum punya sampel** | Persiapan (Desain → Pola) → **Tahap Sampel** (1 pcs, harus disetujui) → Produksi Massal |
-| **Sudah punya sampel** | Persiapan (Desain → Pola) → Produksi Massal. **Tahap Sampel tidak dibuat.** |
+| **Sudah punya sampel** | Langsung Produksi Massal. **Persiapan dan Tahap Sampel tidak dibuat.** |
 | **Target hanya 1 pcs** | Persiapan → Produksi Massal (produk itu sendiri sudah jadi sampelnya) |
 
 **Produk dianggap "sudah punya sampel"** kalau ada batch lain dari produk yang sama yang sampelnya **sudah disetujui**, atau batch itu **sudah selesai**. Kalau ada lebih dari satu, sistem memakai batch terbaru.
 
-> Desain dan Pola tetap dikerjakan di setiap batch, termasuk upload minimal satu sketsa desain, walaupun sampelnya diambil dari batch lain.
+> Desain dan Pola hanya dikerjakan saat membuat sampel. Batch yang memakai sampel dari batch lain mengikuti desain, sketsa, dan pola batch sampel tersebut, jadi tidak perlu upload sketsa lagi.
 
 ---
 
@@ -74,9 +74,9 @@ Setelah batch disimpan:
 
 ![Batch memakai sampel dari batch lain](img/sampel/07-batch-pakai-sampel-atas.png)
 
-### 3. Tidak ada kartu "Tahap Sampel"
+### 3. Tidak ada kartu "Persiapan" dan "Tahap Sampel"
 
-Batch hanya berisi **Persiapan** dan **Produksi Massal**. Setelah **Pembuatan Pola** selesai, **Cutting** massal langsung bisa dimulai tanpa membuat sampel lagi. Bahan untuk sampel juga tidak dihitung di "Bahan Terpakai".
+Batch hanya berisi **Produksi Massal** (Cutting → Sewing → QC & Packing). **Cutting** massal langsung bisa dimulai, tanpa Desain, Pola, maupun sampel lagi. Di kartu Produksi Massal tertulis **"Desain dan pola mengikuti sampel PRD-…"** dengan tautan ke batch sampelnya. Bahan untuk sampel juga tidak dihitung di "Bahan Terpakai".
 
 ![Tahap batch tanpa Tahap Sampel](img/sampel/08-batch-pakai-sampel-tahap.png)
 
@@ -96,7 +96,7 @@ Sistem langsung bertindak sesuai kondisi:
 
 | Kondisi | Hasil |
 | --- | --- |
-| Produk sudah punya sampel dan tahap sampel batch ini **belum dimulai** | Tahap sampel dihapus dan batch pindah ke Produksi Massal |
+| Produk sudah punya sampel dan tahap sampel batch ini **belum dimulai** | Persiapan dan tahap sampel dihapus, batch pindah ke Produksi Massal |
 | Produk belum punya sampel | Diarahkan ke Tahap Sampel |
 | Sampel batch ini **sudah mulai dibuat** atau pernah direvisi | Diarahkan untuk melanjutkan di Tahap Sampel (tidak bisa ganti sampel) |
 
@@ -112,7 +112,7 @@ Kolom Sampel menjadi **"Pakai sampel PRD-…"**.
 
 ![Batch lama setelah Cek Sampel](img/sampel/11-batch-lama-setelah-cek.png)
 
-Kartu Tahap Sampel hilang dan urutan tahap dirapatkan kembali: Persiapan langsung diikuti Produksi Massal.
+Kartu Persiapan dan Tahap Sampel hilang, urutan tahap dirapatkan kembali: batch langsung mulai dari Cutting massal. Sketsa yang sempat diunggah di batch ini tetap tersimpan, tapi yang dipakai adalah desain batch sampelnya.
 
 ![Tahap batch lama setelah Cek Sampel](img/sampel/12-batch-lama-tahap.png)
 

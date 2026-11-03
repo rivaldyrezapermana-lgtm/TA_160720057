@@ -139,7 +139,7 @@ $(function () {
                     .empty()
                     .append($('<span class="font-medium">').text('Sudah ada sampel dari '))
                     .append($('<a target="_blank" class="font-medium underline">').attr('href', res.url).text(res.code))
-                    .append(document.createTextNode(' (' + when + '). Tahap sampel dilewati — batch langsung ke Produksi Massal setelah pola selesai.'));
+                    .append(document.createTextNode(' (' + when + '). Persiapan dan tahap sampel dilewati — batch langsung ke Produksi Massal.'));
 
                 res.sketches.forEach(function (url) {
                     $sketches.append($('<a target="_blank" rel="noopener" class="block border border-ink-100 rounded overflow-hidden">').attr('href', url)

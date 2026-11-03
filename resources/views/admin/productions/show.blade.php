@@ -92,6 +92,12 @@
                 @endif
                 @if ($phase === 'mass')
                     <span id="produksi-massal" class="scroll-mt-24"></span>
+                    @if ($production->sampleSource && ! isset($grouped['common']))
+                        <p class="text-xs text-ink-500 mb-3">
+                            Desain dan pola mengikuti sampel {{ $production->sampleSource->code }} —
+                            <a href="{{ route('admin.productions.show', $production->sampleSource->id) }}" class="underline hover:text-ink-800">lihat batch sampel</a>.
+                        </p>
+                    @endif
                 @endif
                 @if ($phase === 'mass' && $production->hasSamplePhase() && ! $production->sampleApproved())
                     <p class="text-xs text-amber-600 mb-3">Terkunci sampai sampel disetujui.</p>
@@ -424,7 +430,7 @@
                     @endif
                 </p>
                 @if ($canReuse)
-                    <p class="text-xs text-ink-500 mt-1">Tidak perlu buat sampel lagi — tahap sampel batch ini dilewati dan langsung ke produksi massal setelah pola selesai.</p>
+                    <p class="text-xs text-ink-500 mt-1">Tidak perlu buat sampel lagi — Persiapan dan tahap sampel batch ini dilewati, langsung ke produksi massal.</p>
                     <form action="{{ route('admin.productions.reuse-sample', $production->id) }}" method="POST" class="mt-2">
                         @csrf
                         <button class="btn-primary text-xs">Pakai sampel ini, langsung produksi massal</button>
