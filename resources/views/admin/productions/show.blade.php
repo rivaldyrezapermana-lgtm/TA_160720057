@@ -118,6 +118,9 @@
                             // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
                             $sizedStage = $qtyEditable && $stage->sizeRows->isNotEmpty();
                             $sizeLimits = $sizedStage ? $production->stageSizeLimits($stage) : [];
+                            // Semua form tahap memakai nama field yang sama; isian lama dan
+                            // pesan error hanya milik tahap yang tadi dikirim.
+                            $isOldStage = (int) old('_stage') === (int) $stage->id;
                             $needsSizeOutput = ! $sizedStage && $stage->phase === 'mass' && $stage->stage === 'qc_packing'
                                 && $stage->status === 'in_progress' && $production->sizes->count() > 1 && ! $locked;
                             $badge = match($stage->status) {
@@ -148,6 +151,7 @@
                             @else
                                 <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                     @csrf @method('PATCH')
+                                    <input type="hidden" name="_stage" value="{{ $stage->id }}">
                                     @if ($sizedStage)
                                         <div class="field !mb-0 md:col-span-2">
                                             <label class="label text-xs">Jumlah</label>
@@ -177,7 +181,9 @@
                                                     Masuk stok saat Selesai
                                                 @endif
                                             </p>
-                                            @error('output_qty')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
+                                            @if ($isOldStage)
+                                                @error('output_qty')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
+                                            @endif
                                         </div>
                                     @elseif ($hasQty)
                                         <div class="field !mb-0 md:col-span-2">
@@ -233,14 +239,16 @@
                                                             <td class="py-1.5 text-right tabular-nums">{{ $row->input_qty }}</td>
                                                             <td class="py-1.5 text-right">
                                                                 <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $lim['max'] }}"
-                                                                    value="{{ old('size_qty.'.$row->size, $row->output_qty) }}"
+                                                                    value="{{ $isOldStage ? old('size_qty.'.$row->size, $row->output_qty) : $row->output_qty }}"
                                                                     class="input !py-1 text-right tabular-nums" {{ $locked || $stage->status === 'pending' ? 'disabled' : '' }}>
                                                             </td>
                                                         </tr>
                                                     @endforeach
                                                 </tbody>
                                             </table>
-                                            @error('size_qty')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                                            @if ($isOldStage)
+                                                @error('size_qty')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                                            @endif
                                         </div>
                                     @endif
                                     @if ($needsSizeOutput)

@@ -443,6 +443,51 @@ class ProductionSizeTest extends TestCase
         $this->assertSame([3, 37], [$sewing->input_qty, $sewing->output_qty]);
     }
 
+    public function test_lowering_a_size_never_stores_a_negative_remainder(): void
+    {
+        // Kolom production_stage_sizes di MySQL unsigned: angka minus ditolak di sana.
+        ProductionStageSize::saving(function (ProductionStageSize $row) {
+            $this->assertGreaterThanOrEqual(0, (int) $row->input_qty, 'Sisa '.$row->size.' tersimpan minus.');
+        });
+
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
+        $this->stage($prod, 'mass', 'qc_packing')->sizeRows()->where('size', 'S')->update(['input_qty' => 2, 'output_qty' => 8]);
+        $cutting = $this->stage($prod, 'mass', 'cutting');
+
+        $this->withoutExceptionHandling()->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
+                'action' => 'save', 'size_qty' => ['S' => 3, 'M' => 30],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $qc = $this->stage($prod, 'mass', 'qc_packing')->load('sizeRows');
+        $this->assertSame(['S' => 0, 'M' => 30], $qc->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(['S' => 3, 'M' => 0], $qc->sizeRows->pluck('output_qty', 'size')->all());
+    }
+
+    public function test_a_rejected_size_output_stays_on_its_own_stage(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $qc = $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
+        $show = route('admin.productions.show', $prod);
+
+        // QC S hanya menerima 10; 99 ditolak dan dikembalikan ke form.
+        $html = $this->actingAs($this->admin())->from($show)->followingRedirects()
+            ->patch(route('admin.productions.stage', [$prod, $qc]), [
+                '_stage' => $qc->id, 'action' => 'save', 'size_qty' => ['S' => 99, 'M' => 0],
+            ])
+            ->assertOk()
+            ->getContent();
+
+        // Angka 99 hanya muncul di form QC, bukan di kolom Output cutting/sewing.
+        $this->assertSame(1, substr_count($html, 'value="99"'));
+        // Pesan error: sekali di ringkasan atas halaman, sekali di bawah tabel QC saja.
+        $this->assertSame(2, substr_count($html, 'maksimal 10 pcs'));
+    }
+
     public function test_update_adjusts_the_remaining_cutting_per_size(): void
     {
         $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);

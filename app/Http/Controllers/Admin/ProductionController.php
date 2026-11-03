@@ -684,7 +684,8 @@ class ProductionController extends Controller
             return;
         }
 
-        $row->input_qty = (int) $row->input_qty - $delta;
+        // Kolom per ukuran unsigned di MySQL, jadi sisa tidak boleh tersimpan minus.
+        $row->input_qty = max(0, (int) $row->input_qty - $delta);
         $row->output_qty = $qty;
         $row->save();
 
@@ -700,12 +701,18 @@ class ProductionController extends Controller
         }
 
         $nextRow->input_qty = (int) $nextRow->input_qty + $delta;
-        $nextRow->save();
 
-        if ($nextRow->input_qty < 0) {
-            $adjusted[$next->id] = $next->label();
-            $this->setSizeOutput($production, $next, $size, max(0, (int) $nextRow->output_qty + (int) $nextRow->input_qty), $adjusted);
+        if ($nextRow->input_qty >= 0) {
+            $nextRow->save();
+
+            return;
         }
+
+        // Tahap berikutnya sudah mengerjakan lebih dari yang sekarang diterimanya:
+        // turunkan outputnya. Sisa minus tidak disimpan — pemanggilan ini menolkan
+        // sisanya lalu menyimpan barisnya.
+        $adjusted[$next->id] = $next->label();
+        $this->setSizeOutput($production, $next, $size, max(0, (int) $nextRow->output_qty + (int) $nextRow->input_qty), $adjusted);
     }
 
     /**
