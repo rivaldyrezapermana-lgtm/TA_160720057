@@ -116,6 +116,87 @@ class ProductionSizeTest extends TestCase
         $this->assertSame(0, Production::count());
     }
 
+    public function test_store_skips_the_sample_size_when_the_product_already_has_a_sample(): void
+    {
+        $product = $this->product();
+        $this->store($product, ['sizes' => ['S' => 10, 'M' => 30]]);
+        $first = Production::latest('id')->first();
+        $first->forceFill(['sample_approved_at' => now()])->save();
+
+        // Ukuran sampel tidak dipakai, jadi isian yang tidak valid pun tidak menggagalkan.
+        $this->store($product, ['sizes' => ['S' => 5, 'M' => 5], 'sample_size' => 'L'])
+            ->assertSessionHasNoErrors();
+
+        $prod = Production::latest('id')->first();
+        $this->assertSame($first->id, $prod->sample_source_production_id);
+        $this->assertNull($prod->sample_size);
+    }
+
+    public function test_create_page_knows_which_products_already_have_a_sample(): void
+    {
+        $withSample = $this->product();
+        $this->store($withSample, ['sizes' => ['S' => 10, 'M' => 30]]);
+        Production::latest('id')->first()->forceFill(['sample_approved_at' => now()])->save();
+
+        $this->actingAs($this->admin())->get(route('admin.productions.create'))
+            ->assertOk()
+            ->assertViewHas('productsWithSample', fn ($ids) => collect($ids)->map(fn ($id) => (int) $id)->all() === [$withSample->id]);
+    }
+
+    public function test_reusing_a_sample_clears_the_sample_size(): void
+    {
+        $product = $this->product();
+        $this->store($product, ['sizes' => ['S' => 10, 'M' => 30]]);
+        $first = Production::latest('id')->first();
+        $this->store($product, ['sizes' => ['S' => 5, 'M' => 8]]);
+        $second = Production::latest('id')->first();
+        $this->assertSame('M', $second->sample_size);
+        $first->forceFill(['sample_approved_at' => now()])->save();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.check-sample', $second));
+
+        $second->refresh();
+        $this->assertSame($first->id, $second->sample_source_production_id);
+        $this->assertNull($second->sample_size);
+    }
+
+    public function test_batch_reusing_a_sample_has_no_sample_size_on_edit(): void
+    {
+        $product = $this->product();
+        $this->store($product, ['sizes' => ['S' => 10, 'M' => 30]]);
+        Production::latest('id')->first()->forceFill(['sample_approved_at' => now()])->save();
+        $this->store($product, ['sizes' => ['S' => 5, 'M' => 8]]);
+        $prod = Production::latest('id')->first();
+
+        $this->actingAs($this->admin())->get(route('admin.productions.edit', $prod))
+            ->assertOk()->assertDontSee('name="sample_size"', false);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'sizes' => ['S' => 5, 'M' => 10],
+                'sample_size' => 'S',
+                'start_date' => now()->toDateString(),
+                'status' => 'planned',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($prod->fresh()->sample_size);
+    }
+
+    public function test_show_page_hides_a_leftover_sample_size_when_reusing_a_sample(): void
+    {
+        $product = $this->product();
+        $this->store($product, ['sizes' => ['S' => 10, 'M' => 30]]);
+        Production::latest('id')->first()->forceFill(['sample_approved_at' => now()])->save();
+        $this->store($product, ['sizes' => ['S' => 5, 'M' => 8]]);
+        $prod = Production::latest('id')->first();
+        // Data lama: batch yang memakai sampel tapi masih menyimpan ukuran sampel.
+        $prod->forceFill(['sample_size' => 'M'])->save();
+
+        $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
+            ->assertOk()->assertDontSee('Ukuran Sampel');
+    }
+
     public function test_store_requires_at_least_one_size_for_a_sized_product(): void
     {
         $this->store($this->product(), ['planned_qty' => 50, 'sizes' => ['S' => 0]])

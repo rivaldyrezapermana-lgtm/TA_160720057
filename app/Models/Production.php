@@ -82,6 +82,12 @@ class Production extends Model
         return (int) $this->planned_qty > 1;
     }
 
+    /** Batch ini membuat sampelnya sendiri (bukan memakai sampel batch lain), jadi butuh ukuran sampel. */
+    public function makesOwnSample(): bool
+    {
+        return $this->hasSamplePhase() && $this->sample_source_production_id === null;
+    }
+
     public function sampleApproved(): bool
     {
         return $this->sample_approved_at !== null;

@@ -53,7 +53,13 @@ class ProductionController extends Controller
         $selectedProduct = old('product_id', $request->query('product_id'));
         $prefillSizes = old('sizes', $request->query('sizes', []));
 
-        return view('admin.productions.create', compact('products', 'machines', 'productSizes', 'selectedProduct', 'prefillSizes'));
+        // Produk yang sudah punya sampel tidak butuh pilihan ukuran sampel
+        // (kriterianya sama dengan Production::sampleBatchFor).
+        $productsWithSample = Production::query()
+            ->where(fn ($q) => $q->whereNotNull('sample_approved_at')->orWhere('status', 'completed'))
+            ->distinct()->pluck('product_id')->map(fn ($id) => (int) $id)->values();
+
+        return view('admin.productions.create', compact('products', 'machines', 'productSizes', 'selectedProduct', 'prefillSizes', 'productsWithSample'));
     }
 
     public function store(Request $request)
@@ -72,18 +78,19 @@ class ProductionController extends Controller
         ]);
 
         $product = Product::with('sizes')->findOrFail($data['product_id']);
-        $plan = $this->resolvePlan($product, $data);
+
+        // Cek sampel sebelum batch dibuat: produk yang sudah punya sampel tidak
+        // diberi fase sampel sama sekali (dan tidak butuh ukuran sampel), sehingga
+        // batch tidak pernah tersimpan setengah jadi dengan Tahap Sampel.
+        $existingSample = Production::sampleBatchFor($product->id);
+
+        $plan = $this->resolvePlan($product, $data, $existingSample === null);
         if ($plan['error'] !== null) {
             return back()->withErrors($plan['error'])->withInput();
         }
         $data['planned_qty'] = $plan['planned'];
 
-        // Cek sampel sebelum batch dibuat: produk yang sudah punya sampel tidak
-        // diberi fase sampel sama sekali, sehingga batch tidak pernah tersimpan
-        // setengah jadi dengan Tahap Sampel.
-        $source = (int) $data['planned_qty'] > 1
-            ? Production::sampleBatchFor((int) $data['product_id'])
-            : null;
+        $source = (int) $data['planned_qty'] > 1 ? $existingSample : null;
 
         $production = DB::transaction(function () use ($data, $plan, $source) {
             $production = Production::create([
@@ -175,11 +182,11 @@ class ProductionController extends Controller
      * Target batch dari input form. Produk yang punya ukuran wajib dirinci per
      * ukuran dan targetnya adalah jumlah rinciannya; produk tanpa ukuran memakai
      * planned_qty apa adanya. Ukuran sampel default ke ukuran dengan target
-     * terbanyak.
+     * terbanyak, dan dikosongkan kalau batch memakai sampel yang sudah ada.
      *
      * @return array{planned: int, sizes: array<string, int>, sample_size: ?string, error: ?array<string, string>}
      */
-    private function resolvePlan(Product $product, array $data): array
+    private function resolvePlan(Product $product, array $data, bool $needsSampleSize = true): array
     {
         $plan = ['planned' => 0, 'sizes' => [], 'sample_size' => null, 'error' => null];
 
@@ -207,7 +214,7 @@ class ProductionController extends Controller
             return $plan;
         }
 
-        if ($plan['planned'] > 1) {
+        if ($plan['planned'] > 1 && $needsSampleSize) {
             $sample = ($data['sample_size'] ?? null) ?: null;
             if ($sample !== null && ! isset($plan['sizes'][$sample])) {
                 $plan['error'] = ['sample_size' => 'Ukuran sampel harus salah satu ukuran yang diproduksi.'];
@@ -331,7 +338,7 @@ class ProductionController extends Controller
         $production->load('sizes', 'product.sizes');
         $plan = null;
         if ($production->sizes->isNotEmpty()) {
-            $plan = $this->resolvePlan($production->product, $data);
+            $plan = $this->resolvePlan($production->product, $data, $production->makesOwnSample());
             if ($plan['error'] !== null) {
                 return back()->withErrors($plan['error'])->withInput();
             }
@@ -780,9 +787,11 @@ class ProductionController extends Controller
             $production->stages()->orderBy('sort_order')->get()
                 ->each(fn (ProductionStage $s, int $i) => $s->forceFill(['sort_order' => $i + 1])->save());
 
+            // Sampelnya dari batch lain, jadi batch ini tidak punya ukuran sampel sendiri.
             $production->forceFill([
                 'sample_approved_at' => now(),
                 'sample_source_production_id' => $source->id,
+                'sample_size' => null,
             ])->save();
         });
     }

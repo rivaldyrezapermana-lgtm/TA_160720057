@@ -65,9 +65,13 @@ $(function () {
     const productSizes = @json($productSizes);
     const prefill = @json((object) $prefillSizes);
     const oldSample = @json(old('sample_size'));
+    // Produk yang sudah punya sampel tidak perlu memilih ukuran sampel.
+    const productsWithSample = @json($productsWithSample);
+    let hasSample = false;
 
     function renderSizes() {
         const sizes = productSizes[$('#product_id').val()] || [];
+        hasSample = productsWithSample.includes(parseInt($('#product_id').val(), 10));
         const $box = $('#size-inputs').empty();
 
         $('#sizes-card').toggleClass('hidden', sizes.length === 0);
@@ -103,7 +107,9 @@ $(function () {
         });
 
         $('#size-total').text(total);
-        $('#sample-size-field').toggleClass('hidden', total <= 1);
+        const needsSampleSize = total > 1 && !hasSample;
+        $('#sample-size-field').toggleClass('hidden', !needsSampleSize);
+        $sample.prop('disabled', !needsSampleSize);
         if (largest) {
             $sample.val($sample.find('option[value="' + current + '"]').length ? current : largest.size);
         }
@@ -126,6 +132,8 @@ $(function () {
         $result.attr('class', 'flex-1 min-w-[16rem] text-sm text-ink-500').text('Mengecek…');
         $.get(@json(route('admin.productions.sample-status')), { product_id: productId })
             .done(function (res) {
+                hasSample = res.has_sample;
+                updateTotal();
                 const $sketches = $('#sample-sketches').empty();
                 if (!res.has_sample) {
                     $result.attr('class', 'flex-1 min-w-[16rem] text-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-ink-800')

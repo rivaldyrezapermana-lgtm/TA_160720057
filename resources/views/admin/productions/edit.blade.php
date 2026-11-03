@@ -38,7 +38,7 @@
             </div>
             @error('sizes')<p class="field-error mt-2">{{ $message }}</p>@enderror
             @error('planned_qty')<p class="field-error mt-2">{{ $message }}</p>@enderror
-            @if ($production->hasSamplePhase())
+            @if ($production->makesOwnSample())
                 <div class="mt-4 pt-4 border-t border-ink-100 max-w-xs">
                     <x-ui.select name="sample_size" label="Ukuran Sampel" :selected="$production->sample_size"
                         :options="$planned->keys()->mapWithKeys(fn ($s) => [$s => $s])->toArray()" placeholder="— Ukuran terbanyak —" />

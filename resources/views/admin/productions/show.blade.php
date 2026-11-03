@@ -15,7 +15,7 @@
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$production->status" /></div>
                 <div><p class="text-ink-500">Target</p><p class="font-medium tabular-nums">{{ $production->planned_qty }} pcs</p></div>
                 <div><p class="text-ink-500">Aktual</p><p class="font-medium tabular-nums">{{ $production->actual_qty }} pcs</p></div>
-                @if ($production->sample_size)
+                @if ($production->sample_size && $production->makesOwnSample())
                     <div><p class="text-ink-500">Ukuran Sampel</p><p class="font-medium">{{ $production->sample_size }}</p></div>
                 @endif
                 @if ($production->hasSamplePhase())
@@ -416,7 +416,7 @@
     <x-ui.modal id="modal-sampel" title="Cek Sampel — {{ $production->product?->name ?? $production->code }}" size="xl">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
             <div><p class="text-ink-500 text-xs">Batch</p><p class="font-medium">{{ $production->code }}</p></div>
-            <div><p class="text-ink-500 text-xs">Ukuran</p><p class="font-medium">{{ $production->sample_size ?? '—' }}</p></div>
+            <div><p class="text-ink-500 text-xs">Ukuran</p><p class="font-medium">{{ $production->makesOwnSample() ? ($production->sample_size ?? '—') : '—' }}</p></div>
             <div><p class="text-ink-500 text-xs">Status</p><p class="font-medium {{ $sampleStatus[0] }}">{{ $sampleStatus[1] }}</p></div>
             <div><p class="text-ink-500 text-xs">Revisi</p><p class="font-medium tabular-nums">{{ $production->sample_revision_count }} kali</p></div>
         </div>
