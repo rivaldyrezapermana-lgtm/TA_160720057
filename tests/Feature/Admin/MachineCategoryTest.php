@@ -46,6 +46,17 @@ class MachineCategoryTest extends TestCase
             ->assertSessionHasErrors(['name', 'code']);
     }
 
+    public function test_category_cannot_be_mapped_to_the_design_stage(): void
+    {
+        $this->actingAs($this->admin())
+            ->post(route('admin.machine-categories.store'), [
+                'name' => 'Meja Desain', 'code' => 'CAT-DSN', 'stage' => 'design',
+            ])
+            ->assertSessionHasErrors('stage');
+
+        $this->assertDatabaseMissing('machine_categories', ['code' => 'CAT-DSN']);
+    }
+
     public function test_category_can_be_deleted_when_unused(): void
     {
         $cat = MachineCategory::create(['name' => 'X', 'code' => 'CAT-X', 'stage' => null]);

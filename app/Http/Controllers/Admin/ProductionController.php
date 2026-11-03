@@ -270,7 +270,7 @@ class ProductionController extends Controller
 
         // Machines available per stage: those whose category maps to the stage.
         $machinesByStage = [];
-        foreach (ProductionStage::STAGES as $s) {
+        foreach (ProductionStage::MACHINE_STAGES as $s) {
             $machinesByStage[$s] = ProductionMachine::where('status', 'active')
                 ->whereHas('category', fn ($q) => $q->where('stage', $s))
                 ->orderBy('name')
@@ -534,6 +534,11 @@ class ProductionController extends Controller
             ]);
         }
 
+        // Tahap tanpa mesin (Desain) mengabaikan pilihan mesin yang terkirim.
+        if (! $stage->usesMachine()) {
+            $data['production_machine_id'] = null;
+        }
+
         // Machine must belong to the category mapped to this stage.
         if (! empty($data['production_machine_id'])) {
             $machine = ProductionMachine::with('category')->find($data['production_machine_id']);
@@ -610,7 +615,9 @@ class ProductionController extends Controller
                 }
             }
 
-            $stage->production_machine_id = $data['production_machine_id'] ?? $stage->production_machine_id;
+            $stage->production_machine_id = $stage->usesMachine()
+                ? ($data['production_machine_id'] ?? $stage->production_machine_id)
+                : null;
 
             if ($action === 'start' && $stage->status === 'pending') {
                 $stage->status = 'in_progress';

@@ -26,6 +26,9 @@ class ProductionStage extends Model
     /** Tahap yang membawa jumlah pcs. Desain dan pola tidak menghasilkan barang. */
     public const QTY_STAGES = ['cutting', 'sewing', 'qc_packing'];
 
+    /** Tahap yang memakai mesin. Desain dikerjakan tanpa mesin. */
+    public const MACHINE_STAGES = ['pola', 'cutting', 'sewing', 'qc_packing'];
+
     public function production()
     {
         return $this->belongsTo(Production::class);
@@ -52,6 +55,11 @@ class ProductionStage extends Model
     public function carriesQty(): bool
     {
         return in_array($this->stage, self::QTY_STAGES, true);
+    }
+
+    public function usesMachine(): bool
+    {
+        return in_array($this->stage, self::MACHINE_STAGES, true);
     }
 
     public function label(): string

@@ -30,7 +30,7 @@ class MachineCategoryController extends Controller
 
     public function create()
     {
-        return view('admin.machine-categories.create', ['stages' => ProductionStage::STAGES]);
+        return view('admin.machine-categories.create', ['stages' => ProductionStage::MACHINE_STAGES]);
     }
 
     public function store(Request $request)
@@ -50,7 +50,7 @@ class MachineCategoryController extends Controller
     {
         return view('admin.machine-categories.edit', [
             'category' => $machine_category,
-            'stages' => ProductionStage::STAGES,
+            'stages' => ProductionStage::MACHINE_STAGES,
         ]);
     }
 
@@ -80,7 +80,7 @@ class MachineCategoryController extends Controller
         return [
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:255', Rule::unique('machine_categories', 'code')->ignore($category)],
-            'stage' => ['nullable', Rule::in(ProductionStage::STAGES)],
+            'stage' => ['nullable', Rule::in(ProductionStage::MACHINE_STAGES)],
             'notes' => ['nullable', 'string'],
         ];
     }

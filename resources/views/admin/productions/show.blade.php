@@ -192,15 +192,17 @@
                                             <p class="text-sm text-ink-500">Tidak menghasilkan pcs</p>
                                         </div>
                                     @endif
-                                    <div class="field !mb-0">
-                                        <label class="label text-xs">Mesin</label>
-                                        <select name="production_machine_id" class="input" {{ $locked ? 'disabled' : '' }}>
-                                            <option value="">— Pilih —</option>
-                                            @foreach ($machines as $mid => $mname)
-                                                <option value="{{ $mid }}" @selected($stage->production_machine_id == $mid)>{{ $mname }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
+                                    @if ($stage->usesMachine())
+                                        <div class="field !mb-0">
+                                            <label class="label text-xs">Mesin</label>
+                                            <select name="production_machine_id" class="input" {{ $locked ? 'disabled' : '' }}>
+                                                <option value="">— Pilih —</option>
+                                                @foreach ($machines as $mid => $mname)
+                                                    <option value="{{ $mid }}" @selected($stage->production_machine_id == $mid)>{{ $mname }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @endif
                                     <div class="flex gap-2">
                                         @unless ($locked)
                                             @if ($stage->status === 'pending')

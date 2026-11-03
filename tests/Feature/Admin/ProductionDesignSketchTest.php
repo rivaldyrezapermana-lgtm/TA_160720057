@@ -3,9 +3,11 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Category;
+use App\Models\MachineCategory;
 use App\Models\Product;
 use App\Models\Production;
 use App\Models\ProductionDesignSketch;
+use App\Models\ProductionMachine;
 use App\Models\ProductionStage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -173,6 +175,38 @@ class ProductionDesignSketchTest extends TestCase
 
         $this->assertSame(0, ProductionDesignSketch::count());
         Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_design_stage_has_no_machine_picker(): void
+    {
+        $prod = $this->batch();
+
+        // Batch baru: hanya tahap Desain yang terbuka, jadi hanya form Desain yang dirender.
+        $this->actingAs($this->admin())
+            ->get(route('admin.productions.show', $prod))
+            ->assertOk()
+            ->assertDontSee('name="production_machine_id"', false);
+    }
+
+    public function test_machine_sent_for_the_design_stage_is_ignored(): void
+    {
+        $prod = $this->batch();
+        $design = $this->design($prod);
+        // Data lama: kategori mesin yang masih dipetakan ke tahap Desain.
+        $cat = MachineCategory::create(['name' => 'Lama', 'code' => 'CAT-OLD', 'stage' => 'design']);
+        $machine = ProductionMachine::create([
+            'name' => 'Meja Desain', 'code' => 'M-DSN', 'status' => 'active', 'machine_category_id' => $cat->id,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $design]), [
+                'action' => 'start', 'production_machine_id' => $machine->id,
+            ])
+            ->assertSessionHas('success');
+
+        $design->refresh();
+        $this->assertSame('in_progress', $design->status);
+        $this->assertNull($design->production_machine_id);
     }
 
     public function test_batch_page_shows_the_uploaded_sketches(): void
