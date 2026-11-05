@@ -113,11 +113,10 @@
                                 ? $production->stageProgressPct($stage)
                                 : ($stage->status === 'completed' ? 100 : 0);
                             $machines = $machinesByStage[$stage->stage] ?? [];
-                            $maxOut = $production->stageMaxOutput($stage);
+                            $received = $production->stageReceived($stage);
                             $isSampleQc = $stage->phase === 'sample' && $stage->stage === 'qc_packing';
                             // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
                             $sizedStage = $qtyEditable && $stage->sizeRows->isNotEmpty();
-                            $sizeLimits = $sizedStage ? $production->stageSizeLimits($stage) : [];
                             // Semua form tahap memakai nama field yang sama; isian lama dan
                             // pesan error hanya milik tahap yang tadi dikirim.
                             $isOldStage = (int) old('_stage') === (int) $stage->id;
@@ -155,9 +154,9 @@
                                     @if ($sizedStage)
                                         <div class="field !mb-0 md:col-span-2">
                                             <label class="label text-xs">Jumlah</label>
-                                            <p class="text-sm text-ink-700 tabular-nums">Sisa {{ $stage->input_qty }} · Output {{ $stage->output_qty }} pcs</p>
+                                            <p class="text-sm text-ink-700 tabular-nums">Diterima {{ $received }} · Sisa {{ $stage->input_qty }} · Output {{ $stage->output_qty }} pcs</p>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
-                                                Diisi per ukuran di bawah ·
+                                                Isi pcs yang baru dikerjakan per ukuran di bawah — sisa berkurang, output bertambah ·
                                                 @if ($production->nextQtyStage($stage))
                                                     diteruskan ke {{ $production->nextQtyStage($stage)->label() }}
                                                 @else
@@ -169,20 +168,21 @@
                                         <div class="field !mb-0">
                                             <label class="label text-xs">Input (sisa)</label>
                                             <p class="input bg-ink-50 tabular-nums">{{ $stage->input_qty }} pcs</p>
-                                            <p class="text-[11px] text-ink-400 mt-0.5">Diterima {{ $maxOut }} pcs · berkurang otomatis saat output diisi</p>
+                                            <p class="text-[11px] text-ink-400 mt-0.5">Diterima {{ $received }} pcs · output {{ $stage->output_qty }} pcs</p>
                                         </div>
                                         <div class="field !mb-0">
-                                            <label class="label text-xs">Output (total)</label>
-                                            <input type="number" name="output_qty" min="0" max="{{ $maxOut }}" value="{{ $stage->output_qty }}" class="input" {{ $locked ? 'disabled' : '' }}>
+                                            <label class="label text-xs">Kurangi sisa</label>
+                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input" {{ $locked ? 'disabled' : '' }}>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
+                                                Pcs yang baru dikerjakan · menambah output,
                                                 @if ($production->nextQtyStage($stage))
-                                                    Diteruskan ke {{ $production->nextQtyStage($stage)->label() }}
+                                                    diteruskan ke {{ $production->nextQtyStage($stage)->label() }}
                                                 @else
-                                                    Masuk stok saat Selesai
+                                                    masuk stok saat Selesai
                                                 @endif
                                             </p>
                                             @if ($isOldStage)
-                                                @error('output_qty')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
+                                                @error('qty')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
                                             @endif
                                         </div>
                                     @elseif ($hasQty)
@@ -227,19 +227,20 @@
                                                         <th class="text-left font-normal py-1">Ukuran</th>
                                                         <th class="text-right font-normal py-1">Diterima</th>
                                                         <th class="text-right font-normal py-1">Sisa</th>
-                                                        <th class="text-right font-normal py-1 w-32">Output (total)</th>
+                                                        <th class="text-right font-normal py-1">Output</th>
+                                                        <th class="text-right font-normal py-1 w-32">Kurangi sisa</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     @foreach ($stage->sizeRows as $row)
-                                                        @php $lim = $sizeLimits[$row->size]; @endphp
                                                         <tr class="border-t border-ink-100">
                                                             <td class="py-1.5 font-medium">{{ $row->size }}</td>
-                                                            <td class="py-1.5 text-right tabular-nums text-ink-500">{{ $lim['received'] }}</td>
+                                                            <td class="py-1.5 text-right tabular-nums text-ink-500">{{ $row->input_qty + $row->output_qty }}</td>
                                                             <td class="py-1.5 text-right tabular-nums">{{ $row->input_qty }}</td>
+                                                            <td class="py-1.5 text-right tabular-nums">{{ $row->output_qty }}</td>
                                                             <td class="py-1.5 text-right">
-                                                                <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $lim['max'] }}"
-                                                                    value="{{ $isOldStage ? old('size_qty.'.$row->size, $row->output_qty) : $row->output_qty }}"
+                                                                <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $row->input_qty }}"
+                                                                    value="{{ $isOldStage ? old('size_qty.'.$row->size) : '' }}" placeholder="0"
                                                                     class="input !py-1 text-right tabular-nums" {{ $locked || $stage->status === 'pending' ? 'disabled' : '' }}>
                                                             </td>
                                                         </tr>

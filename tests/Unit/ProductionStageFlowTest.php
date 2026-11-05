@@ -187,36 +187,36 @@ class ProductionStageFlowTest extends TestCase
         $this->assertTrue($sewing($prod->fresh('stages')));
     }
 
-    public function test_mass_stage_max_output_is_what_the_stage_received(): void
+    public function test_mass_stage_received_is_remaining_plus_output(): void
     {
         $prod = $this->batch(100);
 
-        $this->assertSame(100, $prod->stageMaxOutput($this->stage($prod, 'mass', 'cutting')));
+        $this->assertSame(100, $prod->stageReceived($this->stage($prod, 'mass', 'cutting')));
 
         // Cutting sudah meneruskan 60 pcs: sisa 40, sewing menerima 60.
         $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['input_qty' => 40, 'output_qty' => 60]);
         $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 60]);
         $prod = $prod->fresh('stages');
 
-        $this->assertSame(100, $prod->stageMaxOutput($this->stage($prod, 'mass', 'cutting')));
-        $this->assertSame(60, $prod->stageMaxOutput($this->stage($prod, 'mass', 'sewing')));
+        $this->assertSame(100, $prod->stageReceived($this->stage($prod, 'mass', 'cutting')));
+        $this->assertSame(60, $prod->stageReceived($this->stage($prod, 'mass', 'sewing')));
     }
 
-    public function test_sample_stage_output_is_capped_at_one(): void
+    public function test_sample_stage_receives_one_pcs(): void
     {
         $prod = $this->batch(100);
 
-        $this->assertSame(1, $prod->stageMaxOutput($this->stage($prod, 'sample', 'cutting')));
-        $this->assertSame(1, $prod->stageMaxOutput($this->stage($prod, 'sample', 'qc_packing')));
+        $this->assertSame(1, $prod->stageReceived($this->stage($prod, 'sample', 'cutting')));
+        $this->assertSame(1, $prod->stageReceived($this->stage($prod, 'sample', 'qc_packing')));
     }
 
-    public function test_stages_without_qty_report_zero_bounds(): void
+    public function test_stages_without_qty_receive_nothing(): void
     {
         $prod = $this->batch(100);
 
         $this->assertFalse($this->stage($prod, 'common', 'design')->carriesQty());
         $this->assertFalse($this->stage($prod, 'common', 'pola')->carriesQty());
-        $this->assertSame(0, $prod->stageMaxOutput($this->stage($prod, 'common', 'pola')));
+        $this->assertSame(0, $prod->stageReceived($this->stage($prod, 'common', 'pola')));
     }
 
     public function test_sample_units_counts_the_sample_plus_every_revision(): void

@@ -488,37 +488,35 @@ class ProductionController extends Controller
         $sizeQty = [];
 
         if ($sizedStage) {
-            // Output diisi per ukuran; totalnya dihitung dari rincian.
+            // Per ukuran: angka yang diketik adalah pcs yang baru dikerjakan —
+            // mengurangi sisa ukuran itu, bukan mengganti outputnya.
             $data = $request->validate([
                 'size_qty' => ['nullable', 'array'],
                 'size_qty.*' => ['nullable', 'integer', 'min:0'],
                 'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ]);
 
-            if ($request->has('size_qty')) {
-                foreach ($production->stageSizeLimits($stage) as $size => $limit) {
-                    $row = $stage->sizeRows->firstWhere('size', $size);
-                    $qty = (int) ($data['size_qty'][$size] ?? $row->output_qty);
+            foreach ($stage->sizeRows as $row) {
+                $qty = (int) ($data['size_qty'][$row->size] ?? 0);
 
-                    if ($qty > $limit['max']) {
-                        return back()->withErrors([
-                            'size_qty' => 'Output ukuran '.$size.' maksimal '.$limit['max'].' pcs (jumlah yang diterima tahap ini).',
-                        ])->withInput();
-                    }
-                    $sizeQty[$size] = $qty;
+                if ($qty > (int) $row->input_qty) {
+                    return back()->withErrors([
+                        'size_qty' => 'Ukuran '.$row->size.' maksimal '.$row->input_qty.' pcs (sisa tahap ini).',
+                    ])->withInput();
                 }
+                $sizeQty[$row->size] = $qty;
             }
         } elseif ($qtyEditable) {
-            // Input tahap massal tidak diketik: input = sisa yang belum dikerjakan,
-            // otomatis berkurang saat output bertambah dan diteruskan ke tahap berikutnya.
-            // Tidak ada batas minimal: output yang diturunkan ikut menurunkan tahap berikutnya.
-            $maxOutput = $production->stageMaxOutput($stage);
+            // Input tahap massal tidak diketik: input = sisa yang belum dikerjakan.
+            // Angka yang diketik adalah pcs yang baru dikerjakan — sisa berkurang
+            // sebanyak itu, output bertambah, dan pcs-nya diteruskan ke tahap berikutnya.
+            $remaining = (int) $stage->input_qty;
 
             $data = $request->validate([
-                'output_qty' => ['nullable', 'integer', 'min:0', 'max:'.$maxOutput],
+                'qty' => ['nullable', 'integer', 'min:0', 'max:'.$remaining],
                 'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ], [
-                'output_qty.max' => 'Output maksimal '.$maxOutput.' pcs (jumlah yang diterima tahap ini).',
+                'qty.max' => 'Maksimal '.$remaining.' pcs (sisa tahap ini).',
             ]);
         } elseif ($stage->phase === 'sample') {
             $data = $request->validate([
@@ -560,34 +558,32 @@ class ProductionController extends Controller
         $sizeOutput = [];
         $isMassQcFinish = $action === 'finish' && $stage->phase === 'mass' && $stage->stage === 'qc_packing';
         if ($isMassQcFinish && ! $sizedStage && $production->sizes()->exists()) {
-            $sizeOutput = $this->resolveSizeOutput($request, $production, (int) ($data['output_qty'] ?? $stage->output_qty));
+            $sizeOutput = $this->resolveSizeOutput($request, $production, (int) $stage->output_qty + (int) ($data['qty'] ?? 0));
             if (is_string($sizeOutput)) {
                 return back()->withErrors(['size_output' => $sizeOutput])->withInput();
             }
         }
 
-        // Tahap berikutnya yang outputnya ikut diturunkan, untuk pesan ke operator.
-        $adjusted = [];
-
-        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput, &$adjusted) {
+        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput) {
             if ($sizedStage) {
                 foreach ($sizeQty as $size => $qty) {
-                    $this->setSizeOutput($production, $stage, $size, $qty, $adjusted);
+                    $this->addSizeOutput($production, $stage, $size, $qty);
                 }
 
-                // Total tiap tahap massal mengikuti rincian ukurannya.
-                for ($s = $stage; $s !== null; $s = $production->nextQtyStage($s)) {
-                    $s->load('sizeRows');
-                    $s->syncTotalsFromSizes();
-                    if ($s !== $stage) {
-                        $s->save();
-                    }
+                // Total tahap ini dan tahap penerimanya mengikuti rincian ukurannya.
+                $stage->load('sizeRows');
+                $stage->syncTotalsFromSizes();
+                $next = $production->nextQtyStage($stage);
+                if ($next !== null) {
+                    $next->load('sizeRows');
+                    $next->syncTotalsFromSizes();
+                    $next->save();
                 }
 
                 // Hasil QC per ukuran langsung menjadi stok per ukuran.
                 $sizeOutput = $stage->sizeRows->pluck('output_qty', 'size')->map(fn ($q) => (int) $q)->all();
-            } elseif ($qtyEditable && isset($data['output_qty'])) {
-                $this->setStageOutput($production, $stage, (int) $data['output_qty'], $adjusted);
+            } elseif ($qtyEditable) {
+                $this->addStageOutput($production, $stage, (int) ($data['qty'] ?? 0));
             }
 
             $stage->production_machine_id = $stage->usesMachine()
@@ -630,63 +626,40 @@ class ProductionController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        $message = 'Tahap diperbarui.';
-        if ($adjusted !== []) {
-            $message .= ' Output '.implode(' dan ', array_values($adjusted)).' ikut disesuaikan supaya tidak melebihi yang diterima.';
-        }
-
-        return back()->with('success', $message);
+        return back()->with('success', 'Tahap diperbarui.');
     }
 
     /**
-     * Set output (total) tahap massal; selisihnya menjadi sisa tahap berikutnya.
-     * Kalau sisa tahap berikutnya jadi minus — output diturunkan di bawah yang
-     * sudah dikerjakan tahap berikutnya — output tahap itu ikut diturunkan ke
-     * jumlah yang sekarang diterimanya, berantai sampai tahap terakhir.
-     *
-     * @param  array<int, string>  $adjusted  tahap yang ikut diturunkan (id => label)
+     * Catat pcs yang baru dikerjakan tahap massal: sisa berkurang sebanyak
+     * $qty, output bertambah sebanyak $qty, dan pcs itu masuk ke sisa tahap
+     * berikutnya. Contoh: sisa 700, output 300, dikerjakan 200 → sisa 500, output 500.
      */
-    private function setStageOutput(Production $production, ProductionStage $stage, int $output, array &$adjusted): void
+    private function addStageOutput(Production $production, ProductionStage $stage, int $qty): void
     {
-        $delta = $output - (int) $stage->output_qty;
-        if ($delta === 0) {
+        if ($qty <= 0) {
             return;
         }
 
-        $stage->input_qty = (int) $stage->input_qty - $delta;
-        $stage->output_qty = $output;
+        $stage->input_qty = (int) $stage->input_qty - $qty;
+        $stage->output_qty = (int) $stage->output_qty + $qty;
 
         $next = $production->nextQtyStage($stage);
-        if ($next === null) {
-            return;
+        if ($next !== null) {
+            $next->input_qty = (int) $next->input_qty + $qty;
+            $next->save();
         }
-
-        $next->input_qty = (int) $next->input_qty + $delta;
-        if ($next->input_qty < 0) {
-            $adjusted[$next->id] = $next->label();
-            $this->setStageOutput($production, $next, max(0, (int) $next->output_qty + (int) $next->input_qty), $adjusted);
-        }
-        $next->save();
     }
 
-    /**
-     * Sama dengan setStageOutput(), tetapi untuk satu ukuran: output ukuran ini
-     * menjadi sisa ukuran yang sama di tahap berikutnya, dan penurunannya ikut
-     * menurunkan ukuran itu di tahap-tahap berikutnya bila perlu.
-     *
-     * @param  array<int, string>  $adjusted  tahap yang ikut diturunkan (id => label)
-     */
-    private function setSizeOutput(Production $production, ProductionStage $stage, string $size, int $qty, array &$adjusted): void
+    /** Sama dengan addStageOutput(), untuk satu ukuran: pcs-nya masuk ke ukuran yang sama di tahap berikutnya. */
+    private function addSizeOutput(Production $production, ProductionStage $stage, string $size, int $qty): void
     {
-        $row = $stage->sizeRows->firstWhere('size', $size);
-        $delta = $qty - (int) $row->output_qty;
-        if ($delta === 0) {
+        if ($qty <= 0) {
             return;
         }
 
-        // Kolom per ukuran unsigned di MySQL, jadi sisa tidak boleh tersimpan minus.
-        $row->input_qty = max(0, (int) $row->input_qty - $delta);
-        $row->output_qty = $qty;
+        $row = $stage->sizeRows->firstWhere('size', $size);
+        $row->input_qty = (int) $row->input_qty - $qty;
+        $row->output_qty = (int) $row->output_qty + $qty;
         $row->save();
 
         $next = $production->nextQtyStage($stage);
@@ -694,25 +667,10 @@ class ProductionController extends Controller
             return;
         }
 
-        $nextRow = $next->sizeRows->firstWhere('size', $size);
-        if ($nextRow === null) {
-            $nextRow = $next->sizeRows()->create(['size' => $size, 'input_qty' => 0, 'output_qty' => 0]);
-            $next->sizeRows->push($nextRow);
-        }
-
-        $nextRow->input_qty = (int) $nextRow->input_qty + $delta;
-
-        if ($nextRow->input_qty >= 0) {
-            $nextRow->save();
-
-            return;
-        }
-
-        // Tahap berikutnya sudah mengerjakan lebih dari yang sekarang diterimanya:
-        // turunkan outputnya. Sisa minus tidak disimpan — pemanggilan ini menolkan
-        // sisanya lalu menyimpan barisnya.
-        $adjusted[$next->id] = $next->label();
-        $this->setSizeOutput($production, $next, $size, max(0, (int) $nextRow->output_qty + (int) $nextRow->input_qty), $adjusted);
+        $nextRow = $next->sizeRows->firstWhere('size', $size)
+            ?? $next->sizeRows()->make(['size' => $size, 'input_qty' => 0, 'output_qty' => 0]);
+        $nextRow->input_qty = (int) $nextRow->input_qty + $qty;
+        $nextRow->save();
     }
 
     /**

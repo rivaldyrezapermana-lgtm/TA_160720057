@@ -168,47 +168,45 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(1, $cutting->fresh()->output_qty);
     }
 
-    public function test_output_cannot_exceed_input(): void
+    public function test_qty_cannot_exceed_the_remaining(): void
     {
         [$prod] = $this->batch();
         $this->approveSample($prod);
+        // Cutting menerima 100, sudah dikerjakan 60: sisa 40.
+        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
+            ->update(['input_qty' => 40, 'output_qty' => 60, 'status' => 'in_progress']);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 60]);
         $cutting = $this->stage($prod, 'mass', 'cutting');
 
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'input_qty' => 100, 'output_qty' => 150,
-            ])
-            ->assertSessionHasErrors('output_qty');
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'qty' => 50])
+            ->assertSessionHasErrors(['qty' => 'Maksimal 40 pcs (sisa tahap ini).']);
+
+        $this->assertSame([40, 60], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame(60, $this->stage($prod, 'mass', 'sewing')->input_qty);
     }
 
-    public function test_output_reduces_input_and_becomes_the_next_stage_input(): void
+    public function test_typed_qty_is_subtracted_from_the_remaining_and_added_to_the_output(): void
     {
-        [$prod] = $this->batch();
+        [$prod] = $this->batch(1000);
         $this->approveSample($prod);
         $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')->update(['status' => 'in_progress']);
         $cutting = $this->stage($prod, 'mass', 'cutting');
         $sewing = $this->stage($prod, 'mass', 'sewing');
 
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'output_qty' => 60])
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'qty' => 300])
             ->assertSessionHas('success');
 
-        $this->assertSame([40, 60], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
-        $this->assertSame(60, $sewing->fresh()->input_qty);
+        $this->assertSame([700, 300], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame(300, $sewing->fresh()->input_qty);
 
-        // Output diisi total, bukan tambahan: 70 berarti 10 pcs lagi diteruskan.
+        // Angka berikutnya mengurangi sisa lagi, bukan mengganti output: sisa 700 − 200 = 500.
         $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'output_qty' => 70]);
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'qty' => 200]);
 
-        $this->assertSame([30, 70], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
-        $this->assertSame(70, $sewing->fresh()->input_qty);
-
-        // Koreksi turun mengembalikan pcs ke sisa cutting.
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'save', 'output_qty' => 65]);
-
-        $this->assertSame([35, 65], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
-        $this->assertSame(65, $sewing->fresh()->input_qty);
+        $this->assertSame([500, 500], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
+        $this->assertSame(500, $sewing->fresh()->input_qty);
     }
 
     public function test_mass_input_cannot_be_typed_manually(): void
@@ -219,67 +217,29 @@ class ProductionFlowTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'input_qty' => 5, 'output_qty' => 0,
+                'action' => 'save', 'input_qty' => 5, 'qty' => 0,
             ])
             ->assertSessionHas('success');
 
         $this->assertSame(100, $cutting->fresh()->input_qty);
     }
 
-    public function test_lowering_output_below_what_the_next_stage_worked_on_lowers_the_following_stages(): void
-    {
-        [$prod] = $this->batch();
-        $this->approveSample($prod);
-        // Cutting meneruskan 60; sewing sudah mengerjakan 50 dan meneruskannya ke QC; QC mengerjakan 20.
-        $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
-            ->update(['input_qty' => 40, 'output_qty' => 60, 'status' => 'in_progress']);
-        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')
-            ->update(['input_qty' => 10, 'output_qty' => 50, 'status' => 'in_progress']);
-        $prod->stages()->where('phase', 'mass')->where('stage', 'qc_packing')
-            ->update(['input_qty' => 30, 'output_qty' => 20, 'status' => 'in_progress']);
-        $cutting = $this->stage($prod, 'mass', 'cutting');
-
-        // Angka bebas, tanpa batas minimal: sewing ikut turun ke 40, QC tidak perlu turun.
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'output_qty' => 40,
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'Tahap diperbarui. Output Sewing ikut disesuaikan supaya tidak melebihi yang diterima.');
-
-        $sewing = $this->stage($prod, 'mass', 'sewing');
-        $qc = $this->stage($prod, 'mass', 'qc_packing');
-        $this->assertSame([60, 40], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
-        $this->assertSame([0, 40], [$sewing->input_qty, $sewing->output_qty]);
-        $this->assertSame([20, 20], [$qc->input_qty, $qc->output_qty]);
-
-        // Turun lagi sampai di bawah yang dikerjakan QC: penyesuaian berlanjut ke QC.
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'output_qty' => 15,
-            ])
-            ->assertSessionHasNoErrors();
-
-        $sewing = $sewing->fresh();
-        $qc = $qc->fresh();
-        $this->assertSame([85, 15], [$cutting->fresh()->input_qty, $cutting->fresh()->output_qty]);
-        $this->assertSame([0, 15], [$sewing->input_qty, $sewing->output_qty]);
-        $this->assertSame([0, 15], [$qc->input_qty, $qc->output_qty]);
-    }
-
-    public function test_show_page_sets_no_minimum_on_stage_output(): void
+    public function test_show_page_asks_how_much_to_subtract_from_the_remaining(): void
     {
         [$prod] = $this->batch();
         $this->approveSample($prod);
         $prod->stages()->where('phase', 'mass')->where('stage', 'cutting')
             ->update(['input_qty' => 40, 'output_qty' => 60, 'status' => 'in_progress']);
-        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')
-            ->update(['input_qty' => 10, 'output_qty' => 50, 'status' => 'in_progress']);
+        $prod->stages()->where('phase', 'mass')->where('stage', 'sewing')->update(['input_qty' => 60]);
 
-        $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
+        $html = $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
             ->assertOk()
-            ->assertDontSee('min="50"', false)
-            ->assertDontSee('min 50 pcs');
+            ->assertSee('Kurangi sisa')
+            ->getContent();
+
+        // Kolomnya kosong (bukan berisi output 60) dan dibatasi sisa cutting.
+        $this->assertMatchesRegularExpression('/<input type="number" name="qty" min="0" max="40"[^>]*>/', $html);
+        $this->assertDoesNotMatchRegularExpression('/name="qty"[^>]*value="60"/', $html);
     }
 
     public function test_starting_mass_qc_packing_moves_the_batch_to_qc_status(): void
@@ -346,7 +306,7 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(497, $kain->fresh()->stock);     // 500 - 3*1
     }
 
-    public function test_completed_stage_can_still_be_edited_until_batch_completes(): void
+    public function test_completed_stage_can_still_reduce_its_remaining_until_batch_completes(): void
     {
         [$prod] = $this->batch();
         $this->approveSample($prod);
@@ -357,13 +317,13 @@ class ProductionFlowTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'output_qty' => 85,
+                'action' => 'save', 'qty' => 5,
             ])
             ->assertSessionHas('success');
 
-        $this->assertSame(85, $cutting->fresh()->output_qty);
-        $this->assertSame(15, $cutting->fresh()->input_qty);
-        $this->assertSame(85, $this->stage($prod, 'mass', 'sewing')->input_qty);
+        $this->assertSame(95, $cutting->fresh()->output_qty);
+        $this->assertSame(5, $cutting->fresh()->input_qty);
+        $this->assertSame(95, $this->stage($prod, 'mass', 'sewing')->input_qty);
         $this->assertSame('completed', $cutting->fresh()->status);
     }
 
@@ -382,7 +342,7 @@ class ProductionFlowTest extends TestCase
         $cutting = $this->stage($prod, 'mass', 'cutting');
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'input_qty' => 100, 'output_qty' => 50,
+                'action' => 'save', 'qty' => 50,
             ])
             ->assertSessionHas('error');
 

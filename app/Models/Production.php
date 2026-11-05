@@ -233,32 +233,6 @@ class Production extends Model
         return (int) $stage->input_qty + (int) $stage->output_qty;
     }
 
-    /** Batas atas output tahap: semua pcs yang sudah diterima tahap itu. */
-    public function stageMaxOutput(ProductionStage $stage): int
-    {
-        return $this->stageReceived($stage);
-    }
-
-    /**
-     * Batas output per ukuran sebuah tahap massal berukuran, aturannya sama dengan
-     * total: maks = yang diterima ukuran itu. Tidak ada batas minimal — output
-     * yang diturunkan ikut menurunkan ukuran yang sama di tahap berikutnya.
-     *
-     * @return array<string, array{received: int, max: int}>
-     */
-    public function stageSizeLimits(ProductionStage $stage): array
-    {
-        $limits = [];
-
-        foreach ($stage->sizeRows as $row) {
-            $received = (int) $row->input_qty + (int) $row->output_qty;
-
-            $limits[$row->size] = ['received' => $received, 'max' => $received];
-        }
-
-        return $limits;
-    }
-
     /**
      * Sebab sebuah tahap masih terkunci: 'sample_not_approved', 'gate_50', atau
      * 'previous_incomplete'. Cabangnya sengaja mengikuti stageUnlocked() supaya

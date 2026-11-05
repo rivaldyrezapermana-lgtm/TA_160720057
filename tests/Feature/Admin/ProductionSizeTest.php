@@ -378,7 +378,7 @@ class ProductionSizeTest extends TestCase
         $this->assertSame(0, ProductionStageSize::whereIn('production_stage_id', $prod->stages()->where('phase', '!=', 'mass')->pluck('id'))->count());
     }
 
-    public function test_per_size_output_flows_into_the_same_size_of_the_next_stage(): void
+    public function test_per_size_qty_is_subtracted_from_that_sizes_remaining(): void
     {
         $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
         $prod = Production::latest('id')->first();
@@ -400,71 +400,39 @@ class ProductionSizeTest extends TestCase
         $this->assertSame([11, 29], [$cutting->input_qty, $cutting->output_qty]);
         $this->assertSame(['S' => 4, 'M' => 25], $sewing->sizeRows->pluck('input_qty', 'size')->all());
         $this->assertSame(29, $sewing->input_qty);
+
+        // Simpan lagi: angkanya mengurangi sisa tiap ukuran, bukan mengganti outputnya.
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
+                'action' => 'save', 'size_qty' => ['S' => 2, 'M' => 5],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $cutting = $cutting->fresh('sizeRows');
+        $sewing = $sewing->fresh('sizeRows');
+        $this->assertSame(['S' => 4, 'M' => 0], $cutting->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(['S' => 6, 'M' => 30], $cutting->sizeRows->pluck('output_qty', 'size')->all());
+        $this->assertSame([4, 36], [$cutting->input_qty, $cutting->output_qty]);
+        $this->assertSame(['S' => 6, 'M' => 30], $sewing->sizeRows->pluck('input_qty', 'size')->all());
+        $this->assertSame(36, $sewing->input_qty);
     }
 
-    public function test_per_size_output_cannot_exceed_what_the_size_received(): void
+    public function test_per_size_qty_cannot_exceed_that_sizes_remaining(): void
     {
         $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
         $prod = Production::latest('id')->first();
         $qc = $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
+        // QC S menerima 10 dan sudah mengerjakan 8: sisanya tinggal 2.
+        $qc->sizeRows()->where('size', 'S')->update(['input_qty' => 2, 'output_qty' => 8]);
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $qc]), [
-                'action' => 'finish', 'size_qty' => ['S' => 12, 'M' => 26],
+                'action' => 'save', 'size_qty' => ['S' => 5, 'M' => 0],
             ])
-            ->assertSessionHasErrors('size_qty');
+            ->assertSessionHasErrors(['size_qty' => 'Ukuran S maksimal 2 pcs (sisa tahap ini).']);
 
-        $this->assertNotSame('completed', $prod->fresh()->status);
-    }
-
-    public function test_lowering_a_size_below_what_the_next_stage_used_lowers_that_size_there_too(): void
-    {
-        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
-        $prod = Production::latest('id')->first();
-        $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
-        // Sewing S meneruskan 10 ke QC; QC sudah mengerjakan 8 di antaranya.
-        $this->stage($prod, 'mass', 'qc_packing')->sizeRows()->where('size', 'S')->update(['input_qty' => 2, 'output_qty' => 8]);
-        $sewing = $this->stage($prod, 'mass', 'sewing');
-
-        $this->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $sewing]), [
-                'action' => 'save', 'size_qty' => ['S' => 7, 'M' => 30],
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'Tahap diperbarui. Output QC & Packing ikut disesuaikan supaya tidak melebihi yang diterima.');
-
-        $sewing = $sewing->fresh('sizeRows');
-        $qc = $this->stage($prod, 'mass', 'qc_packing')->load('sizeRows');
-        $this->assertSame(['S' => 3, 'M' => 0], $sewing->sizeRows->pluck('input_qty', 'size')->all());
-        $this->assertSame(['S' => 7, 'M' => 30], $sewing->sizeRows->pluck('output_qty', 'size')->all());
-        $this->assertSame(['S' => 0, 'M' => 30], $qc->sizeRows->pluck('input_qty', 'size')->all());
-        $this->assertSame(['S' => 7, 'M' => 0], $qc->sizeRows->pluck('output_qty', 'size')->all());
-        $this->assertSame([30, 7], [$qc->input_qty, $qc->output_qty]);
-        $this->assertSame([3, 37], [$sewing->input_qty, $sewing->output_qty]);
-    }
-
-    public function test_lowering_a_size_never_stores_a_negative_remainder(): void
-    {
-        // Kolom production_stage_sizes di MySQL unsigned: angka minus ditolak di sana.
-        ProductionStageSize::saving(function (ProductionStageSize $row) {
-            $this->assertGreaterThanOrEqual(0, (int) $row->input_qty, 'Sisa '.$row->size.' tersimpan minus.');
-        });
-
-        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
-        $prod = Production::latest('id')->first();
-        $this->readyForSizedQc($prod, ['S' => 10, 'M' => 30]);
-        $this->stage($prod, 'mass', 'qc_packing')->sizeRows()->where('size', 'S')->update(['input_qty' => 2, 'output_qty' => 8]);
-        $cutting = $this->stage($prod, 'mass', 'cutting');
-
-        $this->withoutExceptionHandling()->actingAs($this->admin())
-            ->patch(route('admin.productions.stage', [$prod, $cutting]), [
-                'action' => 'save', 'size_qty' => ['S' => 3, 'M' => 30],
-            ])
-            ->assertSessionHasNoErrors();
-
-        $qc = $this->stage($prod, 'mass', 'qc_packing')->load('sizeRows');
-        $this->assertSame(['S' => 0, 'M' => 30], $qc->sizeRows->pluck('input_qty', 'size')->all());
-        $this->assertSame(['S' => 3, 'M' => 0], $qc->sizeRows->pluck('output_qty', 'size')->all());
+        $row = $qc->sizeRows()->where('size', 'S')->first();
+        $this->assertSame([2, 8], [$row->input_qty, $row->output_qty]);
     }
 
     public function test_a_rejected_size_output_stays_on_its_own_stage(): void
