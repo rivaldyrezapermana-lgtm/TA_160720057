@@ -174,7 +174,7 @@ class ProductionController extends Controller
             'url' => route('admin.productions.show', $source->id),
             'approved_at' => $source->sample_approved_at?->translatedFormat('d M Y'),
             'sketches' => $source->designSketches
-                ->map(fn ($s) => Storage::disk('public')->url($s->path))->values(),
+                ->map(fn ($s) => asset('storage/'.$s->path))->values(),
         ]);
     }
 

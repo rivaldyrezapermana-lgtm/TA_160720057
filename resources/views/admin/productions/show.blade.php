@@ -276,8 +276,8 @@
                                             <div class="grid grid-cols-3 md:grid-cols-5 gap-2 mb-2">
                                                 @foreach ($production->designSketches as $sketch)
                                                     <div class="border border-ink-100 rounded-lg overflow-hidden bg-white">
-                                                        <a href="{{ Storage::disk('public')->url($sketch->path) }}" target="_blank" rel="noopener" title="{{ $sketch->original_name }}">
-                                                            <img src="{{ Storage::disk('public')->url($sketch->path) }}" alt="{{ $sketch->original_name }}" class="w-full aspect-square object-cover">
+                                                        <a href="{{ asset('storage/'.$sketch->path) }}" target="_blank" rel="noopener" title="{{ $sketch->original_name }}">
+                                                            <img src="{{ asset('storage/'.$sketch->path) }}" alt="{{ $sketch->original_name }}" class="w-full aspect-square object-cover">
                                                         </a>
                                                         @unless ($sketchLocked)
                                                             <form action="{{ route('admin.productions.sketches.destroy', [$production->id, $sketch->id]) }}" method="POST" class="px-2 py-1 text-right">
