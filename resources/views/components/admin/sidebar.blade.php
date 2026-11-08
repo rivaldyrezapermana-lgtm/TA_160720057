@@ -23,7 +23,7 @@
         <a href="{{ route('admin.dashboard') }}" class="sidebar-brand-text text-lg font-semibold text-slate-900">
             Labasa <span class="font-normal text-slate-400">Admin</span>
         </a>
-        <button id="sidebar-toggle" type="button" title="Lipat sidebar" aria-label="Lipat sidebar"
+        <button id="sidebar-toggle" type="button" title="Lipat bilah samping" aria-label="Lipat bilah samping"
                 class="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
         </button>
@@ -33,10 +33,10 @@
     <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         <a href="{{ route('admin.dashboard') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.dashboard') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h4v-6h6v6h4V10"/></svg>
-            <span class="sidebar-label">Dashboard</span>
+            <span class="sidebar-label">Dasbor</span>
         </a>
 
-        <p class="sidebar-section px-3 pt-5 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Master Data</p>
+        <p class="sidebar-section px-3 pt-5 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Data Master</p>
 
         <a href="{{ route('admin.categories.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.categories.*') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/></svg>
@@ -55,13 +55,13 @@
 
         <a href="{{ route('admin.suppliers.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.suppliers.*') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 00-2-2H4a2 2 0 00-2 2v11a1 1 0 001 1h2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M15 18h-2M19 18h2a1 1 0 001-1v-3.65a1 1 0 00-.22-.62l-3.48-4.35A1 1 0 0017.52 8H14"/></svg>
-            <span class="sidebar-label">Supplier</span>
+            <span class="sidebar-label">Pemasok</span>
         </a>
 
         @if ($isAdmin)
             <a href="{{ route('admin.users.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.users.*') }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                <span class="sidebar-label">User</span>
+                <span class="sidebar-label">Pengguna</span>
             </a>
         @endif
 
@@ -87,6 +87,11 @@
             <span class="sidebar-label">Kategori Mesin</span>
         </a>
 
+        <a href="{{ route('admin.sizes.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.sizes.*') }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h18v8H3z"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>
+            <span class="sidebar-label">Ukuran</span>
+        </a>
+
         <a href="{{ route('admin.recommendations.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.recommendations.*') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3 11.13c.37.27.66.62.83 1.04.19.59.56.83.96.83h2.42c.4 0 .77-.24.96-.83.17-.42.46-.77.83-1.04A6 6 0 0012 3z"/></svg>
             <span class="sidebar-label">Rekomendasi</span>
@@ -102,7 +107,7 @@
 
         <a href="{{ route('admin.chat.index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.chat.*') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-            <span class="sidebar-label">Live Chat</span>
+            <span class="sidebar-label">Chat Langsung</span>
             @if ($adminUnread > 0)
                 <span class="sidebar-badge ml-auto text-xs font-medium px-1.5 py-0.5 rounded-full bg-emerald-600 text-white">{{ $adminUnread > 99 ? '99+' : $adminUnread }}</span>
             @endif
@@ -112,17 +117,17 @@
 
         <a href="{{ route('admin.reports.production') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.reports.production') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 20v-4M12 20V10M18 20V4"/></svg>
-            <span class="sidebar-label">Lap. Produksi</span>
+            <span class="sidebar-label">Laporan Produksi</span>
         </a>
 
         <a href="{{ route('admin.reports.sales') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.reports.sales') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 6l-9.5 9.5-5-5L1 18"/><path d="M16 6h6v6"/></svg>
-            <span class="sidebar-label">Lap. Penjualan</span>
+            <span class="sidebar-label">Laporan Penjualan</span>
         </a>
 
         <a href="{{ route('admin.reports.inventory') }}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-sm {{ $linkClass('admin.reports.inventory') }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12.89 1.45l8 4A2 2 0 0122 7.24v9.53a2 2 0 01-1.11 1.79l-8 4a2 2 0 01-1.78 0l-8-4a2 2 0 01-1.11-1.79V7.24a2 2 0 011.11-1.79l8-4a2 2 0 011.78 0z"/><path d="M2.32 6.16L12 11l9.68-4.84M12 22.76V11"/></svg>
-            <span class="sidebar-label">Lap. Inventori</span>
+            <span class="sidebar-label">Laporan Inventori</span>
         </a>
     </nav>
 

@@ -13,7 +13,7 @@
     </div>
     <div class="p-5">
         <table id="tbl-materials" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Nama</th><th>Unit</th><th class="text-right">Stok</th><th class="text-right">Min</th><th class="text-right">Harga/Unit</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Nama</th><th>Satuan</th><th class="text-right">Stok</th><th class="text-right">Min</th><th class="text-right">Harga per Unit</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -34,10 +34,10 @@ $(function() {
             { data: 'status', render: d => d === 'low'
                 ? '<span class="badge-red">Stok Rendah</span>'
                 : '<span class="badge-green">Aman</span>' },
-            { data: 'id', className: 'text-right', render: id => `<a href="/admin/materials/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Edit</a>` },
+            { data: 'id', className: 'text-right', render: id => `<a href="/admin/materials/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Ubah</a>` },
         ],
         pageLength: 10, order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: '–', paginate: { previous: '‹', next: '›' } }
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: 'Tidak ada hasil', emptyTable: 'Tidak ada data', infoEmpty: 'Tidak ada data', infoFiltered: '(disaring dari _MAX_ data)', loadingRecords: 'Memuat...', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

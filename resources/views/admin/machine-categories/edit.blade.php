@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Edit Kategori Mesin')
+@section('title', 'Ubah Kategori Mesin')
 @section('breadcrumb')
     <x-admin.breadcrumb :items="[['label' => 'Kategori Mesin', 'url' => route('admin.machine-categories.index')], ['label' => $category->name]]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Edit: {{ $category->name }}</h1>
+    <h1 class="font-display text-xl font-semibold text-ink-900">Ubah: {{ $category->name }}</h1>
 @endsection
 
 @section('content')
@@ -19,7 +19,7 @@
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">
         <a href="{{ route('admin.machine-categories.index') }}" class="btn-secondary">Batal</a>
-        <button class="btn-primary">Simpan</button>
+        <button class="btn-primary">Simpan Perubahan</button>
     </div>
 </form>
 @endsection

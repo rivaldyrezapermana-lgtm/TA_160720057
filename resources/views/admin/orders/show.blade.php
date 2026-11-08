@@ -10,7 +10,7 @@
     <div class="lg:col-span-2 space-y-6">
         <x-ui.card title="Item Pesanan">
             <table class="table-clean">
-                <thead><tr><th>Produk</th><th>Size</th><th class="text-right">Qty</th><th class="text-right">Harga</th><th class="text-right">Subtotal</th></tr></thead>
+                <thead><tr><th>Produk</th><th>Ukuran</th><th class="text-right">Jumlah</th><th class="text-right">Harga</th><th class="text-right">Subtotal</th></tr></thead>
                 <tbody>
                     @foreach ($order->items as $i)
                         <tr>
@@ -42,16 +42,16 @@
                     <div>
                         <p class="text-ink-500">Bukti Transfer</p>
                         @if ($order->payment->proof_image)
-                            <a href="{{ asset('storage/'.$order->payment->proof_image) }}" target="_blank" class="text-ink-900 underline text-sm">Lihat bukti</a>
+                            <a href="{{ asset('storage/'.$order->payment->proof_image) }}" target="_blank" class="text-ink-900 underline text-sm">Lihat Bukti</a>
                         @else
-                            <span class="text-ink-400 text-sm">Belum diupload</span>
+                            <span class="text-ink-400 text-sm">Belum diunggah</span>
                         @endif
                     </div>
-                    <div><p class="text-ink-500">Tanggal Bayar</p><p class="font-medium">{{ $order->payment->paid_at?->translatedFormat('d M Y, H:i') ?? '-' }}</p></div>
+                    <div><p class="text-ink-500">Tanggal Pembayaran</p><p class="font-medium">{{ $order->payment->paid_at?->translatedFormat('d M Y, H:i') ?? '-' }}</p></div>
                 </div>
                 @if ($order->payment->status === 'rejected' && $order->payment->note)
                     <div class="mt-4 rounded-lg bg-red-50 border border-red-200 p-3">
-                        <p class="text-xs font-semibold text-red-700">Alasan penolakan</p>
+                        <p class="text-xs font-semibold text-red-700">Alasan Penolakan</p>
                         <p class="text-sm text-red-600 mt-1">{{ $order->payment->note }}</p>
                     </div>
                 @endif
@@ -63,7 +63,7 @@
 
     <div>
         <x-ui.card title="Status Pesanan">
-            <p class="text-xs text-ink-500 mb-2">Status saat ini</p>
+            <p class="text-xs text-ink-500 mb-2">Status Saat Ini</p>
             <x-ui.status-badge :status="$order->status" />
 
             <p class="text-xs text-ink-500 mt-4 mb-2">Ubah Status</p>
@@ -71,10 +71,10 @@
                 @csrf @method('PATCH')
                 <select name="status" class="input">
                     @foreach (\App\Models\Order::STATUSES as $s)
-                        <option value="{{ $s }}" {{ $order->status === $s ? 'selected' : '' }}>{{ $s }}</option>
+                        <option value="{{ $s }}" {{ $order->status === $s ? 'selected' : '' }}>{{ ['pending' => 'Menunggu', 'paid' => 'Dibayar', 'processing' => 'Diproses', 'shipped' => 'Dikirim', 'completed' => 'Selesai', 'cancelled' => 'Dibatalkan'][$s] ?? $s }}</option>
                     @endforeach
                 </select>
-                <button class="btn-primary w-full justify-center">Update</button>
+                <button class="btn-primary w-full justify-center">Perbarui</button>
             </form>
 
             @if ($order->payment && $order->payment->status !== 'verified')
@@ -87,7 +87,7 @@
                             <button class="btn-primary w-full justify-center">Verifikasi Pembayaran</button>
                         </form>
                     @else
-                        <p class="text-xs text-ink-400">Pembeli belum mengupload bukti.</p>
+                        <p class="text-xs text-ink-400">Pelanggan belum mengunggah bukti.</p>
                     @endif
 
                     <form action="{{ route('admin.orders.reject', $order->id) }}" method="POST" class="space-y-2">

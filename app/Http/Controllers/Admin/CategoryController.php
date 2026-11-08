@@ -50,7 +50,7 @@ class CategoryController extends Controller
     {
         if ($category->products()->exists()) {
             return redirect()->route('admin.categories.index')
-                ->with('error', 'Kategori tidak bisa dihapus karena masih memiliki produk.');
+                ->with('error', 'Kategori tidak dapat dihapus karena masih memiliki produk.');
         }
 
         $category->delete();

@@ -14,7 +14,7 @@
             <x-ui.input name="code" label="Kode" required />
             <x-ui.input name="unit" label="Satuan" placeholder="meter, roll, pcs..." required />
             <x-ui.input name="stock" type="number" label="Stok Awal" required />
-            <x-ui.input name="min_stock" type="number" label="Minimum Stok" required help="Untuk alert stok rendah" />
+            <x-ui.input name="min_stock" type="number" label="Stok Minimum" required help="Digunakan untuk peringatan stok rendah." />
             <x-ui.input name="unit_cost" type="number" label="Harga per Unit (Rp)" required />
         </div>
     </x-ui.card>

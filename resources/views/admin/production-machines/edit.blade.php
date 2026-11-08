@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Edit Mesin')
+@section('title', 'Ubah Mesin Produksi')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Mesin Produksi', 'url' => route('admin.production-machines.index')], ['label' => $machine->name]]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Edit: {{ $machine->name }}</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Mesin Produksi', 'url' => route('admin.production-machines.index')], ['label' => $machine->display_name]]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Ubah: {{ $machine->display_name }}</h1>
 @endsection
 
 @section('content')
@@ -11,7 +11,10 @@
     <x-ui.card>
         <div class="grid md:grid-cols-2 gap-4">
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama Mesin" :value="$machine->name" required /></div>
-            <x-ui.input name="code" label="Kode" :value="$machine->code" required />
+            <div class="field">
+                <label class="label">ID Mesin</label>
+                <input type="text" value="{{ $machine->kode_mesin }}" class="input bg-ink-50" readonly disabled>
+            </div>
             <x-ui.select name="status" label="Status" required :options="['active' => 'Aktif', 'maintenance' => 'Perawatan', 'inactive' => 'Nonaktif']" :selected="$machine->status" />
             <x-ui.select name="machine_category_id" label="Kategori" :selected="$machine->machine_category_id" :options="$categories" />
             <x-ui.input name="capacity" type="number" label="Kapasitas (pcs/hari)" :value="$machine->capacity" />
@@ -20,7 +23,7 @@
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">
         <a href="{{ route('admin.production-machines.index') }}" class="btn-secondary">Batal</a>
-        <button class="btn-primary">Simpan</button>
+        <button class="btn-primary">Simpan Perubahan</button>
     </div>
 </form>
 @endsection

@@ -33,7 +33,7 @@ class RecommendationController extends Controller
 
                 $result = $this->fuzzy->calculate(
                     (float) $latest->demand,
-                    (float) $latest->stock_end,
+                    (float) $product->stock,
                     $history,
                 );
 
@@ -52,12 +52,17 @@ class RecommendationController extends Controller
 
     public function create(Request $request)
     {
-        $products = Product::orderBy('name')->get(['id', 'name']);
-        $productId = (int) $request->query('product_id', $products->first()->id ?? 0);
+        $products = Product::orderBy('name')->get(['id', 'name', 'stock']);
+
+        // Old input wins after the calculate redirect, so the select, the stock
+        // and the history table all describe the product that was calculated.
+        $requestedId = (int) $request->old('product_id', $request->query('product_id'));
+        $selectedProduct = $products->firstWhere('id', $requestedId) ?? $products->first();
+        $selectedProductId = $selectedProduct?->id;
 
         $history = collect();
-        if ($productId) {
-            $history = SalesHistory::where('product_id', $productId)
+        if ($selectedProductId) {
+            $history = SalesHistory::where('product_id', $selectedProductId)
                 ->orderBy('year')
                 ->orderBy('month')
                 ->get()
@@ -70,7 +75,7 @@ class RecommendationController extends Controller
                 ->all();
         }
 
-        return view('admin.recommendations.create', compact('products', 'history'));
+        return view('admin.recommendations.create', compact('products', 'selectedProduct', 'selectedProductId', 'history'));
     }
 
     public function calculate(Request $request)
@@ -78,7 +83,6 @@ class RecommendationController extends Controller
         $data = $request->validate([
             'product_id' => ['required', 'exists:products,id'],
             'demand' => ['required', 'numeric', 'min:0'],
-            'stock' => ['required', 'numeric', 'min:0'],
         ]);
 
         $product = Product::findOrFail($data['product_id']);
@@ -90,7 +94,7 @@ class RecommendationController extends Controller
 
         $result = $this->fuzzy->calculate(
             (float) $data['demand'],
-            (float) $data['stock'],
+            (float) $product->stock,
             $history,
         );
 

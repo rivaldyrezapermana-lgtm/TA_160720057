@@ -8,12 +8,12 @@
 @section('content')
 <div class="bg-white border border-ink-100 rounded-xl overflow-hidden">
     <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-ink-100">
-        <p class="text-sm text-ink-500">PO bahan baku ke supplier.</p>
-        <a href="{{ route('admin.purchases.create') }}" class="btn-primary">+ PO Baru</a>
+        <p class="text-sm text-ink-500">Pesanan pembelian bahan baku kepada pemasok.</p>
+        <a href="{{ route('admin.purchases.create') }}" class="btn-primary">+ Pesanan Pembelian Baru</a>
     </div>
     <div class="p-5">
         <table id="tbl-purchases" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Supplier</th><th>Tanggal</th><th class="text-right">Total</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Pemasok</th><th>Tanggal</th><th class="text-right">Total</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -31,13 +31,13 @@ $(function() {
             { data: 'total', className: 'text-right tabular-nums' },
             { data: 'status', render: d => {
                 const map = { pending: 'badge-amber', received: 'badge-green', cancelled: 'badge-red' };
-                const label = { pending: 'Pending', received: 'Diterima', cancelled: 'Dibatalkan' };
+                const label = { pending: 'Menunggu', received: 'Diterima', cancelled: 'Dibatalkan' };
                 return `<span class="${map[d]}">${label[d]}</span>`;
             }},
             { data: 'id', className: 'text-right', render: id => `<a href="/admin/purchases/${id}" class="text-ink-600 hover:text-ink-900 text-sm">Detail</a>` },
         ],
         pageLength: 10, order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: '–', paginate: { previous: '‹', next: '›' } }
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: 'Tidak ada hasil', emptyTable: 'Tidak ada data', infoEmpty: 'Tidak ada data', infoFiltered: '(disaring dari _MAX_ data)', loadingRecords: 'Memuat...', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

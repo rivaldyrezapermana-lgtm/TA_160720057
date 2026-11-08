@@ -16,7 +16,7 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
@@ -24,13 +24,14 @@ class LoginController extends Controller
             $request->session()->regenerate();
 
             $user = Auth::user();
+
             return $user->isPembeli()
                 ? redirect()->route('home')
                 : redirect()->route('admin.dashboard');
         }
 
         return back()->withErrors([
-            'email' => 'Email atau password salah.',
+            'email' => 'Email atau kata sandi salah.',
         ])->onlyInput('email');
     }
 
@@ -39,6 +40,7 @@ class LoginController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect()->route('home');
     }
 }

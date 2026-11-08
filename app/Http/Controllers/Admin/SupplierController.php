@@ -25,7 +25,7 @@ class SupplierController extends Controller
         Supplier::create($request->validate($this->rules()));
 
         return redirect()->route('admin.suppliers.index')
-            ->with('success', 'Supplier berhasil ditambahkan.');
+            ->with('success', 'Pemasok berhasil ditambahkan.');
     }
 
     public function show(Supplier $supplier)
@@ -43,20 +43,20 @@ class SupplierController extends Controller
         $supplier->update($request->validate($this->rules()));
 
         return redirect()->route('admin.suppliers.index')
-            ->with('success', 'Supplier berhasil diperbarui.');
+            ->with('success', 'Pemasok berhasil diperbarui.');
     }
 
     public function destroy(Supplier $supplier)
     {
         if ($supplier->purchases()->exists()) {
             return redirect()->route('admin.suppliers.index')
-                ->with('error', 'Supplier tidak bisa dihapus karena masih memiliki riwayat pembelian.');
+                ->with('error', 'Pemasok tidak dapat dihapus karena masih memiliki riwayat pembelian.');
         }
 
         $supplier->delete();
 
         return redirect()->route('admin.suppliers.index')
-            ->with('success', 'Supplier berhasil dihapus.');
+            ->with('success', 'Pemasok berhasil dihapus.');
     }
 
     /** Validation rules shared by store and update. */

@@ -10,6 +10,7 @@ use App\Models\ProductionMachine;
 use App\Models\ProductMaterial;
 use App\Models\ProductSize;
 use App\Models\SalesHistory;
+use App\Models\Size;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -33,9 +34,14 @@ class DatabaseSeeder extends Seeder
             Category::create(['name' => $c, 'description' => $c.' Toko Labasa']);
         }
 
+        // ---- Master sizes ---------------------------------------------
+        $this->call(SizeSeeder::class);
+        $sizeNames = Size::ordered()->pluck('name');
+
         // ---- Products + sizes -----------------------------------------
         $products = [
-            ['Gamis Anaya Navy', 1, 225000, 48, 'gamis-anaya-navy.svg'],
+            // Stok 2370 = persediaan pada contoh perhitungan proposal; Fuzzy Mamdani membaca stok produk.
+            ['Gamis Anaya Navy', 1, 225000, 2370, 'gamis-anaya-navy.svg'],
             ['Koko Modern Sage', 2, 180000, 32, 'koko-modern-sage.svg'],
             ['Tunik Basic Cream', 3, 145000, 21, 'tunik-basic-cream.svg'],
             ['Hijab Pashmina Plain', 4, 50000, 86, 'hijab-pashmina-plain.svg'],
@@ -51,7 +57,7 @@ class DatabaseSeeder extends Seeder
                 'image' => $this->seedProductImage($p[4]),
                 'is_active' => true,
             ]);
-            foreach (['S', 'M', 'L', 'XL'] as $j => $size) {
+            foreach ($sizeNames as $j => $size) {
                 ProductSize::create([
                     'product_id' => $product->id,
                     'size' => $size,
@@ -108,17 +114,17 @@ class DatabaseSeeder extends Seeder
 
         // ---- Production machines ---------------------------------------
         $machines = [
-            [$catSew->id, 'Mesin Jahit Juki A', 'MCH-0001', 'active', 120, 'Lini jahit utama'],
-            [$catCut->id, 'Mesin Potong Kain', 'MCH-0002', 'active', 300, 'Cutting otomatis'],
-            [$catSew->id, 'Mesin Obras', 'MCH-0003', 'maintenance', 150, 'Sedang perawatan berkala'],
-            [$catCut->id, 'Mesin Potong Laser', 'MCH-0004', 'active', 250, 'Cadangan lini cutting'],
-            [$catSew->id, 'Mesin Jahit Juki B', 'MCH-0005', 'active', 110, 'Lini jahit kedua'],
-            [$catQc->id, 'Setrika Uap Industri', 'MCH-0006', 'active', 200, 'Finishing & pengecekan akhir'],
-            [$catPack->id, 'Mesin Sealer Plastik', 'MCH-0007', 'active', 400, 'Segel kemasan plastik'],
+            [$catSew->id, 'Mesin Jahit Juki A', 'MSN-001', 'active', 120, 'Lini jahit utama'],
+            [$catCut->id, 'Mesin Potong Kain', 'MSN-002', 'active', 300, 'Cutting otomatis'],
+            [$catSew->id, 'Mesin Obras', 'MSN-003', 'maintenance', 150, 'Sedang perawatan berkala'],
+            [$catCut->id, 'Mesin Potong Laser', 'MSN-004', 'active', 250, 'Cadangan lini cutting'],
+            [$catSew->id, 'Mesin Jahit Juki B', 'MSN-005', 'active', 110, 'Lini jahit kedua'],
+            [$catQc->id, 'Setrika Uap Industri', 'MSN-006', 'active', 200, 'Finishing & pengecekan akhir'],
+            [$catPack->id, 'Mesin Sealer Plastik', 'MSN-007', 'active', 400, 'Segel kemasan plastik'],
         ];
         foreach ($machines as $m) {
             ProductionMachine::create([
-                'machine_category_id' => $m[0], 'name' => $m[1], 'code' => $m[2], 'status' => $m[3], 'capacity' => $m[4], 'notes' => $m[5],
+                'machine_category_id' => $m[0], 'name' => $m[1], 'kode_mesin' => $m[2], 'status' => $m[3], 'capacity' => $m[4], 'notes' => $m[5],
             ]);
         }
 

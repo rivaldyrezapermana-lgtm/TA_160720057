@@ -30,13 +30,13 @@ $(function() {
             { data: 'total', className: 'text-right tabular-nums' },
             { data: 'status', render: d => {
                 const m = { pending: 'badge-amber', paid: 'badge-blue', processing: 'badge-blue', shipped: 'badge-blue', completed: 'badge-green', cancelled: 'badge-red' };
-                const l = { pending: 'Pending', paid: 'Dibayar', processing: 'Diproses', shipped: 'Dikirim', completed: 'Selesai', cancelled: 'Dibatalkan' };
+                const l = { pending: 'Menunggu', paid: 'Dibayar', processing: 'Diproses', shipped: 'Dikirim', completed: 'Selesai', cancelled: 'Dibatalkan' };
                 return `<span class="${m[d]}">${l[d]}</span>`;
             }},
             { data: 'id', className: 'text-right', render: id => `<a href="/admin/orders/${id}" class="text-ink-600 hover:text-ink-900 text-sm">Detail</a>` },
         ],
         pageLength: 10, order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: '–', paginate: { previous: '‹', next: '›' } }
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: 'Tidak ada hasil', emptyTable: 'Tidak ada data', infoEmpty: 'Tidak ada data', infoFiltered: '(disaring dari _MAX_ data)', loadingRecords: 'Memuat...', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

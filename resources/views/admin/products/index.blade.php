@@ -52,12 +52,12 @@ $(function () {
             },
             { data: 'id', className: 'text-right', render: id =>
                 `<a href="/admin/products/${id}" class="text-ink-600 hover:text-ink-900 text-sm">Detail</a> ·
-                 <a href="/admin/products/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Edit</a>`
+                 <a href="/admin/products/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Ubah</a>`
             },
         ],
         pageLength: 10,
         order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', infoEmpty: '0', zeroRecords: 'Tidak ada hasil', paginate: { previous: '‹', next: '›' } }
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', infoEmpty: 'Tidak ada data', zeroRecords: 'Tidak ada hasil', emptyTable: 'Tidak ada data', infoFiltered: '(disaring dari _MAX_ data)', loadingRecords: 'Memuat...', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

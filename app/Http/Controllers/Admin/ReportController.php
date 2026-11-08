@@ -40,7 +40,7 @@ class ReportController extends Controller
         [$filename, $headers, $rows] = match ($type) {
             'production' => [
                 'laporan-produksi-'.now()->format('Y-m-d').'.csv',
-                ['Kode', 'Produk', 'Periode', 'Plan', 'Aktual', 'Per Ukuran (Aktual/Plan)', 'Pencapaian'],
+                ['Kode', 'Produk', 'Periode', 'Rencana', 'Aktual', 'Per Ukuran (Aktual/Rencana)', 'Pencapaian'],
                 $this->productionRows($request)
                     ->map(fn ($r) => [$r['code'], $r['product'], $r['period'], $r['planned'], $r['actual'], $r['sizes'], $r['completion']]),
             ],
@@ -52,7 +52,7 @@ class ReportController extends Controller
             ],
             'inventory' => [
                 'laporan-inventori-'.now()->format('Y-m-d').'.csv',
-                ['Tipe', 'Nama', 'Stok', 'Min', 'Unit', 'Status'],
+                ['Tipe', 'Nama', 'Stok', 'Minimum', 'Satuan', 'Status'],
                 $this->inventoryRows()
                     ->map(fn ($r) => [$r['type'], $r['name'], $r['stock'], $r['min'], $r['unit'], $r['status']]),
             ],

@@ -52,6 +52,12 @@ class Production extends Model
         return $this->hasMany(ProductionSize::class)->orderBy('id');
     }
 
+    /** Catatan tombol Pause, urut dari yang paling lama. */
+    public function logs()
+    {
+        return $this->hasMany(ProductionLog::class, 'produksi_id')->orderBy('waktu')->orderBy('id');
+    }
+
     public function sampleRevisions()
     {
         return $this->hasMany(ProductionSampleRevision::class)->orderByDesc('revision_no');
@@ -231,6 +237,46 @@ class Production extends Model
         }
 
         return (int) $stage->input_qty + (int) $stage->output_qty;
+    }
+
+    /**
+     * Posisi produksi saat ini dalam satu kalimat pendek, mis. "Tahap Sewing Massal:
+     * 20 dari 50 pcs". Tahap massal bisa berjalan bersamaan (gate 50%), jadi semua
+     * tahap yang sedang berjalan disebut; kalau tidak ada, tahap berikutnya.
+     */
+    public function positionSummary(): string
+    {
+        $stages = $this->stages->sortBy('sort_order');
+
+        $current = $stages->where('status', 'in_progress');
+        if ($current->isEmpty()) {
+            $current = $stages->where('status', 'pending')->take(1);
+        }
+
+        if ($current->isEmpty()) {
+            return $stages->isEmpty() ? 'Batch ini belum memiliki tahap produksi.' : 'Semua tahap sudah selesai.';
+        }
+
+        return $current->map(fn (ProductionStage $s) => $this->stagePosition($s))->implode('; ');
+    }
+
+    private function stagePosition(ProductionStage $stage): string
+    {
+        $label = $stage->label();
+        if ($stage->phase === 'mass') {
+            $label .= ' Massal';
+        } elseif ($stage->phase === 'sample' && $stage->stage !== 'qc_packing') {
+            $label .= ' Sampel';   // label QC fase sampel sudah "QC Sampel"
+        }
+
+        $pending = $stage->status === 'pending';
+
+        if (! $stage->carriesQty()) {
+            return 'Tahap '.$label.': '.($pending ? 'belum dimulai' : 'sedang dikerjakan');
+        }
+
+        return 'Tahap '.$label.': '.(int) $stage->output_qty.' dari '.$this->stageReceived($stage).' pcs'
+            .($pending ? ' (belum dimulai)' : '');
     }
 
     /**

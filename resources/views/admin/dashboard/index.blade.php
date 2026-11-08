@@ -1,9 +1,9 @@
 @extends('layouts.admin')
-@section('title', 'Dashboard')
+@section('title', 'Dasbor')
 
 @section('content')
 <div class="mb-6">
-    <h1 class="font-display text-2xl font-semibold text-ink-900">Selamat datang kembali</h1>
+    <h1 class="font-display text-2xl font-semibold text-ink-900">Selamat Datang Kembali</h1>
     <p class="text-sm text-ink-500 mt-1">Ringkasan operasional Toko Labasa hari ini.</p>
 </div>
 
@@ -19,7 +19,7 @@
     <x-admin.stat-card
         label="Bahan Stok Rendah"
         :value="$stats['low_stock_materials']"
-        sub="perlu re-stock"
+        sub="perlu pengisian ulang"
         tone="red"
         icon='<svg class=&quot;w-5 h-5&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; viewBox=&quot;0 0 24 24&quot;><path stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; stroke-width=&quot;1.5&quot; d=&quot;M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z&quot;/></svg>'
     />
@@ -31,7 +31,7 @@
         icon='<svg class=&quot;w-5 h-5&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; viewBox=&quot;0 0 24 24&quot;><path stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; stroke-width=&quot;1.5&quot; d=&quot;M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z&quot;/></svg>'
     />
     <x-admin.stat-card
-        label="Pesanan Pending"
+        label="Pesanan Menunggu"
         :value="$stats['orders_pending']"
         sub="menunggu verifikasi"
         tone="amber"
@@ -70,7 +70,7 @@
         </x-ui.card>
     </div>
     <div>
-        <x-ui.card title="Best Seller" subtitle="30 hari terakhir">
+        <x-ui.card title="Produk Terlaris" subtitle="30 hari terakhir">
             <div class="space-y-3">
                 @foreach ($bestSellers as $i => $b)
                     <div class="flex items-center gap-3">
@@ -88,7 +88,7 @@
 
 {{-- Low stock + Recent orders --}}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <x-ui.card title="Stok Bahan Rendah" subtitle="Segera lakukan pembelian">
+    <x-ui.card title="Stok Bahan Rendah" subtitle="Segera lakukan pembelian.">
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-[11px] uppercase tracking-wider text-ink-500 border-b border-ink-100">

@@ -3,7 +3,7 @@
 
 @section('content')
 <div class="max-w-3xl mx-auto px-6 py-10">
-    <h1 class="text-2xl font-semibold text-slate-900">Profil saya</h1>
+    <h1 class="text-2xl font-semibold text-slate-900">Profil Saya</h1>
     <p class="text-sm text-slate-600 mt-1 mb-6">Perbarui detail akun, kontak pengiriman, dan kata sandi Anda.</p>
 
     @if (session('success'))
@@ -89,7 +89,7 @@
     {{-- Session --}}
     <div class="bg-white border border-slate-200 rounded-lg p-6 mt-6">
         <h2 class="text-sm font-semibold text-slate-900 mb-1">Sesi</h2>
-        <p class="text-xs text-slate-500 mb-4">Keluar dari akun ini di perangkat ini.</p>
+        <p class="text-xs text-slate-500 mb-4">Keluar dari akun Anda pada perangkat ini.</p>
         <form action="{{ route('logout') }}" method="POST">
             @csrf
             <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-red-300 text-red-700 hover:bg-red-50">

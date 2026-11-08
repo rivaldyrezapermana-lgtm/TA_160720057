@@ -38,6 +38,9 @@ $(function () {
             info: 'Menampilkan _START_-_END_ dari _TOTAL_',
             infoEmpty: 'Tidak ada data',
             zeroRecords: 'Tidak ada hasil',
+            emptyTable: 'Tidak ada data',
+            loadingRecords: 'Memuat...',
+            infoFiltered: '(disaring dari _MAX_ data)',
             paginate: { previous: '‹', next: '›' }
         }
     });

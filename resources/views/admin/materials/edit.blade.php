@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Edit Bahan')
+@section('title', 'Ubah Bahan Baku')
 @section('breadcrumb')
     <x-admin.breadcrumb :items="[['label' => 'Bahan Baku', 'url' => route('admin.materials.index')], ['label' => $material->name]]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Edit: {{ $material->name }}</h1>
+    <h1 class="font-display text-xl font-semibold text-ink-900">Ubah: {{ $material->name }}</h1>
 @endsection
 
 @section('content')
@@ -16,15 +16,15 @@
             <div class="field">
                 <label class="label">Stok</label>
                 <input type="number" value="{{ $material->stock }}" class="input bg-ink-50" readonly disabled>
-                <p class="field-help">Stok hanya berubah lewat pembelian &amp; produksi.</p>
+                <p class="field-help">Stok hanya berubah melalui pembelian dan produksi.</p>
             </div>
-            <x-ui.input name="min_stock" type="number" label="Min Stok" :value="$material->min_stock" required />
-            <x-ui.input name="unit_cost" type="number" label="Harga/Unit" :value="$material->unit_cost" required />
+            <x-ui.input name="min_stock" type="number" label="Stok Minimum" :value="$material->min_stock" required />
+            <x-ui.input name="unit_cost" type="number" label="Harga per Unit (Rp)" :value="$material->unit_cost" required />
         </div>
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">
         <a href="{{ route('admin.materials.index') }}" class="btn-secondary">Batal</a>
-        <button class="btn-primary">Simpan</button>
+        <button class="btn-primary">Simpan Perubahan</button>
     </div>
 </form>
 @endsection

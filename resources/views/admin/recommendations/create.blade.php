@@ -14,20 +14,22 @@
 
     {{-- Input Form --}}
     <div class="lg:col-span-2">
-        <x-ui.card title="Input Parameter" subtitle="Masukkan permintaan dan persediaan saat ini">
+        <x-ui.card title="Parameter Input" subtitle="Masukkan permintaan; persediaan mengikuti stok produk.">
             <form action="{{ route('admin.recommendations.calculate') }}" method="POST" class="space-y-4">
                 @csrf
                 <x-ui.select name="product_id" label="Produk" required
-                    :selected="old('product_id', 1)"
+                    :selected="$selectedProductId"
                     :options="$products->pluck('name','id')->toArray()" />
 
                 <x-ui.input name="demand" type="number" label="Permintaan (unit)" required
                     :value="old('demand', 5877)"
-                    help="Permintaan untuk periode yang akan dihitung" />
+                    help="Permintaan untuk periode yang akan dihitung." />
 
-                <x-ui.input name="stock" type="number" label="Persediaan Saat Ini (unit)" required
-                    :value="old('stock', 2370)"
-                    help="Stok produk yang masih tersedia" />
+                <div class="field">
+                    <p class="label">Persediaan Saat Ini (unit)</p>
+                    <p id="current-stock" class="input bg-ink-50 tabular-nums">{{ number_format($selectedProduct?->stock ?? 0) }}</p>
+                    <p class="field-help">Diambil otomatis dari stok produk.</p>
+                </div>
 
                 <button type="submit" class="btn-primary w-full justify-center">
                     Hitung Rekomendasi
@@ -36,7 +38,7 @@
         </x-ui.card>
 
         <x-ui.card title="Data Historis" class="mt-4">
-            <p class="text-xs text-ink-500 mb-3">Range yang digunakan untuk fuzzifikasi diambil dari data 12 bulan terakhir:</p>
+            <p class="text-xs text-ink-500 mb-3">Rentang yang digunakan untuk fuzzifikasi diambil dari seluruh riwayat penjualan produk ini:</p>
             <table class="w-full text-xs">
                 <thead>
                     <tr class="border-b border-ink-100">
@@ -72,10 +74,21 @@
                 <p class="text-sm text-ink-300 mt-2">
                     Berdasarkan permintaan {{ number_format($result['inputs']['demand']) }} dan stok {{ number_format($result['inputs']['stock']) }} unit.
                 </p>
+                @php
+                    $stockInput = $result['inputs']['stock'];
+                    $stockMin = $result['ranges']['stock_min'];
+                    $stockMax = $result['ranges']['stock_max'];
+                @endphp
+                {{-- With no spread in the history (min = max) the service scores both sets 0, so the note would be false. --}}
+                @if ($stockMax > $stockMin && ($stockInput < $stockMin || $stockInput > $stockMax))
+                    <p class="text-xs text-ink-300 mt-3 pt-3 border-t border-ink-700">
+                        Stok saat ini berada di luar rentang data historis, sehingga derajat keanggotaan persediaan bernilai penuh pada himpunan {{ $stockInput < $stockMin ? 'SEDIKIT' : 'BANYAK' }}.
+                    </p>
+                @endif
             </div>
 
             @if (! empty($result['size_breakdown']))
-                <x-ui.card title="Rekomendasi per Ukuran" subtitle="Total dibagi sesuai proporsi penjualan tiap ukuran (dibagi rata bila belum ada penjualan)" class="mb-4">
+                <x-ui.card title="Rekomendasi per Ukuran" subtitle="Total dibagi sesuai proporsi penjualan tiap ukuran (dibagi rata jika belum ada penjualan)." class="mb-4">
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         @foreach ($result['size_breakdown'] as $row)
                             <div class="border border-ink-100 rounded-lg p-3">
@@ -124,7 +137,7 @@
                         </div>
                     </div>
                     <p class="text-xs text-ink-500 pt-2 border-t border-ink-100">
-                        Range: Permintaan [{{ number_format($result['ranges']['demand_min']) }} – {{ number_format($result['ranges']['demand_max']) }}],
+                        Rentang: Permintaan [{{ number_format($result['ranges']['demand_min']) }} – {{ number_format($result['ranges']['demand_max']) }}],
                         Persediaan [{{ number_format($result['ranges']['stock_min']) }} – {{ number_format($result['ranges']['stock_max']) }}]
                     </p>
                 </div>
@@ -171,3 +184,15 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    $(function () {
+        $('#product_id').on('change', function () {
+            if (this.value) {
+                window.location = @json(route('admin.recommendations.create')) + '?product_id=' + encodeURIComponent(this.value);
+            }
+        });
+    });
+</script>
+@endpush

@@ -39,7 +39,7 @@
     </form>
 
     <p class="text-sm text-slate-600 text-center mt-6">
-        Belum punya akun?
+        Belum memiliki akun?
         <a href="{{ route('register') }}" class="text-emerald-700 hover:text-emerald-800 font-medium">Daftar</a>
     </p>
 

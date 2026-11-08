@@ -14,7 +14,7 @@
     <table class="table-clean">
         <thead>
             <tr>
-                <th>id</th>
+                <th>ID</th>
                 <th>Nama</th>
                 <th>Deskripsi</th>
                 <th class="text-right">Jumlah Produk</th>
@@ -29,7 +29,7 @@
                     <td class="text-ink-600">{{ $c->description }}</td>
                     <td class="text-right tabular-nums">{{ $c->products_count }}</td>
                     <td class="text-right">
-                        <a href="{{ route('admin.categories.edit', $c->id) }}" class="text-ink-600 hover:text-ink-900 text-sm">Edit</a>
+                        <a href="{{ route('admin.categories.edit', $c->id) }}" class="text-ink-600 hover:text-ink-900 text-sm">Ubah</a>
                         <form action="{{ route('admin.categories.destroy', $c->id) }}" method="POST" class="inline" onsubmit="return confirm('Hapus kategori ini?')">
                             @csrf @method('DELETE')
                             <button class="text-red-600 hover:text-red-700 text-sm ml-3">Hapus</button>

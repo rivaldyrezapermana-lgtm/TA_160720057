@@ -113,7 +113,7 @@ class ProductionFlowTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $sewing]), ['action' => 'start'])
-            ->assertSessionHas('error', 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.');
+            ->assertSessionHas('error', 'Tahap sebelumnya belum mencapai 50%. Belum dapat dimulai.');
     }
 
     public function test_mass_cutting_starts_once_the_sample_is_approved(): void
@@ -138,7 +138,7 @@ class ProductionFlowTest extends TestCase
         // Tidak ada fase sampel dan tidak ada gate 50% di sini — yang kurang adalah pola.
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $cutting]), ['action' => 'start'])
-            ->assertSessionHas('error', 'Tahap sebelumnya belum selesai. Belum bisa dimulai.');
+            ->assertSessionHas('error', 'Tahap sebelumnya belum selesai. Belum dapat dimulai.');
     }
 
     public function test_pola_cannot_start_before_design_is_finished(): void
@@ -234,7 +234,7 @@ class ProductionFlowTest extends TestCase
 
         $html = $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
             ->assertOk()
-            ->assertSee('Kurangi sisa')
+            ->assertSee('Kurangi Sisa')
             ->getContent();
 
         // Kolomnya kosong (bukan berisi output 60) dan dibatasi sisa cutting.
@@ -423,7 +423,7 @@ class ProductionFlowTest extends TestCase
             ->assertOk()
             ->assertSee('Cek Sampel')
             ->assertSee('id="modal-sampel"', false)
-            ->assertSee('Input (sisa)')
+            ->assertSee('Input (Sisa)')
             ->assertDontSee('name="input_qty"', false);
     }
 

@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Material;
 use App\Models\Product;
+use App\Models\Size;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -38,13 +40,14 @@ class ProductController extends Controller
     {
         $categories = Category::orderBy('name')->get();
         $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
+        $sizes = Size::ordered()->pluck('name');
 
-        return view('admin.products.create', compact('categories', 'materials'));
+        return view('admin.products.create', compact('categories', 'materials', 'sizes'));
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules(), $this->messages());
 
         $product = Product::create([
             'category_id' => $data['category_id'],
@@ -80,13 +83,14 @@ class ProductController extends Controller
         $product->load('sizes', 'materials');
         $categories = Category::orderBy('name')->get();
         $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
+        $sizes = $this->sizesForEdit($product);
 
-        return view('admin.products.edit', compact('product', 'categories', 'materials'));
+        return view('admin.products.edit', compact('product', 'categories', 'materials', 'sizes'));
     }
 
     public function update(Request $request, Product $product)
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules($product), $this->messages());
 
         $product->fill([
             'category_id' => $data['category_id'],
@@ -119,7 +123,7 @@ class ProductController extends Controller
             || $product->productions()->exists()
             || $product->salesHistories()->exists()) {
             return redirect()->route('admin.products.index')
-                ->with('error', 'Produk tidak bisa dihapus karena sudah dipakai pada pesanan, produksi, atau riwayat penjualan.');
+                ->with('error', 'Produk tidak dapat dihapus karena sudah digunakan pada pesanan, produksi, atau riwayat penjualan.');
         }
 
         if ($product->image) {
@@ -132,9 +136,27 @@ class ProductController extends Controller
             ->with('success', 'Produk berhasil dihapus.');
     }
 
-    /** Validation rules shared by store and update. */
-    private function rules(): array
+    /**
+     * Master sizes in order, then any size only this product has. A row spelled
+     * differently from the master (xl vs XL) keeps its own spelling so the form
+     * edits that row instead of adding a second one.
+     */
+    private function sizesForEdit(Product $product): Collection
     {
+        $own = $product->sizes->pluck('size')->keyBy(fn (string $size) => mb_strtolower($size));
+
+        return Size::ordered()->pluck('name')
+            ->map(fn (string $name) => $own->get(mb_strtolower($name), $name))
+            ->merge($own->values())
+            ->unique()
+            ->values();
+    }
+
+    /** Validation rules shared by store and update. */
+    private function rules(?Product $product = null): array
+    {
+        $allowedSizes = Size::pluck('name')->merge($product?->sizes()->pluck('size') ?? [])->all();
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['required', Rule::exists('categories', 'id')],
@@ -143,7 +165,7 @@ class ProductController extends Controller
             'stock' => ['nullable', 'integer', 'min:0'],
             'image' => ['nullable', 'image', 'max:2048'],
             'sizes' => ['nullable', 'array'],
-            'sizes.*.size' => ['required', 'string', 'max:10'],
+            'sizes.*.size' => ['required', 'string', 'max:10', Rule::in($allowedSizes)],
             'sizes.*.chest_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.length_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.sleeve_cm' => ['nullable', 'integer', 'min:0'],
@@ -154,11 +176,24 @@ class ProductController extends Controller
         ];
     }
 
+    private function messages(): array
+    {
+        return ['sizes.*.size.in' => 'Ukuran :input tidak terdaftar pada master ukuran.'];
+    }
+
     /** Create or update each size variant submitted with the product. */
     private function syncSizes(Product $product, array $sizes): void
     {
         foreach ($sizes as $size) {
             if (empty($size['size'])) {
+                continue;
+            }
+
+            // Baris kosong berarti produk tidak memakai ukuran ini. Varian baru
+            // tetap bisa muncul saat ukuran tersebut dipilih pada batch produksi.
+            $isBlank = collect(['chest_cm', 'length_cm', 'sleeve_cm', 'stock'])
+                ->every(fn (string $field) => $this->intOrNull($size[$field] ?? null) === null);
+            if ($isBlank && ! $product->sizes()->where('size', $size['size'])->exists()) {
                 continue;
             }
 

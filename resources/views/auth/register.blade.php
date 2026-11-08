@@ -55,7 +55,7 @@
     </form>
 
     <p class="text-sm text-slate-600 text-center mt-6">
-        Sudah punya akun?
+        Sudah memiliki akun?
         <a href="{{ route('login') }}" class="text-emerald-700 hover:text-emerald-800 font-medium">Masuk</a>
     </p>
 @endsection

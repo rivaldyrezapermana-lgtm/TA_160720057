@@ -1,9 +1,9 @@
 @extends('layouts.customer')
-@section('title', 'Checkout')
+@section('title', 'Pembayaran')
 
 @section('content')
 <div class="max-w-5xl mx-auto px-6 py-10">
-    <h1 class="font-display text-4xl font-semibold mb-8">Checkout</h1>
+    <h1 class="font-display text-4xl font-semibold mb-8">Pembayaran</h1>
 
     <form action="{{ route('checkout.store') }}" method="POST">
         @csrf
@@ -49,7 +49,7 @@
                             <div class="flex justify-between text-sm">
                                 <div class="flex-1">
                                     <p class="font-medium text-ink-900">{{ $i->product }}</p>
-                                    <p class="text-xs text-ink-500">{{ $i->qty }}× · Size {{ $i->size }}</p>
+                                    <p class="text-xs text-ink-500">{{ $i->qty }}× · Ukuran {{ $i->size }}</p>
                                 </div>
                                 <p class="tabular-nums">Rp {{ number_format($i->subtotal, 0, ',', '.') }}</p>
                             </div>
@@ -57,15 +57,18 @@
                     </div>
                     <div class="border-t border-ink-100 pt-4 space-y-2 text-sm">
                         <div class="flex justify-between"><span class="text-ink-500">Subtotal</span><span class="tabular-nums">Rp {{ number_format($total, 0, ',', '.') }}</span></div>
-                        <div class="flex justify-between"><span class="text-ink-500">Ongkir</span><span class="tabular-nums">Rp {{ number_format($shipping, 0, ',', '.') }}</span></div>
+                        <div class="flex justify-between"><span class="text-ink-500">Ongkos Kirim</span><span class="tabular-nums">Rp {{ number_format($shipping, 0, ',', '.') }}</span></div>
                     </div>
                     <div class="border-t border-ink-100 mt-3 pt-3 flex justify-between items-baseline">
                         <span class="font-medium">Total</span>
                         <span class="font-display text-2xl font-semibold tabular-nums">Rp {{ number_format($total + $shipping, 0, ',', '.') }}</span>
                     </div>
-                    <button type="submit" class="btn-primary w-full justify-center mt-4">Buat Pesanan</button>
                 </div>
             </div>
+        </div>
+
+        <div class="flex justify-end mt-6">
+            <button type="submit" class="btn btn-primary">Buat Pesanan</button>
         </div>
     </form>
 </div>

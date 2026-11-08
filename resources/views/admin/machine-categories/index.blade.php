@@ -8,12 +8,12 @@
 @section('content')
 <div class="bg-white border border-ink-100 rounded-xl overflow-hidden">
     <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-ink-100">
-        <p class="text-sm text-ink-500">Kelompok mesin menurut fungsi/tahap produksi.</p>
+        <p class="text-sm text-ink-500">Kelompok mesin menurut fungsi atau tahap produksi.</p>
         <a href="{{ route('admin.machine-categories.create') }}" class="btn-primary">+ Tambah Kategori</a>
     </div>
     <div class="p-5">
         <table id="tbl-cats" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Nama</th><th>Tahap</th><th class="text-right">Jml Mesin</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Nama</th><th>Tahap</th><th class="text-right">Jumlah Mesin</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -30,10 +30,10 @@ $(function() {
             { data: 'name' },
             { data: 'stage', render: d => labels[d] || d },
             { data: 'machines', className: 'text-right tabular-nums' },
-            { data: 'id', className: 'text-right', render: id => `<a href="/admin/machine-categories/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Edit</a>` },
+            { data: 'id', className: 'text-right', render: id => `<a href="/admin/machine-categories/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Ubah</a>` },
         ],
         pageLength: 10, order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: '–', paginate: { previous: '‹', next: '›' } }
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: 'Tidak ada hasil', emptyTable: 'Tidak ada data', infoEmpty: 'Tidak ada data', infoFiltered: '(disaring dari _MAX_ data)', loadingRecords: 'Memuat...', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

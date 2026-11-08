@@ -11,7 +11,7 @@
             <div class="w-8 h-8 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-semibold">L</div>
             <div>
                 <p class="text-sm font-medium">Toko Labasa</p>
-                <p class="text-xs text-emerald-600">● Online</p>
+                <p class="text-xs text-emerald-600">● Daring</p>
             </div>
         </div>
 

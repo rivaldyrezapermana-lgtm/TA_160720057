@@ -71,7 +71,7 @@ class OrderController extends Controller
         }
 
         if (! $order->payment->proof_image) {
-            return back()->with('error', 'Belum ada bukti pembayaran yang diupload.');
+            return back()->with('error', 'Belum ada bukti pembayaran yang diunggah.');
         }
 
         DB::transaction(function () use ($order) {
@@ -90,7 +90,7 @@ class OrderController extends Controller
             }
         });
 
-        return back()->with('success', 'Pembayaran diverifikasi, stok produk dipotong.');
+        return back()->with('success', 'Pembayaran diverifikasi dan stok produk dikurangi.');
     }
 
     /**
@@ -107,7 +107,7 @@ class OrderController extends Controller
         }
 
         if ($order->payment->status === 'verified') {
-            return back()->with('error', 'Pembayaran sudah diverifikasi, tidak bisa ditolak.');
+            return back()->with('error', 'Pembayaran sudah diverifikasi sehingga tidak dapat ditolak.');
         }
 
         $data = $request->validate([
@@ -120,6 +120,6 @@ class OrderController extends Controller
             'paid_at' => null,
         ])->save();
 
-        return back()->with('success', 'Pembayaran ditolak. Pembeli dapat mengupload ulang bukti.');
+        return back()->with('success', 'Pembayaran ditolak. Pelanggan dapat mengunggah ulang bukti pembayaran.');
     }
 }

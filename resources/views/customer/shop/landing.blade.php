@@ -12,7 +12,7 @@
                 <em class="font-normal">dijahit dengan rapi.</em>
             </h1>
             <p class="text-base text-ink-600 leading-relaxed mt-6 max-w-md">
-                Setiap helai dirancang dan diproduksi sendiri di workshop Labasa,
+                Setiap helai dirancang dan dibuat sendiri di rumah produksi Labasa,
                 dengan bahan terpilih dan jahitan yang dapat dipertanggungjawabkan.
             </p>
             <div class="flex items-center gap-3 mt-8">
@@ -23,12 +23,12 @@
         <div class="relative">
             <div class="aspect-[4/5] bg-ink-100 rounded-2xl overflow-hidden">
                 <img src="{{ asset('images/hero.svg') }}"
-                     alt="Rak gantung workshop Labasa berisi gamis, koko, dan tunik"
+                     alt="Rak gantung rumah produksi Labasa berisi gamis, koko, dan tunik"
                      class="w-full h-full object-cover">
             </div>
             <div class="absolute -bottom-4 -left-4 bg-white border border-ink-100 rounded-xl p-4 shadow-sm">
                 <p class="text-xs uppercase tracking-wider text-ink-500 font-semibold">Produksi sendiri</p>
-                <p class="font-display text-xl font-semibold mt-0.5">Workshop Surabaya</p>
+                <p class="font-display text-xl font-semibold mt-0.5">Rumah Produksi Surabaya</p>
             </div>
         </div>
     </div>
@@ -102,11 +102,11 @@
         </div>
         <div>
             <p class="font-display text-xl font-semibold">Jahitan Rapi</p>
-            <p class="text-ink-300 text-sm leading-relaxed mt-2">Quality control 6 tahap, dari design hingga packing.</p>
+            <p class="text-ink-300 text-sm leading-relaxed mt-2">Pemeriksaan kualitas 6 tahap, dari desain hingga packing.</p>
         </div>
         <div>
-            <p class="font-display text-xl font-semibold">Live Chat</p>
-            <p class="text-ink-300 text-sm leading-relaxed mt-2">Tanya langsung sebelum order — kami balas selama jam toko.</p>
+            <p class="font-display text-xl font-semibold">Chat Langsung</p>
+            <p class="text-ink-300 text-sm leading-relaxed mt-2">Tanyakan langsung sebelum memesan — kami membalas selama jam operasional toko.</p>
         </div>
     </div>
 </section>

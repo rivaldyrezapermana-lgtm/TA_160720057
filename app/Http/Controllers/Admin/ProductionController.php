@@ -9,7 +9,9 @@ use App\Models\Production;
 use App\Models\ProductionMachine;
 use App\Models\ProductionStage;
 use App\Models\ProductSize;
+use App\Models\Size;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -44,11 +46,16 @@ class ProductionController extends Controller
     public function create(Request $request)
     {
         $products = Product::with('sizes')->orderBy('name')->get(['id', 'name']);
-        $machines = ProductionMachine::where('status', 'active')->orderBy('name')->get(['id', 'name']);
+        $machines = ProductionMachine::where('status', 'active')->orderBy('kode_mesin')->get(['id', 'name', 'kode_mesin']);
 
-        // Ukuran tiap produk untuk form; ?product_id=&sizes[M]= datang dari halaman rekomendasi.
+        // Ukuran yang bisa dicentang per produk (master + ukuran milik produk) dan
+        // varian yang sudah ada; ?product_id=&sizes[M]= datang dari halaman rekomendasi.
+        $master = Size::ordered()->pluck('name');
         $productSizes = $products->mapWithKeys(fn (Product $p) => [
-            $p->id => $p->sizes->sortBy('id')->pluck('size')->values(),
+            $p->id => $this->sizeOptions($master, $p),
+        ]);
+        $productVariants = $products->mapWithKeys(fn (Product $p) => [
+            $p->id => $p->sizes->pluck('size')->values(),
         ]);
         $selectedProduct = old('product_id', $request->query('product_id'));
         $prefillSizes = old('sizes', $request->query('sizes', []));
@@ -59,7 +66,7 @@ class ProductionController extends Controller
             ->where(fn ($q) => $q->whereNotNull('sample_approved_at')->orWhere('status', 'completed'))
             ->distinct()->pluck('product_id')->map(fn ($id) => (int) $id)->values();
 
-        return view('admin.productions.create', compact('products', 'machines', 'productSizes', 'selectedProduct', 'prefillSizes', 'productsWithSample'));
+        return view('admin.productions.create', compact('products', 'machines', 'productSizes', 'productVariants', 'selectedProduct', 'prefillSizes', 'productsWithSample'));
     }
 
     public function store(Request $request)
@@ -92,7 +99,9 @@ class ProductionController extends Controller
 
         $source = (int) $data['planned_qty'] > 1 ? $existingSample : null;
 
-        $production = DB::transaction(function () use ($data, $plan, $source) {
+        $production = DB::transaction(function () use ($product, $data, $plan, $source) {
+            $this->ensureProductSizes($product, $plan['sizes']);
+
             $production = Production::create([
                 'product_id' => $data['product_id'],
                 'user_id' => auth()->id(),
@@ -148,11 +157,11 @@ class ProductionController extends Controller
 
         if ($source !== null) {
             return redirect($show.'#produksi-massal')->with('success',
-                'Batch produksi dibuat. Memakai sampel dari '.$source->code.' — langsung produksi massal.');
+                'Batch produksi dibuat. Menggunakan sampel dari '.$source->code.', sehingga langsung masuk produksi massal.');
         }
 
         return redirect($show.'#tahap-sampel')->with('success',
-            'Batch produksi dibuat. Produk ini belum punya sampel, jadi mulai dari Tahap Sampel.');
+            'Batch produksi dibuat. Produk ini belum memiliki sampel, sehingga produksi dimulai dari Tahap Sampel.');
     }
 
     /** Tombol Cek Sampel di form buat batch: info sampel produk yang dipilih (JSON). */
@@ -179,31 +188,77 @@ class ProductionController extends Controller
     }
 
     /**
-     * Target batch dari input form. Produk yang punya ukuran wajib dirinci per
-     * ukuran dan targetnya adalah jumlah rinciannya; produk tanpa ukuran memakai
-     * planned_qty apa adanya. Ukuran sampel default ke ukuran dengan target
-     * terbanyak, dan dikosongkan kalau batch memakai sampel yang sudah ada.
+     * Ukuran yang boleh diproduksi: master sesuai urutannya, lalu ukuran milik
+     * produk dan milik batch yang tidak ada di master.
      *
+     * @param  Collection<int, string>  $master
+     * @param  iterable<string>  $batchSizes
+     * @return list<string>
+     */
+    private function sizeOptions(Collection $master, Product $product, iterable $batchSizes = []): array
+    {
+        return $master
+            ->merge($product->sizes->sortBy('id')->pluck('size'))
+            ->merge($batchSizes)
+            ->map(fn ($size) => (string) $size)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Ukuran master yang belum jadi varian produk dibuatkan variannya (stok 0),
+     * supaya hasil produksinya punya tempat saat batch selesai.
+     *
+     * @param  array<string, int>  $sizes
+     */
+    private function ensureProductSizes(Product $product, array $sizes): void
+    {
+        foreach (array_keys($sizes) as $size) {
+            ProductSize::firstOrCreate(['product_id' => $product->id, 'size' => (string) $size], ['stock' => 0]);
+        }
+    }
+
+    /**
+     * Target batch dari input form. Ukuran yang diproduksi hanya yang dikirim dengan
+     * jumlah di atas 0, dan targetnya adalah jumlah rinciannya; ukuran yang tidak
+     * dikenal ditolak. Produk tanpa varian boleh memakai planned_qty tanpa rincian.
+     * Ukuran sampel default ke ukuran dengan target terbanyak, dan dikosongkan
+     * kalau batch memakai sampel yang sudah ada.
+     *
+     * @param  list<string>  $batchSizes  ukuran batch yang sedang diedit
      * @return array{planned: int, sizes: array<string, int>, sample_size: ?string, error: ?array<string, string>}
      */
-    private function resolvePlan(Product $product, array $data, bool $needsSampleSize = true): array
+    private function resolvePlan(Product $product, array $data, bool $needsSampleSize = true, array $batchSizes = []): array
     {
         $plan = ['planned' => 0, 'sizes' => [], 'sample_size' => null, 'error' => null];
 
-        if ($product->sizes->isEmpty()) {
+        $options = $this->sizeOptions(Size::ordered()->pluck('name'), $product, $batchSizes);
+        $input = array_filter($data['sizes'] ?? [], fn ($qty) => (int) $qty > 0);
+
+        foreach (array_keys($input) as $size) {
+            if (! in_array((string) $size, $options, true)) {
+                $plan['error'] = ['sizes' => 'Ukuran '.$size.' tidak terdaftar di master ukuran maupun di produk ini.'];
+
+                return $plan;
+            }
+        }
+
+        if ($input === [] && $product->sizes->isEmpty() && $batchSizes === []) {
             if (empty($data['planned_qty'])) {
-                $plan['error'] = ['planned_qty' => 'Target Qty wajib diisi.'];
+                // Ada ukuran yang dicentang tapi tanpa jumlah: kolom Target Qty sedang tersembunyi.
+                $plan['error'] = empty($data['sizes'])
+                    ? ['planned_qty' => 'Target Jumlah wajib diisi.']
+                    : ['sizes' => 'Isi jumlah minimal untuk satu ukuran.'];
             }
             $plan['planned'] = (int) ($data['planned_qty'] ?? 0);
 
             return $plan;
         }
 
-        $input = $data['sizes'] ?? [];
-        foreach ($product->sizes->sortBy('id') as $s) {
-            $qty = (int) ($input[$s->size] ?? 0);
-            if ($qty > 0) {
-                $plan['sizes'][$s->size] = $qty;
+        foreach ($options as $size) {
+            if (isset($input[$size])) {
+                $plan['sizes'][$size] = (int) $input[$size];
             }
         }
 
@@ -273,6 +328,7 @@ class ProductionController extends Controller
             'sampleRevisions.user',
             'sizes',
             'designSketches',
+            'logs.user',
         ]);
 
         // Machines available per stage: those whose category maps to the stage.
@@ -280,8 +336,9 @@ class ProductionController extends Controller
         foreach (ProductionStage::MACHINE_STAGES as $s) {
             $machinesByStage[$s] = ProductionMachine::where('status', 'active')
                 ->whereHas('category', fn ($q) => $q->where('stage', $s))
-                ->orderBy('name')
-                ->pluck('name', 'id')
+                ->orderBy('kode_mesin')
+                ->get(['id', 'name', 'kode_mesin'])
+                ->mapWithKeys(fn (ProductionMachine $m) => [$m->id => $m->display_name])
                 ->toArray();
         }
 
@@ -309,15 +366,26 @@ class ProductionController extends Controller
         $products = Product::orderBy('name')->get(['id', 'name']);
         $machines = ProductionMachine::where('status', 'active')
             ->orWhere('id', $production->production_machine_id)
-            ->orderBy('name')->get(['id', 'name']);
+            ->orderBy('kode_mesin')->get(['id', 'name', 'kode_mesin'])
+            ->mapWithKeys(fn (ProductionMachine $m) => [$m->id => $m->display_name]);
 
-        return view('admin.productions.edit', compact('production', 'products', 'machines'));
+        $sizeOptions = $this->sizeOptions(
+            Size::ordered()->pluck('name'),
+            $production->product,
+            $production->sizes->pluck('size')
+        );
+
+        // Ukuran yang sudah dipotong tidak bisa dihapus dari batch.
+        $cutBySize = $production->stages()->where('phase', 'mass')->where('stage', 'cutting')->first()
+            ?->sizeRows->pluck('output_qty', 'size')->map(fn ($qty) => (int) $qty)->all() ?? [];
+
+        return view('admin.productions.edit', compact('production', 'products', 'machines', 'sizeOptions', 'cutBySize'));
     }
 
     public function update(Request $request, Production $production)
     {
         if ($production->status === 'completed') {
-            return back()->with('error', 'Batch sudah selesai. Data batch tidak bisa diubah lagi.');
+            return back()->with('error', 'Batch sudah selesai. Data batch tidak dapat diubah lagi.');
         }
 
         $data = $request->validate([
@@ -338,20 +406,20 @@ class ProductionController extends Controller
         $production->load('sizes', 'product.sizes');
         $plan = null;
         if ($production->sizes->isNotEmpty()) {
-            $plan = $this->resolvePlan($production->product, $data, $production->makesOwnSample());
+            $plan = $this->resolvePlan($production->product, $data, $production->makesOwnSample(), $production->sizes->pluck('size')->all());
             if ($plan['error'] !== null) {
                 return back()->withErrors($plan['error'])->withInput();
             }
             $data['planned_qty'] = $plan['planned'];
         } elseif (empty($data['planned_qty'])) {
-            return back()->withErrors(['planned_qty' => 'Target Qty wajib diisi.'])->withInput();
+            return back()->withErrors(['planned_qty' => 'Target Jumlah wajib diisi.'])->withInput();
         }
 
         // Fase sampel ditentukan saat batch dibuat, jadi target tidak boleh melintasi
         // batas 1 pcs ↔ produksi massal.
         if (((int) $production->planned_qty === 1) !== ((int) $data['planned_qty'] === 1)) {
             return back()->withErrors([
-                'planned_qty' => 'Target tidak bisa diubah dari 1 pcs ke produksi massal (atau sebaliknya). Buat batch baru.',
+                'planned_qty' => 'Target tidak dapat diubah dari 1 pcs ke produksi massal (atau sebaliknya). Buat batch baru.',
             ])->withInput();
         }
 
@@ -379,6 +447,10 @@ class ProductionController extends Controller
         }
 
         DB::transaction(function () use ($production, $data, $plan, $massCutting, $sizedCutting) {
+            if ($plan !== null) {
+                $this->ensureProductSizes($production->product, $plan['sizes']);
+            }
+
             if ($sizedCutting) {
                 $this->resizeMassStages($production, $plan['sizes']);
             } elseif ($massCutting !== null) {
@@ -442,10 +514,35 @@ class ProductionController extends Controller
         }
     }
 
+    /**
+     * Tombol Pause: hanya mencatat posisi produksi saat ini. Status batch dan
+     * tahap tidak berubah. Keterangan kosong diisi otomatis dengan posisi tahap.
+     */
+    public function pause(Request $request, Production $production)
+    {
+        $data = $request->validate([
+            'keterangan' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (in_array($production->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'Batch sudah selesai atau dibatalkan. Catatan pause tidak dapat ditambahkan.');
+        }
+
+        $production->load('stages');
+
+        $production->logs()->create([
+            'waktu' => now(),
+            'keterangan' => filled($data['keterangan'] ?? null) ? $data['keterangan'] : $production->positionSummary(),
+            'user_id' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'Catatan pause berhasil disimpan.');
+    }
+
     public function destroy(Production $production)
     {
         if (! in_array($production->status, ['planned', 'cancelled'], true)) {
-            return back()->with('error', 'Batch yang sudah berjalan tidak bisa dihapus. Tandai sebagai cancelled.');
+            return back()->with('error', 'Batch yang sudah berjalan tidak dapat dihapus. Tandai sebagai Dibatalkan.');
         }
 
         // Baris sketsa ikut terhapus lewat cascade, tapi filenya harus dihapus sendiri.
@@ -468,7 +565,7 @@ class ProductionController extends Controller
         $stage = $production->stages->firstWhere('id', $stage->id);
 
         if ($production->status === 'completed') {
-            return back()->with('error', 'Batch sudah selesai. Tahapan tidak bisa diubah lagi.');
+            return back()->with('error', 'Batch sudah selesai. Tahapan tidak dapat diubah lagi.');
         }
 
         $action = $request->input('action', 'save');
@@ -704,7 +801,7 @@ class ProductionController extends Controller
         }
 
         if (array_sum($result) !== $output) {
-            return 'Jumlah hasil per ukuran ('.array_sum($result).' pcs) harus sama dengan output QC & Packing ('.$output.' pcs).';
+            return 'Jumlah hasil per ukuran ('.array_sum($result).' pcs) harus sama dengan hasil QC & Packing ('.$output.' pcs).';
         }
 
         return $result;
@@ -715,8 +812,8 @@ class ProductionController extends Controller
     {
         return match ($production->lockCause($stage)) {
             'sample_not_approved' => 'Sampel belum disetujui. Selesaikan dan setujui sampel sebelum memulai produksi massal.',
-            'gate_50' => 'Tahap sebelumnya belum mencapai 50%. Belum bisa dimulai.',
-            default => 'Tahap sebelumnya belum selesai. Belum bisa dimulai.',
+            'gate_50' => 'Tahap sebelumnya belum mencapai 50%. Belum dapat dimulai.',
+            default => 'Tahap sebelumnya belum selesai. Belum dapat dimulai.',
         };
     }
 
@@ -735,17 +832,17 @@ class ProductionController extends Controller
         }
 
         if (! $production->canReuseSample()) {
-            return back()->with('error', 'Fase sampel batch ini sudah berjalan, jadi tidak bisa memakai sampel lain.');
+            return back()->with('error', 'Fase sampel batch ini sudah berjalan, sehingga tidak dapat menggunakan sampel lain.');
         }
 
         $source = $production->existingSampleBatch();
         if ($source === null) {
-            return back()->with('error', 'Produk ini belum punya sampel. Buat sampel dulu di Tahap Sampel.');
+            return back()->with('error', 'Produk ini belum memiliki sampel. Buat sampel terlebih dahulu di Tahap Sampel.');
         }
 
         $this->applyReusedSample($production, $source);
 
-        return back()->with('success', 'Memakai sampel dari '.$source->code.'. Produksi massal bisa langsung dimulai.');
+        return back()->with('success', 'Menggunakan sampel dari '.$source->code.'. Produksi massal dapat langsung dimulai.');
     }
 
     /**
@@ -777,13 +874,13 @@ class ProductionController extends Controller
         $source = $production->existingSampleBatch();
         if ($source === null) {
             return redirect($show.'#tahap-sampel')
-                ->with('success', 'Produk ini belum punya sampel. Silakan buat sampel di Tahap Sampel.');
+                ->with('success', 'Produk ini belum memiliki sampel. Silakan buat sampel di Tahap Sampel.');
         }
 
         $this->applyReusedSample($production, $source);
 
         return redirect($show.'#produksi-massal')
-            ->with('success', 'Produk ini sudah punya sampel dari '.$source->code.'. Persiapan dan tahap sampel dilewati — langsung produksi massal.');
+            ->with('success', 'Produk ini sudah memiliki sampel dari '.$source->code.'. Persiapan dan tahap sampel dilewati, sehingga langsung masuk produksi massal.');
     }
 
     /** Hapus Persiapan dan tahap sampel batch ini, rapatkan urutan, dan tandai sampelnya dari batch lain. */
@@ -808,12 +905,12 @@ class ProductionController extends Controller
     private function approveSample(Production $production, ProductionStage $sampleQc)
     {
         if ($sampleQc->status !== 'completed') {
-            return back()->with('error', 'Selesaikan tahap QC Sampel dulu sebelum menyetujui sampel.');
+            return back()->with('error', 'Selesaikan tahap QC Sampel terlebih dahulu sebelum menyetujui sampel.');
         }
 
         $production->forceFill(['sample_approved_at' => now()])->save();
 
-        return back()->with('success', 'Sampel disetujui. Produksi massal bisa dimulai.');
+        return back()->with('success', 'Sampel disetujui. Produksi massal dapat dimulai.');
     }
 
     /**

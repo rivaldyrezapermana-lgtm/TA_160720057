@@ -46,7 +46,7 @@
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="font-medium text-ink-900">{{ $i->product?->name ?? '—' }}</p>
-                                <p class="text-xs text-ink-500">{{ $i->qty }}× · Size {{ $i->size ?? '-' }}</p>
+                                <p class="text-xs text-ink-500">{{ $i->qty }}× · Ukuran {{ $i->size ?? '-' }}</p>
                             </div>
                             <p class="font-display text-lg font-semibold tabular-nums">Rp {{ number_format($i->subtotal, 0, ',', '.') }}</p>
                         </div>
@@ -80,7 +80,7 @@
 
                 @if ($pStatus === 'rejected')
                     <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
-                        <p class="text-xs font-semibold text-red-700">Bukti pembayaran ditolak</p>
+                        <p class="text-xs font-semibold text-red-700">Bukti pembayaran ditolak.</p>
                         @if ($payment->note)
                             <p class="text-xs text-red-600 mt-1">Alasan: {{ $payment->note }}</p>
                         @endif
@@ -96,7 +96,7 @@
                     <form action="{{ route('checkout.proof', $order->id) }}" method="POST" enctype="multipart/form-data" class="mt-3 space-y-2">
                         @csrf
                         <input type="file" name="proof" accept="image/*" required class="input text-xs">
-                        <button class="btn-primary w-full justify-center text-sm">{{ $pStatus === 'rejected' ? 'Upload Ulang Bukti' : 'Upload Bukti' }}</button>
+                        <button class="btn-primary w-full justify-center text-sm">{{ $pStatus === 'rejected' ? 'Unggah Ulang Bukti' : 'Unggah Bukti' }}</button>
                     </form>
                 @endif
             </div>

@@ -11,7 +11,7 @@
         <x-ui.card title="Informasi Batch">
             <div class="grid md:grid-cols-2 gap-4 text-sm">
                 <div><p class="text-ink-500">Produk</p><p class="font-medium">{{ $production->product?->name ?? '—' }}</p></div>
-                <div><p class="text-ink-500">Mesin</p><p class="font-medium">{{ $production->machine?->name ?? '—' }}</p></div>
+                <div><p class="text-ink-500">Mesin</p><p class="font-medium">{{ $production->machine?->display_name ?? '—' }}</p></div>
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$production->status" /></div>
                 <div><p class="text-ink-500">Target</p><p class="font-medium tabular-nums">{{ $production->planned_qty }} pcs</p></div>
                 <div><p class="text-ink-500">Aktual</p><p class="font-medium tabular-nums">{{ $production->actual_qty }} pcs</p></div>
@@ -24,7 +24,7 @@
                         <div class="flex items-center gap-2 mt-0.5">
                             <p class="font-medium">
                                 @if ($production->sampleSource)
-                                    Pakai sampel {{ $production->sampleSource->code }}
+                                    Menggunakan sampel {{ $production->sampleSource->code }}
                                 @elseif ($production->sampleApproved())
                                     Disetujui
                                 @else
@@ -48,7 +48,7 @@
         </x-ui.card>
 
         @if ($production->sizes->isNotEmpty())
-            <x-ui.card title="Rincian per Ukuran" subtitle="{{ $production->status === 'completed' ? 'Hasil sudah masuk ke stok tiap ukuran' : 'Hasil diisi saat QC & Packing massal diselesaikan' }}">
+            <x-ui.card title="Rincian per Ukuran" subtitle="{{ $production->status === 'completed' ? 'Hasil sudah masuk ke stok tiap ukuran.' : 'Hasil diisi saat QC & Packing massal diselesaikan.' }}">
                 <table class="table-clean">
                     <thead><tr><th>Ukuran</th><th class="text-right">Target</th><th class="text-right">Hasil</th><th class="text-right">Capaian</th></tr></thead>
                     <tbody>
@@ -67,9 +67,9 @@
 
         @php
             $phaseMeta = [
-                'common' => ['Persiapan', 'Desain dan pola dikerjakan sekali di awal'],
-                'sample' => ['Tahap Sampel', 'Satu potong dulu — produksi massal terbuka setelah sampel disetujui'],
-                'mass' => ['Produksi Massal', 'Tahap berikutnya bisa mulai saat tahap sebelumnya mencapai 50%'],
+                'common' => ['Persiapan', 'Desain dan pola dikerjakan sekali di awal.'],
+                'sample' => ['Tahap Sampel', 'Satu potong terlebih dahulu — produksi massal terbuka setelah sampel disetujui.'],
+                'mass' => ['Produksi Massal', 'Tahap berikutnya dapat dimulai saat tahap sebelumnya mencapai 50%.'],
             ];
             $grouped = $production->stages->sortBy('sort_order')->groupBy('phase');
             $gate = $production->gateQty();
@@ -78,7 +78,7 @@
 
         @if (! $production->hasSamplePhase())
             <x-ui.card>
-                <p class="text-sm text-ink-600">Batch 1 pcs — produk ini sekaligus sampelnya, jadi tidak ada fase sampel terpisah.</p>
+                <p class="text-sm text-ink-600">Batch 1 pcs — produk ini sekaligus sampelnya, sehingga tidak ada fase sampel terpisah.</p>
             </x-ui.card>
         @endif
 
@@ -124,7 +124,7 @@
                                 && $stage->status === 'in_progress' && $production->sizes->count() > 1 && ! $locked;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
-                                'in_progress' => ['bg-ink-50 border-ink-200', 'Berlangsung'],
+                                'in_progress' => ['bg-ink-50 border-ink-200', 'Berjalan'],
                                 default => ['bg-white border-ink-100', $unlocked ? 'Siap' : 'Terkunci'],
                             };
                         @endphp
@@ -152,7 +152,7 @@
                                     @csrf @method('PATCH')
                                     <input type="hidden" name="_stage" value="{{ $stage->id }}">
                                     @if ($sizedStage)
-                                        <div class="field !mb-0 md:col-span-2">
+                                        <div class="field !mb-0 col-span-2">
                                             <label class="label text-xs">Jumlah</label>
                                             <p class="text-sm text-ink-700 tabular-nums">Diterima {{ $received }} · Sisa {{ $stage->input_qty }} · Output {{ $stage->output_qty }} pcs</p>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
@@ -166,12 +166,12 @@
                                         </div>
                                     @elseif ($qtyEditable)
                                         <div class="field !mb-0">
-                                            <label class="label text-xs">Input (sisa)</label>
+                                            <label class="label text-xs">Input (Sisa)</label>
                                             <p class="input bg-ink-50 tabular-nums">{{ $stage->input_qty }} pcs</p>
                                             <p class="text-[11px] text-ink-400 mt-0.5">Diterima {{ $received }} pcs · output {{ $stage->output_qty }} pcs</p>
                                         </div>
                                         <div class="field !mb-0">
-                                            <label class="label text-xs">Kurangi sisa</label>
+                                            <label class="label text-xs">Kurangi Sisa</label>
                                             <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input" {{ $locked ? 'disabled' : '' }}>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
                                                 Pcs yang baru dikerjakan · menambah output,
@@ -186,18 +186,18 @@
                                             @endif
                                         </div>
                                     @elseif ($hasQty)
-                                        <div class="field !mb-0 md:col-span-2">
+                                        <div class="field !mb-0 col-span-2">
                                             <label class="label text-xs">Jumlah</label>
                                             <p class="text-sm text-ink-700 tabular-nums">1 pcs (sampel)</p>
                                         </div>
                                     @else
-                                        <div class="field !mb-0 md:col-span-2">
+                                        <div class="field !mb-0 col-span-2 {{ $stage->usesMachine() ? '' : 'md:col-span-4' }}">
                                             <label class="label text-xs">Jumlah</label>
                                             <p class="text-sm text-ink-500">Tidak menghasilkan pcs</p>
                                         </div>
                                     @endif
                                     @if ($stage->usesMachine())
-                                        <div class="field !mb-0">
+                                        <div class="field !mb-0 col-span-2">
                                             <label class="label text-xs">Mesin</label>
                                             <select name="production_machine_id" class="input" {{ $locked ? 'disabled' : '' }}>
                                                 <option value="">— Pilih —</option>
@@ -207,18 +207,6 @@
                                             </select>
                                         </div>
                                     @endif
-                                    <div class="flex gap-2">
-                                        @unless ($locked)
-                                            @if ($stage->status === 'pending')
-                                                <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
-                                            @elseif ($stage->status === 'in_progress')
-                                                <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
-                                                <button name="action" value="finish" class="btn-primary text-xs">Selesai</button>
-                                            @else
-                                                <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
-                                            @endif
-                                        @endunless
-                                    </div>
                                     @if ($sizedStage)
                                         <div class="col-span-2 md:col-span-4 border-t border-ink-100 pt-3 mt-1">
                                             <table class="w-full text-sm">
@@ -228,7 +216,7 @@
                                                         <th class="text-right font-normal py-1">Diterima</th>
                                                         <th class="text-right font-normal py-1">Sisa</th>
                                                         <th class="text-right font-normal py-1">Output</th>
-                                                        <th class="text-right font-normal py-1 w-32">Kurangi sisa</th>
+                                                        <th class="text-right font-normal py-1 w-32">Kurangi Sisa</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -266,6 +254,18 @@
                                             @error('size_output')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                                         </div>
                                     @endif
+                                    @unless ($locked)
+                                        <div class="col-span-2 md:col-span-4 flex justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
+                                            @if ($stage->status === 'pending')
+                                                <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
+                                            @elseif ($stage->status === 'in_progress')
+                                                <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
+                                                <button name="action" value="finish" class="btn-primary text-xs">Selesai</button>
+                                            @else
+                                                <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
+                                            @endif
+                                        </div>
+                                    @endunless
                                 </form>
 
                                 @if ($stage->stage === 'design')
@@ -294,12 +294,14 @@
                                             <p class="text-xs text-ink-400 mb-2">Belum ada sketsa.</p>
                                         @endif
                                         @unless ($sketchLocked)
-                                            <form action="{{ route('admin.productions.sketches.store', $production->id) }}" method="POST" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+                                            <form action="{{ route('admin.productions.sketches.store', $production->id) }}" method="POST" enctype="multipart/form-data" class="space-y-2">
                                                 @csrf
-                                                <input type="file" name="sketches[]" multiple accept="image/jpeg,image/png,image/webp" class="text-xs">
-                                                <button class="btn-secondary text-xs">Unggah Sketsa</button>
+                                                <input type="file" name="sketches[]" multiple accept="image/jpeg,image/png,image/webp" class="block text-xs">
+                                                <p class="text-[11px] text-ink-400">JPG, PNG, atau WebP, maksimal 2 MB per file.</p>
+                                                <div class="flex justify-end">
+                                                    <button class="btn-secondary text-xs">Unggah Sketsa</button>
+                                                </div>
                                             </form>
-                                            <p class="text-[11px] text-ink-400 mt-1">JPG, PNG, atau WebP, maksimal 2 MB per file.</p>
                                             @if ($errors->has('sketches') || $errors->has('sketches.*'))
                                                 <p class="text-xs text-red-600 mt-1">{{ $errors->first('sketches') ?: $errors->first('sketches.*') }}</p>
                                             @endif
@@ -314,12 +316,12 @@
                                         @else
                                             <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="space-y-2">
                                                 @csrf @method('PATCH')
-                                                <label class="label text-xs">Catatan revisi (wajib kalau sampel perlu diperbaiki)</label>
-                                                <textarea name="notes" rows="2" class="input" placeholder="Contoh: panjang lengan kurang 2cm">{{ old('notes') }}</textarea>
+                                                <label class="label text-xs">Catatan Revisi (wajib jika sampel perlu diperbaiki)</label>
+                                                <textarea name="notes" rows="2" class="input" placeholder="Contoh: panjang lengan kurang 2 cm">{{ old('notes') }}</textarea>
                                                 @error('notes')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
-                                                <div class="flex gap-2">
-                                                    <button name="action" value="approve_sample" class="btn-primary text-xs">Sampel disetujui</button>
-                                                    <button name="action" value="revise_sample" class="btn-secondary text-xs">Perlu revisi</button>
+                                                <div class="flex justify-end gap-2">
+                                                    <button name="action" value="approve_sample" class="btn-primary text-xs">Sampel Disetujui</button>
+                                                    <button name="action" value="revise_sample" class="btn-secondary text-xs">Perlu Revisi</button>
                                                 </div>
                                             </form>
                                         @endif
@@ -327,7 +329,7 @@
                                 @endif
 
                                 @if (empty($machines) && $hasQty)
-                                    <p class="text-xs text-amber-600 mt-1">Belum ada mesin aktif untuk tahap ini. Tambahkan kategori mesin bertahap "{{ $stage->label() }}".</p>
+                                    <p class="text-xs text-amber-600 mt-1">Belum ada mesin aktif untuk tahap ini. Tambahkan kategori mesin dengan tahap "{{ $stage->label() }}".</p>
                                 @endif
                             @endif
                         </div>
@@ -375,7 +377,7 @@
                             </tr>
                         @endforeach
                     @else
-                        <tr><td colspan="4" class="text-ink-400 text-center">Produk ini belum punya resep bahan.</td></tr>
+                        <tr><td colspan="4" class="text-ink-400 text-center">Produk ini belum memiliki resep bahan.</td></tr>
                     @endif
                 </tbody>
             </table>
@@ -396,12 +398,41 @@
         </x-ui.card>
 
         <x-ui.card title="Aksi">
-            <a href="{{ route('admin.productions.edit', $production->id) }}" class="btn-secondary w-full justify-center mb-2">Edit Batch</a>
+            <a href="{{ route('admin.productions.edit', $production->id) }}" class="btn-secondary w-full justify-center mb-2">Ubah Batch</a>
             @if (in_array($production->status, ['planned','cancelled'], true))
                 <form action="{{ route('admin.productions.destroy', $production->id) }}" method="POST" onsubmit="return confirm('Hapus batch ini?')">
                     @csrf @method('DELETE')
                     <button class="btn-secondary w-full justify-center text-red-600">Hapus Batch</button>
                 </form>
+            @endif
+        </x-ui.card>
+
+        @unless (in_array($production->status, ['completed', 'cancelled'], true))
+            <x-ui.card title="Pause Produksi" subtitle="Mencatat posisi produksi saat ini. Status batch dan tahap tidak berubah.">
+                <form action="{{ route('admin.productions.pause', $production->id) }}" method="POST" class="space-y-2">
+                    @csrf
+                    <label for="keterangan" class="label text-xs">Keterangan <span class="text-ink-400 font-normal">(opsional)</span></label>
+                    <textarea name="keterangan" id="keterangan" rows="2" maxlength="500" class="input" placeholder="Contoh: istirahat, mesin diperbaiki">{{ old('keterangan') }}</textarea>
+                    <p class="text-[11px] text-ink-400">Jika dikosongkan, posisi tahap saat ini dicatat otomatis.</p>
+                    @error('keterangan')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+                    <button class="btn-secondary w-full justify-center">Pause</button>
+                </form>
+            </x-ui.card>
+        @endunless
+
+        <x-ui.card title="Log Produksi">
+            @if ($production->logs->isEmpty())
+                <p class="text-sm text-ink-400">Belum ada catatan pause.</p>
+            @else
+                <ul class="space-y-3">
+                    @foreach ($production->logs as $log)
+                        <li class="border-l-2 border-ink-200 pl-3">
+                            <p class="text-xs text-ink-500">{{ $log->waktu_label }}</p>
+                            <p class="text-sm text-ink-800 break-words">{{ $log->keterangan }}</p>
+                            <p class="text-xs text-ink-400">{{ $log->user?->name ?? '—' }}</p>
+                        </li>
+                    @endforeach
+                </ul>
             @endif
         </x-ui.card>
     </div>
@@ -411,9 +442,9 @@
     @php
         $sampleQc = $production->stages->first(fn ($s) => $s->phase === 'sample' && $s->stage === 'qc_packing');
         $sampleStatus = match (true) {
-            $production->sampleSource !== null => ['text-emerald-700', 'Pakai sampel '.$production->sampleSource->code],
+            $production->sampleSource !== null => ['text-emerald-700', 'Menggunakan sampel '.$production->sampleSource->code],
             $production->sampleApproved() => ['text-emerald-700', 'Disetujui '.$production->sample_approved_at->translatedFormat('d M Y')],
-            $sampleQc?->status === 'completed' => ['text-amber-600', 'Sudah jadi, menunggu dicek'],
+            $sampleQc?->status === 'completed' => ['text-amber-600', 'Sudah selesai, menunggu pemeriksaan'],
             $production->stages->contains(fn ($s) => $s->phase === 'sample' && $s->status !== 'pending') => ['text-ink-700', 'Sedang dibuat'],
             default => ['text-ink-500', 'Belum dibuat'],
         };
@@ -430,7 +461,7 @@
         @if ($existingSample)
             <div class="rounded-lg border px-4 py-3 mb-4 {{ $canReuse ? 'border-emerald-200 bg-emerald-50' : 'border-ink-100 bg-ink-50' }}">
                 <p class="text-sm text-ink-800">
-                    Produk ini sudah punya sampel dari batch <span class="font-medium">{{ $existingSample->code }}</span>
+                    Produk ini sudah memiliki sampel dari batch <span class="font-medium">{{ $existingSample->code }}</span>
                     @if ($existingSample->sample_approved_at)
                         (disetujui {{ $existingSample->sample_approved_at->translatedFormat('d M Y') }}).
                     @else
@@ -438,13 +469,13 @@
                     @endif
                 </p>
                 @if ($canReuse)
-                    <p class="text-xs text-ink-500 mt-1">Tidak perlu buat sampel lagi — Persiapan dan tahap sampel batch ini dilewati, langsung ke produksi massal.</p>
+                    <p class="text-xs text-ink-500 mt-1">Tidak perlu membuat sampel lagi — Persiapan dan tahap sampel batch ini dilewati, langsung ke produksi massal.</p>
                     <form action="{{ route('admin.productions.reuse-sample', $production->id) }}" method="POST" class="mt-2">
                         @csrf
-                        <button class="btn-primary text-xs">Pakai sampel ini, langsung produksi massal</button>
+                        <button class="btn-primary text-xs">Gunakan Sampel Ini, Langsung Produksi Massal</button>
                     </form>
                 @elseif (! $production->sampleSource && ! $production->sampleApproved())
-                    <p class="text-xs text-ink-500 mt-1">Sampel batch ini sudah mulai dibuat, jadi lanjutkan di Tahap Sampel.</p>
+                    <p class="text-xs text-ink-500 mt-1">Sampel batch ini sudah mulai dibuat, sehingga proses dilanjutkan di Tahap Sampel.</p>
                 @endif
             </div>
 
@@ -452,7 +483,7 @@
             @include('admin.productions.partials.sketch-grid', ['sketches' => $existingSample->designSketches])
         @elseif (! $production->sampleApproved())
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 mb-4">
-                <p class="text-sm text-ink-800">Produk ini belum punya sampel. Buat sampel dulu (1 pcs) sebelum produksi massal.</p>
+                <p class="text-sm text-ink-800">Produk ini belum memiliki sampel. Buat sampel terlebih dahulu (1 pcs) sebelum produksi massal.</p>
                 <a href="#tahap-sampel" onclick="closeModal('modal-sampel')" class="btn-primary text-xs mt-2 inline-flex">Ke Tahap Sampel</a>
             </div>
         @endif

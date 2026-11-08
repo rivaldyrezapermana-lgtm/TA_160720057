@@ -74,7 +74,7 @@ class ProductionStageFlowTest extends TestCase
     {
         $cat = MachineCategory::create(['name' => 'Mesin Potong', 'code' => 'CAT-CUT', 'stage' => 'cutting']);
         $machine = ProductionMachine::create([
-            'name' => 'Cutter A', 'code' => 'M-CUT-A', 'status' => 'active', 'machine_category_id' => $cat->id,
+            'name' => 'Cutter A', 'status' => 'active', 'machine_category_id' => $cat->id,
         ]);
 
         $this->assertSame('cutting', $machine->category->stage);

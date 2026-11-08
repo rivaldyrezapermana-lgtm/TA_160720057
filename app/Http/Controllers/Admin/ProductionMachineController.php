@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\MachineCategory;
 use App\Models\ProductionMachine;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,9 +18,9 @@ class ProductionMachineController extends Controller
     /** AJAX endpoint for DataTables. */
     public function data(Request $request)
     {
-        $rows = ProductionMachine::latest()->get()->map(fn (ProductionMachine $machine) => [
+        $rows = ProductionMachine::orderBy('kode_mesin')->get()->map(fn (ProductionMachine $machine) => [
             'id' => $machine->id,
-            'code' => $machine->code,
+            'kode_mesin' => $machine->kode_mesin,
             'name' => $machine->name,
             'capacity' => $machine->capacity !== null ? $machine->capacity : '-',
             'status' => $machine->status,
@@ -31,7 +32,8 @@ class ProductionMachineController extends Controller
     public function create()
     {
         return view('admin.production-machines.create', [
-            'categories' => \App\Models\MachineCategory::orderBy('name')->pluck('name', 'id')->toArray(),
+            'categories' => MachineCategory::orderBy('name')->pluck('name', 'id')->toArray(),
+            'nextKode' => ProductionMachine::nextKode(),
         ]);
     }
 
@@ -52,13 +54,13 @@ class ProductionMachineController extends Controller
     {
         return view('admin.production-machines.edit', [
             'machine' => $production_machine,
-            'categories' => \App\Models\MachineCategory::orderBy('name')->pluck('name', 'id')->toArray(),
+            'categories' => MachineCategory::orderBy('name')->pluck('name', 'id')->toArray(),
         ]);
     }
 
     public function update(Request $request, ProductionMachine $production_machine)
     {
-        $production_machine->update($request->validate($this->rules($production_machine)));
+        $production_machine->update($request->validate($this->rules()));
 
         return redirect()->route('admin.production-machines.index')
             ->with('success', 'Mesin produksi berhasil diperbarui.');
@@ -68,7 +70,7 @@ class ProductionMachineController extends Controller
     {
         if ($production_machine->productions()->exists()) {
             return redirect()->route('admin.production-machines.index')
-                ->with('error', 'Mesin tidak bisa dihapus karena sudah dipakai pada batch produksi.');
+                ->with('error', 'Mesin tidak dapat dihapus karena sudah digunakan pada batch produksi.');
         }
 
         $production_machine->delete();
@@ -77,12 +79,11 @@ class ProductionMachineController extends Controller
             ->with('success', 'Mesin produksi berhasil dihapus.');
     }
 
-    /** Validation rules shared by store and update. */
-    private function rules(?ProductionMachine $machine = null): array
+    /** Validation rules shared by store and update. kode_mesin dibuat sistem, jadi sengaja tidak diterima dari form. */
+    private function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:255', Rule::unique('production_machines', 'code')->ignore($machine)],
             'machine_category_id' => ['nullable', 'exists:machine_categories,id'],
             'status' => ['required', Rule::in(ProductionMachine::STATUSES)],
             'capacity' => ['nullable', 'integer', 'min:0'],

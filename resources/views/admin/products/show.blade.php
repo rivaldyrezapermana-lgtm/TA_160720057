@@ -23,7 +23,7 @@
                 <p class="text-sm text-ink-500">Belum ada varian ukuran.</p>
             @else
                 <table class="table-clean">
-                    <thead><tr><th>Size</th><th class="text-right">Lingkar Dada</th><th class="text-right">Panjang</th><th class="text-right">Lengan</th><th class="text-right">Stok</th></tr></thead>
+                    <thead><tr><th>Ukuran</th><th class="text-right">Lingkar Dada</th><th class="text-right">Panjang</th><th class="text-right">Lengan</th><th class="text-right">Stok</th></tr></thead>
                     <tbody>
                         @foreach ($product->sizes as $s)
                             <tr>
@@ -39,12 +39,12 @@
             @endif
         </x-ui.card>
 
-        <x-ui.card title="Bahan Baku (Resep)" subtitle="Bahan yang dibutuhkan per 1 unit produk">
+        <x-ui.card title="Bahan Baku (Resep)" subtitle="Bahan yang dibutuhkan per 1 unit produk.">
             @if ($product->materials->isEmpty())
                 <p class="text-sm text-ink-500">Belum ada resep bahan baku.</p>
             @else
                 <table class="table-clean">
-                    <thead><tr><th>Bahan</th><th class="text-right">Qty per Unit</th><th>Unit</th></tr></thead>
+                    <thead><tr><th>Bahan</th><th class="text-right">Jumlah per Unit</th><th>Satuan</th></tr></thead>
                     <tbody>
                         @foreach ($product->materials as $bom)
                             <tr>
@@ -71,7 +71,7 @@
                 <div class="flex justify-between"><span class="text-ink-500">Status</span><x-ui.status-badge :status="$product->is_active ? 'active' : 'inactive'" /></div>
             </div>
             <div class="mt-4 space-y-2">
-                <a href="{{ route('admin.products.edit', $product->id) }}" class="btn-secondary w-full justify-center">Edit Produk</a>
+                <a href="{{ route('admin.products.edit', $product->id) }}" class="btn-secondary w-full justify-center">Ubah Produk</a>
                 <form action="{{ route('admin.products.destroy', $product->id) }}" method="POST" onsubmit="return confirm('Hapus produk ini?')">
                     @csrf @method('DELETE')
                     <button class="btn-danger w-full justify-center">Hapus Produk</button>

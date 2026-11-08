@@ -7,8 +7,8 @@
 
     @if ($items->isEmpty())
         <div class="border border-dashed border-ink-200 rounded-xl p-16 text-center">
-            <p class="font-display text-xl text-ink-700">Keranjang kosong</p>
-            <p class="text-sm text-ink-500 mt-1 mb-4">Yuk pilih produk dulu.</p>
+            <p class="font-display text-xl text-ink-700">Keranjang Kosong</p>
+            <p class="text-sm text-ink-500 mt-1 mb-4">Silakan pilih produk terlebih dahulu.</p>
             <a href="{{ route('shop.index') }}" class="btn-primary">Belanja Sekarang</a>
         </div>
     @else
@@ -19,12 +19,12 @@
                         <div class="w-20 h-20 bg-ink-100 rounded-lg flex-shrink-0 flex items-center justify-center font-display text-2xl text-ink-300">B</div>
                         <div class="flex-1 min-w-0">
                             <p class="font-medium text-ink-900">{{ $item->product }}</p>
-                            <p class="text-xs text-ink-500">Size: {{ $item->size }}</p>
+                            <p class="text-xs text-ink-500">Ukuran: {{ $item->size }}</p>
                             <div class="flex items-center gap-3 mt-2">
                                 <form action="{{ route('cart.update', $item->id) }}" method="POST" class="flex items-center gap-2">
                                     @csrf @method('PATCH')
                                     <input type="number" name="qty" value="{{ $item->qty }}" min="1" class="input w-20 py-1 text-sm">
-                                    <button class="text-xs text-ink-600 hover:text-ink-900">Update</button>
+                                    <button class="text-xs text-ink-600 hover:text-ink-900">Perbarui</button>
                                 </form>
                                 <form action="{{ route('cart.remove', $item->id) }}" method="POST">
                                     @csrf @method('DELETE')
@@ -42,13 +42,13 @@
                     <h2 class="font-display text-xl font-semibold mb-4">Ringkasan</h2>
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between"><span class="text-ink-500">Subtotal ({{ $items->count() }} item)</span><span class="tabular-nums">Rp {{ number_format($total, 0, ',', '.') }}</span></div>
-                        <div class="flex justify-between"><span class="text-ink-500">Ongkir</span><span class="text-ink-500 text-xs">dihitung di checkout</span></div>
+                        <div class="flex justify-between"><span class="text-ink-500">Ongkos Kirim</span><span class="text-ink-500 text-xs">dihitung pada halaman Pembayaran</span></div>
                     </div>
                     <div class="border-t border-ink-100 mt-4 pt-4 flex justify-between items-baseline">
                         <span class="font-medium">Total</span>
                         <span class="font-display text-2xl font-semibold tabular-nums">Rp {{ number_format($total, 0, ',', '.') }}</span>
                     </div>
-                    <a href="{{ route('checkout.index') }}" class="btn-primary w-full justify-center mt-4">Checkout</a>
+                    <a href="{{ route('checkout.index') }}" class="btn-primary w-full justify-center mt-4">Lanjut ke Pembayaran</a>
                 </div>
             </div>
         </div>

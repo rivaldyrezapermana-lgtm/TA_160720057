@@ -56,8 +56,8 @@
         <div class="md:col-span-3">
             @if ($products->isEmpty())
                 <div class="border border-dashed border-ink-200 rounded-xl p-16 text-center">
-                    <p class="font-display text-xl text-ink-700">Tidak ada produk ditemukan</p>
-                    <p class="text-sm text-ink-500 mt-1">Coba ubah kata kunci atau kategori.</p>
+                    <p class="font-display text-xl text-ink-700">Tidak Ada Produk Ditemukan</p>
+                    <p class="text-sm text-ink-500 mt-1">Silakan ubah kata kunci atau kategori.</p>
                 </div>
             @else
                 <p class="text-sm text-ink-500 mb-4">{{ $products->count() }} produk</p>
@@ -83,7 +83,7 @@
                             <div class="flex items-center justify-between mt-1">
                                 <p class="font-display text-lg font-semibold">Rp {{ number_format($p->price, 0, ',', '.') }}</p>
                                 @if ($p->stock > 0 && $p->stock < 10)
-                                    <span class="badge-amber">Stok terbatas</span>
+                                    <span class="badge-amber">Stok Terbatas</span>
                                 @endif
                             </div>
                             <x-ui.size-chips :sizes="$p->sizes" />

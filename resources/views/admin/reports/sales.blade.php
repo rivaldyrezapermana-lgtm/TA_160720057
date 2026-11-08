@@ -12,7 +12,7 @@
         <button class="btn-secondary">Filter</button>
     </form>
     <div class="flex gap-2">
-        <a href="{{ route('admin.reports.export', 'sales') }}" class="btn-secondary">Export CSV</a>
+        <a href="{{ route('admin.reports.export', 'sales') }}" class="btn-secondary">Ekspor CSV</a>
     </div>
 </div>
 

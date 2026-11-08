@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Edit Kategori')
+@section('title', 'Ubah Kategori')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Kategori', 'url' => route('admin.categories.index')], ['label' => 'Edit']]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Edit Kategori</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Kategori', 'url' => route('admin.categories.index')], ['label' => 'Ubah']]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Ubah Kategori</h1>
 @endsection
 
 @section('content')

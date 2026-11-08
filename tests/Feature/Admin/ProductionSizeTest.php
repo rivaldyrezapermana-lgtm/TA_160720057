@@ -224,6 +224,146 @@ class ProductionSizeTest extends TestCase
         $this->assertTrue($prod->sizes->isEmpty());
     }
 
+    public function test_store_produces_only_the_submitted_subset_of_sizes(): void
+    {
+        $this->store($this->product(), ['sizes' => ['M' => 12]])->assertSessionHasNoErrors();
+
+        $prod = Production::with('sizes')->latest('id')->first();
+        $this->assertSame(['M' => 12], $prod->sizes->pluck('planned_qty', 'size')->all());
+        $this->assertSame(12, (int) $prod->planned_qty);
+        $this->assertSame(['M'], $this->stage($prod, 'mass', 'cutting')->sizeRows->pluck('size')->all());
+    }
+
+    public function test_store_orders_size_rows_by_the_master_list(): void
+    {
+        $this->store($this->product(), ['sizes' => ['XL' => 3, 'S' => 5]])->assertSessionHasNoErrors();
+
+        $this->assertSame(['S', 'XL'], Production::latest('id')->first()->sizes->pluck('size')->all());
+    }
+
+    public function test_master_size_without_a_variant_creates_the_variant_and_the_batch(): void
+    {
+        $product = $this->product();
+
+        $this->store($product, ['sizes' => ['XL' => 20]])->assertSessionHasNoErrors();
+
+        $prod = Production::with('sizes')->latest('id')->first();
+        $this->assertSame(['XL' => 20], $prod->sizes->pluck('planned_qty', 'size')->all());
+        $this->assertSame(0, $product->sizes()->where('size', 'XL')->value('stock'));
+    }
+
+    public function test_finishing_a_batch_credits_a_newly_created_variant(): void
+    {
+        $product = $this->product();
+        $this->store($product, ['sizes' => ['XL' => 20]]);
+        $prod = Production::latest('id')->first();
+        $qc = $this->readyForSizedQc($prod, ['XL' => 20]);
+
+        $this->actingAs($this->admin())
+            ->patch(route('admin.productions.stage', [$prod, $qc]), ['action' => 'finish', 'size_qty' => ['XL' => 20]])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(20, $product->sizes()->where('size', 'XL')->value('stock'));
+    }
+
+    public function test_store_rejects_an_unknown_size(): void
+    {
+        $product = $this->product();
+
+        $this->store($product, ['sizes' => ['S' => 5, 'JUMBO' => 3]])->assertSessionHasErrors('sizes');
+
+        $this->assertSame(0, Production::count());
+        $this->assertFalse($product->sizes()->where('size', 'JUMBO')->exists());
+    }
+
+    public function test_store_accepts_a_product_size_that_is_not_in_the_master(): void
+    {
+        $this->store($this->product(['S', 'XXXL']), ['sizes' => ['XXXL' => 4]])->assertSessionHasNoErrors();
+
+        $this->assertSame(['XXXL'], Production::latest('id')->first()->sizes->pluck('size')->all());
+    }
+
+    public function test_product_without_variants_can_be_detailed_per_size(): void
+    {
+        $product = $this->product([]);
+
+        $this->store($product, ['sizes' => ['M' => 6]])->assertSessionHasNoErrors();
+
+        $this->assertSame(['M' => 6], Production::latest('id')->first()->sizes->pluck('planned_qty', 'size')->all());
+        $this->assertTrue($product->sizes()->where('size', 'M')->exists());
+    }
+
+    public function test_product_without_variants_still_rejects_an_unknown_size(): void
+    {
+        $this->store($this->product([]), ['planned_qty' => 25, 'sizes' => ['JUMBO' => 3]])
+            ->assertSessionHasErrors('sizes');
+
+        $this->assertSame(0, Production::count());
+    }
+
+    public function test_update_can_add_a_master_size_and_drop_an_uncut_size(): void
+    {
+        $product = $this->product();
+        $this->store($product, ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'sizes' => ['M' => 30, 'XL' => 5], 'start_date' => now()->toDateString(), 'status' => 'planned',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(['M' => 30, 'XL' => 5], $prod->fresh()->sizes->pluck('planned_qty', 'size')->all());
+        $this->assertTrue($product->sizes()->where('size', 'XL')->exists());
+    }
+
+    public function test_update_rejects_an_unknown_size(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.productions.update', $prod), [
+                'sizes' => ['S' => 10, 'JUMBO' => 5], 'start_date' => now()->toDateString(), 'status' => 'planned',
+            ])
+            ->assertSessionHasErrors('sizes');
+
+        $this->assertSame(40, (int) $prod->fresh()->planned_qty);
+    }
+
+    public function test_create_form_lists_master_sizes_in_order_plus_the_products_own(): void
+    {
+        $product = $this->product(['M', 'XXXL']);
+
+        $this->actingAs($this->admin())->get(route('admin.productions.create'))
+            ->assertOk()
+            ->assertViewHas('productSizes', fn ($sizes) => $sizes[$product->id] === ['S', 'M', 'L', 'XL', 'XXXL'])
+            ->assertViewHas('productVariants', fn ($variants) => $variants[$product->id]->all() === ['M', 'XXXL'])
+            ->assertSee('"'.$product->id.'":["S","M","L","XL","XXXL"]', false);
+    }
+
+    public function test_edit_form_ticks_only_the_batch_sizes_and_disables_the_rest(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+
+        $html = $this->actingAs($this->admin())->get(route('admin.productions.edit', $prod))
+            ->assertOk()->assertSee('sizes[XL]', false)->getContent();
+
+        $this->assertSame(2, preg_match_all('/class="size-tick"\s+checked/', $html));
+        $this->assertMatchesRegularExpression('/name="sizes\[XL\]"[^>]*disabled/', $html);
+    }
+
+    public function test_edit_form_keeps_a_size_that_is_already_cut_ticked(): void
+    {
+        $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);
+        $prod = Production::latest('id')->first();
+        $this->stage($prod, 'mass', 'cutting')->sizeRows()->where('size', 'M')->update(['input_qty' => 20, 'output_qty' => 10]);
+
+        $this->actingAs($this->admin())->get(route('admin.productions.edit', $prod))
+            ->assertOk()->assertSee('Sudah dipotong 10 pcs');
+    }
+
     public function test_finishing_mass_qc_requires_a_matching_size_breakdown(): void
     {
         $this->store($this->product(), ['sizes' => ['S' => 10, 'M' => 30]]);

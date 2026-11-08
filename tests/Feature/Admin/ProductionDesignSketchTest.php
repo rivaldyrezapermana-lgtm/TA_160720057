@@ -195,7 +195,7 @@ class ProductionDesignSketchTest extends TestCase
         // Data lama: kategori mesin yang masih dipetakan ke tahap Desain.
         $cat = MachineCategory::create(['name' => 'Lama', 'code' => 'CAT-OLD', 'stage' => 'design']);
         $machine = ProductionMachine::create([
-            'name' => 'Meja Desain', 'code' => 'M-DSN', 'status' => 'active', 'machine_category_id' => $cat->id,
+            'name' => 'Meja Desain', 'status' => 'active', 'machine_category_id' => $cat->id,
         ]);
 
         $this->actingAs($this->admin())

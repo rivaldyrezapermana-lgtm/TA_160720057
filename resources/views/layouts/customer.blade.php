@@ -98,7 +98,7 @@
                     <a href="{{ route('customer.chat.index') }}"   class="block py-1 text-slate-700">Chat</a>
                     <a href="{{ route('profile.edit') }}"          class="block py-1 text-slate-700">Profil</a>
                 @else
-                    <a href="{{ route('admin.dashboard') }}" class="block py-1 text-slate-700">Dashboard Admin</a>
+                    <a href="{{ route('admin.dashboard') }}" class="block py-1 text-slate-700">Dasbor Admin</a>
                     <a href="{{ route('profile.edit') }}"    class="block py-1 text-slate-700">Profil</a>
                 @endif
             @else
@@ -125,7 +125,7 @@
     <div class="max-w-7xl mx-auto px-6 py-8 grid md:grid-cols-3 gap-6 text-sm text-slate-600">
         <div>
             <p class="font-semibold text-slate-900 mb-1">Labasa</p>
-            <p>Baju muslim — dijahit dengan rapi, dipakai dengan bangga.</p>
+            <p>Baju muslim — dijahit dengan rapi, dikenakan dengan bangga.</p>
         </div>
         <div>
             <p class="font-semibold text-slate-900 mb-1">Kontak</p>

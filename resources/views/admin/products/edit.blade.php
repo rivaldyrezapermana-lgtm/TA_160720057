@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Edit Produk')
+@section('title', 'Ubah Produk')
 @section('breadcrumb')
     <x-admin.breadcrumb :items="[['label' => 'Produk', 'url' => route('admin.products.index')], ['label' => $product->name]]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Edit: {{ $product->name }}</h1>
+    <h1 class="font-display text-xl font-semibold text-ink-900">Ubah: {{ $product->name }}</h1>
 @endsection
 
 @section('content')
@@ -11,18 +11,18 @@
     @csrf @method('PUT')
     <x-ui.card title="Informasi Produk">
         <div class="grid md:grid-cols-2 gap-4">
-            <div class="md:col-span-2"><x-ui.input name="name" label="Nama" :value="$product->name" required /></div>
+            <div class="md:col-span-2"><x-ui.input name="name" label="Nama Produk" :value="$product->name" required /></div>
             <div class="field">
                 <label class="label">SKU</label>
                 <input type="text" value="{{ $product->sku }}" class="input bg-ink-50" readonly disabled>
-                <p class="field-help">SKU dibuat otomatis dan tidak bisa diubah.</p>
+                <p class="field-help">SKU dibuat otomatis dan tidak dapat diubah.</p>
             </div>
             <x-ui.select name="category_id" label="Kategori" required :selected="$product->category_id" :options="$categories->pluck('name','id')->toArray()" />
             <x-ui.input name="price" type="number" label="Harga (Rp)" :value="$product->price" required />
             <div class="field">
                 <label class="label">Stok</label>
                 <input type="number" value="{{ $product->stock }}" class="input bg-ink-50" readonly disabled>
-                <p class="field-help">Stok hanya berubah lewat penjualan &amp; produksi.</p>
+                <p class="field-help">Stok hanya berubah melalui penjualan dan produksi.</p>
             </div>
             <div class="md:col-span-2"><x-ui.textarea name="description" label="Deskripsi" :value="$product->description" rows="4" /></div>
             <div class="md:col-span-2">
@@ -37,23 +37,23 @@
             <div class="md:col-span-2">
                 <label class="flex items-center gap-2 text-sm text-ink-700">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $product->is_active)) class="rounded border-ink-300">
-                    Tampilkan di storefront
+                    Tampilkan di toko
                 </label>
             </div>
         </div>
     </x-ui.card>
 
-    <x-ui.card title="Ukuran" subtitle="Perbarui varian ukuran (S/M/L/XL) dengan stok masing-masing">
+    <x-ui.card title="Ukuran" subtitle="Perbarui varian ukuran beserta stok masing-masing.">
         <div class="space-y-2">
             <div class="grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">
-                <div class="col-span-2">Size</div>
+                <div class="col-span-2">Ukuran</div>
                 <div class="col-span-2">Lingkar Dada</div>
                 <div class="col-span-2">Panjang</div>
                 <div class="col-span-2">Lengan</div>
                 <div class="col-span-3">Stok</div>
                 <div class="col-span-1"></div>
             </div>
-            @foreach (['S','M','L','XL'] as $sz)
+            @foreach ($sizes as $sz)
                 @php $row = $sizeRows->get($sz); @endphp
                 <div class="grid grid-cols-12 gap-2">
                     <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input col-span-2" readonly>
@@ -67,9 +67,9 @@
         </div>
     </x-ui.card>
 
-    <x-ui.card title="Bahan Baku (Resep)" subtitle="Centang bahan yang dibutuhkan untuk membuat 1 unit produk ini">
+    <x-ui.card title="Bahan Baku (Resep)" subtitle="Centang bahan yang dibutuhkan untuk membuat 1 unit produk ini.">
         <table class="table-clean">
-            <thead><tr><th>Bahan</th><th class="text-right">Qty per Unit</th><th>Unit</th></tr></thead>
+            <thead><tr><th>Bahan</th><th class="text-right">Jumlah per Unit</th><th>Satuan</th></tr></thead>
             <tbody>
                 @foreach ($materials as $m)
                     @php $bom = $bomRows->get($m->id); @endphp
@@ -88,7 +88,7 @@
         </table>
     </x-ui.card>
 
-    <x-ui.card title="HPP (Harga Pokok)" subtitle="Dihitung otomatis dari resep bahan baku">
+    <x-ui.card title="HPP (Harga Pokok)" subtitle="Dihitung otomatis dari resep bahan baku.">
         <div class="flex items-center justify-between">
             <p class="text-sm text-ink-500">Total biaya bahan per unit</p>
             <p class="font-display text-2xl font-semibold tabular-nums">Rp <span id="hpp-total">0</span></p>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductSize;
+use App\Models\Size;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
@@ -53,16 +54,18 @@ class ShopController extends Controller
         return view('customer.shop.index', compact('products', 'categories', 'sizes'));
     }
 
-    /** Distinct sizes across active products, in S → XXL order (unknown sizes last). */
+    /** Distinct sizes across active products, in master size order (unknown sizes last). */
     private function sizeOptions(): array
     {
-        $order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+        $order = Size::ordered()->pluck('name')
+            ->map(fn (string $name) => mb_strtoupper($name))
+            ->all();
 
         return ProductSize::whereHas('product', fn ($p) => $p->where('is_active', true))
             ->distinct()
             ->pluck('size')
             ->sortBy(function ($size) use ($order) {
-                $rank = array_search(strtoupper($size), $order, true);
+                $rank = array_search(mb_strtoupper($size), $order, true);
 
                 return [$rank === false ? PHP_INT_MAX : $rank, $size];
             })

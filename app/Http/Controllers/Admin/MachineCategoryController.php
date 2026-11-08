@@ -66,7 +66,7 @@ class MachineCategoryController extends Controller
     {
         if ($machine_category->machines()->exists()) {
             return redirect()->route('admin.machine-categories.index')
-                ->with('error', 'Kategori tidak bisa dihapus karena masih dipakai mesin.');
+                ->with('error', 'Kategori tidak dapat dihapus karena masih digunakan oleh mesin.');
         }
 
         $machine_category->delete();

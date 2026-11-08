@@ -13,7 +13,7 @@ class ProductionDesignSketchController extends Controller
     public function store(Request $request, Production $production)
     {
         if ($production->designSketchesLocked()) {
-            return back()->with('error', 'Tahap Desain sudah selesai. Sketsa tidak bisa ditambah lagi.');
+            return back()->with('error', 'Tahap Desain sudah selesai. Sketsa tidak dapat ditambahkan lagi.');
         }
 
         $request->validate([
@@ -21,7 +21,7 @@ class ProductionDesignSketchController extends Controller
             'sketches.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ], [
             'sketches.required' => 'Pilih minimal satu gambar sketsa.',
-            'sketches.*.image' => 'File sketsa harus berupa gambar.',
+            'sketches.*.image' => 'Berkas sketsa harus berupa gambar.',
             'sketches.*.mimes' => 'Sketsa harus berformat JPG, PNG, atau WebP.',
             'sketches.*.max' => 'Ukuran tiap sketsa maksimal 2 MB.',
         ]);
@@ -42,7 +42,7 @@ class ProductionDesignSketchController extends Controller
         abort_unless($sketch->production_id === $production->id, 404);
 
         if ($production->designSketchesLocked()) {
-            return back()->with('error', 'Tahap Desain sudah selesai. Sketsa tidak bisa dihapus lagi.');
+            return back()->with('error', 'Tahap Desain sudah selesai. Sketsa tidak dapat dihapus lagi.');
         }
 
         Storage::disk('public')->delete($sketch->path);

@@ -86,7 +86,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9l-7 7-7-7"/></svg>
                     </summary>
                     <table class="w-full mt-4 text-sm">
-                        <thead><tr class="border-b border-ink-100"><th class="text-left py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Size</th><th class="text-right py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Lingkar Dada</th><th class="text-right py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Panjang</th><th class="text-right py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Lengan</th></tr></thead>
+                        <thead><tr class="border-b border-ink-100"><th class="text-left py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Ukuran</th><th class="text-right py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Lingkar Dada</th><th class="text-right py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Panjang</th><th class="text-right py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">Lengan</th></tr></thead>
                         <tbody>
                             @foreach ($product->sizes as $s)
                                 <tr class="border-b border-ink-50 last:border-0">

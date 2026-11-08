@@ -1,24 +1,24 @@
 @extends('layouts.admin')
-@section('title', 'PO Baru')
+@section('title', 'Pesanan Pembelian Baru')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Pembelian', 'url' => route('admin.purchases.index')], ['label' => 'PO Baru']]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Buat PO Baru</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Pembelian', 'url' => route('admin.purchases.index')], ['label' => 'Pesanan Pembelian Baru']]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Buat Pesanan Pembelian Baru</h1>
 @endsection
 
 @section('content')
 <form action="{{ route('admin.purchases.store') }}" method="POST" class="max-w-4xl space-y-4">
     @csrf
-    <x-ui.card title="Informasi PO">
+    <x-ui.card title="Informasi Pesanan Pembelian">
         <div class="grid md:grid-cols-3 gap-4">
-            <x-ui.select name="supplier_id" label="Supplier" required :options="$suppliers->pluck('name','id')->toArray()" />
+            <x-ui.select name="supplier_id" label="Pemasok" required :options="$suppliers->pluck('name','id')->toArray()" />
             <x-ui.input name="purchase_date" type="date" label="Tanggal" required />
-            <x-ui.input name="code" label="Kode PO" placeholder="auto" />
+            <x-ui.input name="code" label="Kode Pesanan Pembelian" placeholder="Otomatis" />
         </div>
     </x-ui.card>
 
-    <x-ui.card title="Item Pembelian" subtitle="Daftar bahan yang dibeli">
+    <x-ui.card title="Item Pembelian" subtitle="Daftar bahan yang dibeli.">
         <table class="table-clean">
-            <thead><tr><th>Bahan</th><th class="text-right">Qty</th><th>Unit</th><th class="text-right">Harga/Unit</th><th class="text-right">Subtotal</th></tr></thead>
+            <thead><tr><th>Bahan</th><th class="text-right">Jumlah</th><th>Satuan</th><th class="text-right">Harga per Unit</th><th class="text-right">Subtotal</th></tr></thead>
             <tbody>
                 @foreach ($materials as $m)
                     <tr>
@@ -44,7 +44,7 @@
 
     <div class="flex justify-end gap-3">
         <a href="{{ route('admin.purchases.index') }}" class="btn-secondary">Batal</a>
-        <button class="btn-primary">Simpan PO</button>
+        <button class="btn-primary">Simpan Pesanan Pembelian</button>
     </div>
 </form>
 @endsection

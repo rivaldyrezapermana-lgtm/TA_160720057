@@ -13,7 +13,7 @@
     </div>
     <div class="p-5">
         <table id="tbl-productions" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Produk</th><th class="text-right">Plan</th><th class="text-right">Aktual</th><th>Ukuran</th><th>Mulai</th><th>Selesai</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Produk</th><th class="text-right">Rencana</th><th class="text-right">Aktual</th><th>Ukuran</th><th>Mulai</th><th>Selesai</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -40,7 +40,7 @@ $(function() {
             { data: 'id', className: 'text-right', render: id => `<a href="/admin/productions/${id}" class="text-ink-600 hover:text-ink-900 text-sm">Detail</a>` },
         ],
         pageLength: 10, order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: '–', paginate: { previous: '‹', next: '›' } }
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', infoEmpty: 'Tidak ada data', emptyTable: 'Tidak ada data', zeroRecords: 'Tidak ada hasil', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

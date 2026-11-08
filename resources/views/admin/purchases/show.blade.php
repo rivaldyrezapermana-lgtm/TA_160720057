@@ -8,10 +8,10 @@
 @section('content')
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
-        <x-ui.card title="Detail PO">
+        <x-ui.card title="Detail Pesanan Pembelian">
             <div class="grid md:grid-cols-2 gap-4 text-sm">
-                <div><p class="text-ink-500">Kode PO</p><p class="font-medium">{{ $purchase->code }}</p></div>
-                <div><p class="text-ink-500">Supplier</p><p class="font-medium">{{ $purchase->supplier?->name ?? '—' }}</p></div>
+                <div><p class="text-ink-500">Kode Pesanan Pembelian</p><p class="font-medium">{{ $purchase->code }}</p></div>
+                <div><p class="text-ink-500">Pemasok</p><p class="font-medium">{{ $purchase->supplier?->name ?? '—' }}</p></div>
                 <div><p class="text-ink-500">Tanggal</p><p class="font-medium">{{ $purchase->purchase_date?->translatedFormat('d M Y') ?? '-' }}</p></div>
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$purchase->status" /></div>
             </div>
@@ -19,7 +19,7 @@
 
         <x-ui.card title="Item Pembelian">
             <table class="table-clean">
-                <thead><tr><th>Bahan</th><th class="text-right">Qty</th><th>Unit</th><th class="text-right">Harga</th><th class="text-right">Subtotal</th></tr></thead>
+                <thead><tr><th>Bahan</th><th class="text-right">Jumlah</th><th>Satuan</th><th class="text-right">Harga per Unit</th><th class="text-right">Subtotal</th></tr></thead>
                 <tbody>
                     @foreach ($purchase->items as $i)
                         <tr>
@@ -45,15 +45,15 @@
                         @csrf @method('PATCH')
                         <button class="btn-primary w-full justify-center">Tandai Diterima</button>
                     </form>
-                    <form action="{{ route('admin.purchases.cancel', $purchase->id) }}" method="POST" onsubmit="return confirm('Batalkan PO ini?')">
+                    <form action="{{ route('admin.purchases.cancel', $purchase->id) }}" method="POST" onsubmit="return confirm('Batalkan pesanan pembelian ini?')">
                         @csrf @method('PATCH')
-                        <button class="btn-secondary w-full justify-center text-red-600">Batalkan PO</button>
+                        <button class="btn-secondary w-full justify-center text-red-600">Batalkan Pesanan Pembelian</button>
                     </form>
                 @endif
                 @if ($purchase->status !== 'received')
-                    <form action="{{ route('admin.purchases.destroy', $purchase->id) }}" method="POST" onsubmit="return confirm('Hapus PO ini?')">
+                    <form action="{{ route('admin.purchases.destroy', $purchase->id) }}" method="POST" onsubmit="return confirm('Hapus pesanan pembelian ini?')">
                         @csrf @method('DELETE')
-                        <button class="btn-secondary w-full justify-center text-red-600">Hapus PO</button>
+                        <button class="btn-secondary w-full justify-center text-red-600">Hapus Pesanan Pembelian</button>
                     </form>
                 @endif
             </div>

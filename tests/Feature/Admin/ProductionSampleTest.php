@@ -340,7 +340,7 @@ class ProductionSampleTest extends TestCase
 
         $this->actingAs($this->admin())
             ->post(route('admin.productions.reuse-sample', $prod))
-            ->assertSessionHas('error', 'Produk ini belum punya sampel. Buat sampel dulu di Tahap Sampel.');
+            ->assertSessionHas('error', 'Produk ini belum memiliki sampel. Buat sampel terlebih dahulu di Tahap Sampel.');
 
         $this->assertSame(3, $prod->stages()->where('phase', 'sample')->count());
         $this->assertNull($prod->fresh()->sample_approved_at);
@@ -366,16 +366,16 @@ class ProductionSampleTest extends TestCase
 
         $this->actingAs($this->admin())->get(route('admin.productions.show', $first))
             ->assertOk()
-            ->assertSee('Produk ini belum punya sampel')
-            ->assertDontSee('Pakai sampel ini');
+            ->assertSee('Produk ini belum memiliki sampel')
+            ->assertDontSee('Gunakan Sampel Ini');
 
         $second = $this->secondBatch($first);
         $first->forceFill(['sample_approved_at' => now()])->save();
 
         $this->actingAs($this->admin())->get(route('admin.productions.show', $second))
             ->assertOk()
-            ->assertSee('Produk ini sudah punya sampel dari batch')
-            ->assertSee('Pakai sampel ini, langsung produksi massal');
+            ->assertSee('Produk ini sudah memiliki sampel dari batch')
+            ->assertSee('Gunakan Sampel Ini, Langsung Produksi Massal');
     }
 
     public function test_check_sample_goes_to_the_sample_phase_when_the_product_has_none(): void
@@ -385,7 +385,7 @@ class ProductionSampleTest extends TestCase
         $this->actingAs($this->admin())
             ->post(route('admin.productions.check-sample', $prod))
             ->assertRedirect(route('admin.productions.show', $prod).'#tahap-sampel')
-            ->assertSessionHas('success', 'Produk ini belum punya sampel. Silakan buat sampel di Tahap Sampel.');
+            ->assertSessionHas('success', 'Produk ini belum memiliki sampel. Silakan buat sampel di Tahap Sampel.');
 
         $this->assertSame(3, $prod->stages()->where('phase', 'sample')->count());
         $this->assertNull($prod->fresh()->sample_approved_at);

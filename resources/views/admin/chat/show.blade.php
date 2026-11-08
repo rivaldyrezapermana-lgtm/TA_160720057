@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Chat — '.($thread->customer->name ?? 'Pembeli'))
+@section('title', 'Chat — '.($thread->customer->name ?? 'Pelanggan'))
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Live Chat', 'url' => route('admin.chat.index')], ['label' => $thread->customer->name ?? 'Pembeli']]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Chat — {{ $thread->customer->name ?? 'Pembeli' }}</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Chat Langsung', 'url' => route('admin.chat.index')], ['label' => $thread->customer->name ?? 'Pelanggan']]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Chat — {{ $thread->customer->name ?? 'Pelanggan' }}</h1>
 @endsection
 
 @section('content')
@@ -15,7 +15,7 @@
         <div class="divide-y divide-ink-100">
             @foreach ($threads as $t)
                 @php
-                    $name = $t->customer->name ?? 'Pembeli';
+                    $name = $t->customer->name ?? 'Pelanggan';
                     $last = $t->messages->first();
                 @endphp
                 <a href="{{ route('admin.chat.show', $t->id) }}" class="block px-5 py-3 hover:bg-ink-50 {{ $t->id == $thread->id ? 'bg-ink-50' : '' }}">
@@ -38,8 +38,8 @@
         <div class="px-5 py-4 border-b border-ink-100 flex items-center gap-3">
             <div class="w-9 h-9 rounded-full bg-ink-900 text-white flex items-center justify-center font-semibold text-sm">{{ strtoupper(substr($thread->customer->name ?? 'P', 0, 1)) }}</div>
             <div>
-                <p class="font-medium">{{ $thread->customer->name ?? 'Pembeli' }}</p>
-                <p class="text-xs text-emerald-600">● Online</p>
+                <p class="font-medium">{{ $thread->customer->name ?? 'Pelanggan' }}</p>
+                <p class="text-xs text-emerald-600">● Daring</p>
             </div>
         </div>
 

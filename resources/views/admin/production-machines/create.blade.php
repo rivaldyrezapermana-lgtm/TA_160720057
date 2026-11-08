@@ -11,7 +11,11 @@
     <x-ui.card>
         <div class="grid md:grid-cols-2 gap-4">
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama Mesin" required /></div>
-            <x-ui.input name="code" label="Kode" required />
+            <div class="field">
+                <label class="label">ID Mesin</label>
+                <input type="text" value="{{ $nextKode }}" class="input bg-ink-50" readonly disabled>
+                <p class="field-help">Dibuat otomatis.</p>
+            </div>
             <x-ui.select name="status" label="Status" required :options="['active' => 'Aktif', 'maintenance' => 'Perawatan', 'inactive' => 'Nonaktif']" selected="active" />
             <x-ui.select name="machine_category_id" label="Kategori" :options="$categories" />
             <x-ui.input name="capacity" type="number" label="Kapasitas (pcs/hari)" />

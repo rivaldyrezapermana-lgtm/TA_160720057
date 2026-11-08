@@ -68,7 +68,7 @@ class MaterialController extends Controller
     {
         if ($material->purchaseItems()->exists() || $material->productMaterials()->exists()) {
             return redirect()->route('admin.materials.index')
-                ->with('error', 'Bahan baku tidak bisa dihapus karena sudah dipakai pada pembelian atau resep produk.');
+                ->with('error', 'Bahan baku tidak dapat dihapus karena sudah digunakan pada pembelian atau resep produk.');
         }
 
         $material->delete();

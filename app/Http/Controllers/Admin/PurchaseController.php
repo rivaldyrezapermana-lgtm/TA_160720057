@@ -54,7 +54,7 @@ class PurchaseController extends Controller
             ->filter(fn ($row) => ! empty($row['selected']) && (int) ($row['qty'] ?? 0) > 0);
 
         if ($items->isEmpty()) {
-            return back()->withInput()->with('error', 'Pilih minimal satu bahan dengan qty.');
+            return back()->withInput()->with('error', 'Pilih minimal satu bahan beserta jumlahnya.');
         }
 
         $purchase = DB::transaction(function () use ($data, $items) {
@@ -98,7 +98,7 @@ class PurchaseController extends Controller
         });
 
         return redirect()->route('admin.purchases.show', $purchase->id)
-            ->with('success', 'PO berhasil dibuat.');
+            ->with('success', 'Pesanan Pembelian berhasil dibuat.');
     }
 
     public function show(Purchase $purchase)
@@ -122,18 +122,18 @@ class PurchaseController extends Controller
         $purchase->status = $data['status'];
         $purchase->save();
 
-        return back()->with('success', 'PO diperbarui.');
+        return back()->with('success', 'Pesanan Pembelian diperbarui.');
     }
 
     public function destroy(Purchase $purchase)
     {
         if ($purchase->status === 'received') {
-            return back()->with('error', 'PO yang sudah diterima tidak bisa dihapus.');
+            return back()->with('error', 'Pesanan Pembelian yang sudah diterima tidak dapat dihapus.');
         }
 
         $purchase->delete();
 
-        return redirect()->route('admin.purchases.index')->with('success', 'PO dihapus.');
+        return redirect()->route('admin.purchases.index')->with('success', 'Pesanan Pembelian dihapus.');
     }
 
     /**
@@ -142,11 +142,11 @@ class PurchaseController extends Controller
     public function receive(Purchase $purchase)
     {
         if ($purchase->status === 'received') {
-            return back()->with('error', 'PO sudah diterima sebelumnya.');
+            return back()->with('error', 'Pesanan Pembelian sudah diterima sebelumnya.');
         }
 
         if ($purchase->status === 'cancelled') {
-            return back()->with('error', 'PO sudah dibatalkan.');
+            return back()->with('error', 'Pesanan Pembelian sudah dibatalkan.');
         }
 
         DB::transaction(function () use ($purchase) {
@@ -158,18 +158,18 @@ class PurchaseController extends Controller
             $purchase->save();
         });
 
-        return back()->with('success', 'PO ditandai diterima, stok bahan diperbarui.');
+        return back()->with('success', 'Pesanan Pembelian ditandai diterima dan stok bahan diperbarui.');
     }
 
     public function cancel(Purchase $purchase)
     {
         if ($purchase->status === 'received') {
-            return back()->with('error', 'PO yang sudah diterima tidak bisa dibatalkan.');
+            return back()->with('error', 'Pesanan Pembelian yang sudah diterima tidak dapat dibatalkan.');
         }
 
         $purchase->status = 'cancelled';
         $purchase->save();
 
-        return back()->with('success', 'PO dibatalkan.');
+        return back()->with('success', 'Pesanan Pembelian dibatalkan.');
     }
 }

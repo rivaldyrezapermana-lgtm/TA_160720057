@@ -1,34 +1,33 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-// Auth
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\Auth\RegisterController;
-
-// Admin
-use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\Admin\ProductController;
+// Auth
+use App\Http\Controllers\Admin\ChatController as AdminChatController;
+use App\Http\Controllers\Admin\DashboardController;
+// Admin
+use App\Http\Controllers\Admin\MachineCategoryController;
 use App\Http\Controllers\Admin\MaterialController;
-use App\Http\Controllers\Admin\SupplierController;
-use App\Http\Controllers\Admin\PurchaseController;
+use App\Http\Controllers\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProductionController;
 use App\Http\Controllers\Admin\ProductionDesignSketchController;
 use App\Http\Controllers\Admin\ProductionMachineController;
+use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\RecommendationController;
-use App\Http\Controllers\Admin\OrderController as AdminOrderController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\ChatController as AdminChatController;
 use App\Http\Controllers\Admin\ReportController;
-
+use App\Http\Controllers\Admin\SizeController;
+use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
 // Customer
-use App\Http\Controllers\Customer\ShopController;
 use App\Http\Controllers\Customer\CartController;
+use App\Http\Controllers\Customer\ChatController as CustomerChatController;
 use App\Http\Controllers\Customer\CheckoutController;
 use App\Http\Controllers\Customer\OrderController as CustomerOrderController;
-use App\Http\Controllers\Customer\ChatController as CustomerChatController;
 use App\Http\Controllers\Customer\ProfileController;
+use App\Http\Controllers\Customer\ShopController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,7 +55,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
-    Route::get('/profile',   [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
@@ -102,70 +101,73 @@ Route::middleware(['auth', 'role:admin,karyawan'])
     ->name('admin.')
     ->group(function () {
 
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Master Data
-    Route::resource('categories', CategoryController::class);
-    Route::resource('products', ProductController::class);
-    Route::resource('materials', MaterialController::class);
-    Route::resource('suppliers', SupplierController::class);
-    Route::resource('users', UserController::class);
-    Route::resource('production-machines', ProductionMachineController::class);
-    Route::resource('machine-categories', \App\Http\Controllers\Admin\MachineCategoryController::class);
+        // Master Data
+        Route::resource('categories', CategoryController::class);
+        Route::resource('products', ProductController::class);
+        Route::resource('materials', MaterialController::class);
+        Route::resource('suppliers', SupplierController::class);
+        Route::resource('users', UserController::class);
+        Route::resource('production-machines', ProductionMachineController::class);
+        Route::resource('machine-categories', MachineCategoryController::class);
+        Route::resource('sizes', SizeController::class)->except('show');
 
-    // DataTables AJAX endpoints
-    Route::prefix('datatables')->name('datatables.')->group(function () {
-        Route::get('products', [ProductController::class, 'data'])->name('products');
-        Route::get('materials', [MaterialController::class, 'data'])->name('materials');
-        Route::get('orders', [AdminOrderController::class, 'data'])->name('orders');
-        Route::get('productions', [ProductionController::class, 'data'])->name('productions');
-        Route::get('purchases', [PurchaseController::class, 'data'])->name('purchases');
-        Route::get('production-machines', [ProductionMachineController::class, 'data'])->name('production-machines');
-        Route::get('machine-categories', [\App\Http\Controllers\Admin\MachineCategoryController::class, 'data'])->name('machine-categories');
+        // DataTables AJAX endpoints
+        Route::prefix('datatables')->name('datatables.')->group(function () {
+            Route::get('sizes', [SizeController::class, 'data'])->name('sizes');
+            Route::get('products', [ProductController::class, 'data'])->name('products');
+            Route::get('materials', [MaterialController::class, 'data'])->name('materials');
+            Route::get('orders', [AdminOrderController::class, 'data'])->name('orders');
+            Route::get('productions', [ProductionController::class, 'data'])->name('productions');
+            Route::get('purchases', [PurchaseController::class, 'data'])->name('purchases');
+            Route::get('production-machines', [ProductionMachineController::class, 'data'])->name('production-machines');
+            Route::get('machine-categories', [MachineCategoryController::class, 'data'])->name('machine-categories');
+        });
+
+        // Operations
+        Route::resource('purchases', PurchaseController::class);
+        Route::patch('purchases/{purchase}/receive', [PurchaseController::class, 'receive'])->name('purchases.receive');
+        Route::patch('purchases/{purchase}/cancel', [PurchaseController::class, 'cancel'])->name('purchases.cancel');
+        Route::get('productions/sample-status', [ProductionController::class, 'sampleStatus'])->name('productions.sample-status');
+        Route::resource('productions', ProductionController::class);
+        Route::patch('productions/{production}/stage/{stage}', [ProductionController::class, 'updateStage'])->name('productions.stage');
+        Route::post('productions/{production}/pause', [ProductionController::class, 'pause'])->name('productions.pause');
+        Route::post('productions/{production}/reuse-sample', [ProductionController::class, 'reuseSample'])->name('productions.reuse-sample');
+        Route::post('productions/{production}/check-sample', [ProductionController::class, 'checkSample'])->name('productions.check-sample');
+        Route::post('productions/{production}/sketches', [ProductionDesignSketchController::class, 'store'])->name('productions.sketches.store');
+        Route::delete('productions/{production}/sketches/{sketch}', [ProductionDesignSketchController::class, 'destroy'])->name('productions.sketches.destroy');
+
+        // Fuzzy Mamdani recommendation
+        Route::prefix('recommendations')->name('recommendations.')->group(function () {
+            Route::get('/', [RecommendationController::class, 'index'])->name('index');
+            Route::get('/create', [RecommendationController::class, 'create'])->name('create');
+            Route::post('/calculate', [RecommendationController::class, 'calculate'])->name('calculate');
+            Route::get('/{product}/history', [RecommendationController::class, 'history'])->name('history');
+        });
+
+        // Sales
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [AdminOrderController::class, 'index'])->name('index');
+            Route::get('/{order}', [AdminOrderController::class, 'show'])->name('show');
+            Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('status');
+            Route::patch('/{order}/verify-payment', [AdminOrderController::class, 'verifyPayment'])->name('verify');
+            Route::patch('/{order}/reject-payment', [AdminOrderController::class, 'rejectPayment'])->name('reject');
+        });
+
+        // Chat
+        Route::prefix('chat')->name('chat.')->group(function () {
+            Route::get('/', [AdminChatController::class, 'index'])->name('index');
+            Route::get('/{thread}', [AdminChatController::class, 'show'])->name('show');
+            Route::post('/{thread}/send', [AdminChatController::class, 'send'])->name('send');
+            Route::get('/{thread}/poll', [AdminChatController::class, 'poll'])->name('poll');
+        });
+
+        // Reports
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/production', [ReportController::class, 'production'])->name('production');
+            Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
+            Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
+            Route::get('/{type}/export', [ReportController::class, 'export'])->name('export');
+        });
     });
-
-    // Operations
-    Route::resource('purchases', PurchaseController::class);
-    Route::patch('purchases/{purchase}/receive', [PurchaseController::class, 'receive'])->name('purchases.receive');
-    Route::patch('purchases/{purchase}/cancel', [PurchaseController::class, 'cancel'])->name('purchases.cancel');
-    Route::get('productions/sample-status', [ProductionController::class, 'sampleStatus'])->name('productions.sample-status');
-    Route::resource('productions', ProductionController::class);
-    Route::patch('productions/{production}/stage/{stage}', [ProductionController::class, 'updateStage'])->name('productions.stage');
-    Route::post('productions/{production}/reuse-sample', [ProductionController::class, 'reuseSample'])->name('productions.reuse-sample');
-    Route::post('productions/{production}/check-sample', [ProductionController::class, 'checkSample'])->name('productions.check-sample');
-    Route::post('productions/{production}/sketches', [ProductionDesignSketchController::class, 'store'])->name('productions.sketches.store');
-    Route::delete('productions/{production}/sketches/{sketch}', [ProductionDesignSketchController::class, 'destroy'])->name('productions.sketches.destroy');
-
-    // Fuzzy Mamdani recommendation
-    Route::prefix('recommendations')->name('recommendations.')->group(function () {
-        Route::get('/', [RecommendationController::class, 'index'])->name('index');
-        Route::get('/create', [RecommendationController::class, 'create'])->name('create');
-        Route::post('/calculate', [RecommendationController::class, 'calculate'])->name('calculate');
-        Route::get('/{product}/history', [RecommendationController::class, 'history'])->name('history');
-    });
-
-    // Sales
-    Route::prefix('orders')->name('orders.')->group(function () {
-        Route::get('/', [AdminOrderController::class, 'index'])->name('index');
-        Route::get('/{order}', [AdminOrderController::class, 'show'])->name('show');
-        Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('status');
-        Route::patch('/{order}/verify-payment', [AdminOrderController::class, 'verifyPayment'])->name('verify');
-        Route::patch('/{order}/reject-payment', [AdminOrderController::class, 'rejectPayment'])->name('reject');
-    });
-
-    // Chat
-    Route::prefix('chat')->name('chat.')->group(function () {
-        Route::get('/', [AdminChatController::class, 'index'])->name('index');
-        Route::get('/{thread}', [AdminChatController::class, 'show'])->name('show');
-        Route::post('/{thread}/send', [AdminChatController::class, 'send'])->name('send');
-        Route::get('/{thread}/poll', [AdminChatController::class, 'poll'])->name('poll');
-    });
-
-    // Reports
-    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/production', [ReportController::class, 'production'])->name('production');
-        Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
-        Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
-        Route::get('/{type}/export', [ReportController::class, 'export'])->name('export');
-    });
-});

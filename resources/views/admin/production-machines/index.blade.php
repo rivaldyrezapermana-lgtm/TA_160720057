@@ -13,7 +13,7 @@
     </div>
     <div class="p-5">
         <table id="tbl-machines" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Nama</th><th class="text-right">Kapasitas</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>ID Mesin</th><th>Nama</th><th class="text-right">Kapasitas</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -25,7 +25,7 @@ $(function() {
     $('#tbl-machines').DataTable({
         ajax: '{{ route("admin.datatables.production-machines") }}',
         columns: [
-            { data: 'code' },
+            { data: 'kode_mesin' },
             { data: 'name' },
             { data: 'capacity', className: 'text-right tabular-nums' },
             { data: 'status', render: d => {
@@ -33,10 +33,10 @@ $(function() {
                 const [cls, label] = map[d] || ['badge-gray', d];
                 return `<span class="${cls}">${label}</span>`;
             } },
-            { data: 'id', className: 'text-right', render: id => `<a href="/admin/production-machines/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Edit</a>` },
+            { data: 'id', className: 'text-right', render: id => `<a href="/admin/production-machines/${id}/edit" class="text-ink-600 hover:text-ink-900 text-sm">Ubah</a>` },
         ],
-        pageLength: 10, order: [],
-        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: '–', paginate: { previous: '‹', next: '›' } }
+        pageLength: 10, order: [[0, 'asc']],
+        language: { search: 'Cari:', lengthMenu: 'Tampilkan _MENU_', info: 'Menampilkan _START_-_END_ dari _TOTAL_', zeroRecords: 'Tidak ada hasil', emptyTable: 'Tidak ada data', infoEmpty: 'Tidak ada data', infoFiltered: '(disaring dari _MAX_ data)', loadingRecords: 'Memuat...', paginate: { previous: '‹', next: '›' } }
     });
 });
 </script>

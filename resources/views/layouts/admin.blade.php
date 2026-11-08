@@ -86,7 +86,7 @@
 
             @if ($errors->any())
                 <div class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
-                    <p class="font-medium mb-1">Periksa kembali:</p>
+                    <p class="font-medium mb-1">Periksa kembali isian berikut:</p>
                     <ul class="list-disc list-inside">
                         @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
                     </ul>

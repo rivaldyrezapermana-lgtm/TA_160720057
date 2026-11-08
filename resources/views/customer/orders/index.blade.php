@@ -7,7 +7,7 @@
 
     @if ($orders->isEmpty())
         <div class="border border-dashed border-ink-200 rounded-xl p-16 text-center">
-            <p class="font-display text-xl text-ink-700">Belum ada pesanan</p>
+            <p class="font-display text-xl text-ink-700">Belum Ada Pesanan</p>
             <a href="{{ route('shop.index') }}" class="btn-primary mt-4 inline-flex">Belanja Sekarang</a>
         </div>
     @else

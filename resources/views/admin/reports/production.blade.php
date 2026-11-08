@@ -7,19 +7,23 @@
 
 @section('content')
 <div class="flex justify-between items-end mb-4">
-    <form method="GET" class="flex gap-3 items-end">
-        <div><label class="label">Dari</label><input type="date" name="from" class="input"></div>
-        <div><label class="label">Sampai</label><input type="date" name="to" class="input"></div>
-        <button class="btn-secondary">Filter</button>
+    <form method="GET" class="space-y-3">
+        <div class="flex gap-3 items-end">
+            <div><label class="label">Dari</label><input type="date" name="from" class="input"></div>
+            <div><label class="label">Sampai</label><input type="date" name="to" class="input"></div>
+        </div>
+        <div class="flex justify-end">
+            <button class="btn-secondary">Filter</button>
+        </div>
     </form>
     <div class="flex gap-2">
-        <a href="{{ route('admin.reports.export', 'production') }}" class="btn-secondary">Export CSV</a>
+        <a href="{{ route('admin.reports.export', 'production') }}" class="btn-secondary">Ekspor CSV</a>
     </div>
 </div>
 
 <x-ui.card>
     <table class="table-clean">
-        <thead><tr><th>Kode</th><th>Produk</th><th>Periode</th><th class="text-right">Plan</th><th class="text-right">Aktual</th><th>Per Ukuran <span class="font-normal normal-case">(aktual/plan)</span></th><th class="text-right">Pencapaian</th></tr></thead>
+        <thead><tr><th>Kode</th><th>Produk</th><th>Periode</th><th class="text-right">Rencana</th><th class="text-right">Aktual</th><th>Per Ukuran <span class="font-normal normal-case">(aktual/rencana)</span></th><th class="text-right">Pencapaian</th></tr></thead>
         <tbody>
             @foreach ($rows as $r)
                 <tr>

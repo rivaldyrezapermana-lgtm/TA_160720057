@@ -18,9 +18,9 @@ class RegisterController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name'     => ['required', 'string', 'max:120'],
-            'email'    => ['required', 'email', 'unique:users,email'],
-            'phone'    => ['nullable', 'string', 'max:30'],
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:30'],
             'password' => ['required', 'confirmed', Password::min(6)],
         ]);
 
@@ -31,6 +31,6 @@ class RegisterController extends Controller
 
         Auth::login($user);
 
-        return redirect()->route('home')->with('success', 'Pendaftaran berhasil!');
+        return redirect()->route('home')->with('success', 'Pendaftaran berhasil.');
     }
 }

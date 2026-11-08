@@ -28,7 +28,7 @@ class UserController extends Controller
         User::create($data);
 
         return redirect()->route('admin.users.index')
-            ->with('success', 'User berhasil ditambahkan.');
+            ->with('success', 'Pengguna berhasil ditambahkan.');
     }
 
     public function show(User $user)
@@ -53,25 +53,25 @@ class UserController extends Controller
         $user->update($data);
 
         return redirect()->route('admin.users.index')
-            ->with('success', 'User berhasil diperbarui.');
+            ->with('success', 'Pengguna berhasil diperbarui.');
     }
 
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {
             return redirect()->route('admin.users.index')
-                ->with('error', 'Anda tidak bisa menghapus akun Anda sendiri.');
+                ->with('error', 'Anda tidak dapat menghapus akun Anda sendiri.');
         }
 
         if ($user->orders()->exists() || $user->productions()->exists()) {
             return redirect()->route('admin.users.index')
-                ->with('error', 'User tidak bisa dihapus karena memiliki riwayat pesanan atau produksi.');
+                ->with('error', 'Pengguna tidak dapat dihapus karena memiliki riwayat pesanan atau produksi.');
         }
 
         $user->delete();
 
         return redirect()->route('admin.users.index')
-            ->with('success', 'User berhasil dihapus.');
+            ->with('success', 'Pengguna berhasil dihapus.');
     }
 
     /** Validation rules shared by store and update. */

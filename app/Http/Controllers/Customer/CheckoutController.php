@@ -106,7 +106,7 @@ class CheckoutController extends Controller
 
         if ($order->payment?->status === 'verified') {
             return redirect()->route('customer.orders.show', $order->id)
-                ->with('error', 'Pembayaran sudah diverifikasi, tidak bisa diubah.');
+                ->with('error', 'Pembayaran sudah diverifikasi sehingga tidak dapat diubah.');
         }
 
         $request->validate([
@@ -129,6 +129,6 @@ class CheckoutController extends Controller
         ])->save();
 
         return redirect()->route('customer.orders.show', $order->id)
-            ->with('success', 'Bukti pembayaran terupload. Menunggu verifikasi admin.');
+            ->with('success', 'Bukti pembayaran berhasil diunggah. Menunggu verifikasi admin.');
     }
 }
