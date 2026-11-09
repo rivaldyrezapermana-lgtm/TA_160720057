@@ -112,7 +112,10 @@
                             $pct = ($hasQty && $stage->phase === 'mass')
                                 ? $production->stageProgressPct($stage)
                                 : ($stage->status === 'completed' ? 100 : 0);
-                            $machines = $machinesByStage[$stage->stage] ?? [];
+                            // Mesin yang sudah terpasang tetap tampil walaupun sedang tidak aktif,
+                            // supaya tidak terlepas saat form disimpan.
+                            $machines = ($machinesByStage[$stage->stage] ?? [])
+                                + $stage->machines->mapWithKeys(fn ($m) => [$m->id => $m->display_name])->all();
                             $received = $production->stageReceived($stage);
                             $isSampleQc = $stage->phase === 'sample' && $stage->stage === 'qc_packing';
                             // Menutup QC massal pada batch multi-ukuran butuh rincian hasil per ukuran.
@@ -197,14 +200,25 @@
                                         </div>
                                     @endif
                                     @if ($stage->usesMachine())
-                                        <div class="field !mb-0 col-span-2">
-                                            <label class="label text-xs">Mesin</label>
-                                            <select name="production_machine_id" class="input" {{ $locked ? 'disabled' : '' }}>
-                                                <option value="">— Pilih —</option>
-                                                @foreach ($machines as $mid => $mname)
-                                                    <option value="{{ $mid }}" @selected($stage->production_machine_id == $mid)>{{ $mname }}</option>
-                                                @endforeach
-                                            </select>
+                                        @php
+                                            $selectedMachines = $isOldStage
+                                                ? array_map('intval', array_filter((array) old('production_machine_ids', [])))
+                                                : $stage->machines->pluck('id')->all();
+                                        @endphp
+                                        <div class="field !mb-0 col-span-2 self-start">
+                                            <label class="label text-xs">Mesin <span class="text-ink-400 font-normal">(dapat memilih lebih dari satu)</span></label>
+                                            <input type="hidden" name="production_machine_ids[]" value="">
+                                            @forelse ($machines as $mid => $mname)
+                                                <label class="flex items-center gap-2 text-sm text-ink-800 py-0.5 cursor-pointer">
+                                                    <input type="checkbox" name="production_machine_ids[]" value="{{ $mid }}" @checked(in_array($mid, $selectedMachines, true)) class="rounded" {{ $locked ? 'disabled' : '' }}>
+                                                    <span>{{ $mname }}</span>
+                                                </label>
+                                            @empty
+                                                <p class="text-sm text-ink-500">Belum ada mesin untuk tahap ini.</p>
+                                            @endforelse
+                                            @if ($isOldStage)
+                                                @error('production_machine_ids.*')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
+                                            @endif
                                         </div>
                                     @endif
                                     @if ($sizedStage)

@@ -185,7 +185,7 @@ class ProductionDesignSketchTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('admin.productions.show', $prod))
             ->assertOk()
-            ->assertDontSee('name="production_machine_id"', false);
+            ->assertDontSee('name="production_machine_ids[]"', false);
     }
 
     public function test_machine_sent_for_the_design_stage_is_ignored(): void
@@ -200,13 +200,13 @@ class ProductionDesignSketchTest extends TestCase
 
         $this->actingAs($this->admin())
             ->patch(route('admin.productions.stage', [$prod, $design]), [
-                'action' => 'start', 'production_machine_id' => $machine->id,
+                'action' => 'start', 'production_machine_ids' => [$machine->id],
             ])
             ->assertSessionHas('success');
 
         $design->refresh();
         $this->assertSame('in_progress', $design->status);
-        $this->assertNull($design->production_machine_id);
+        $this->assertSame(0, $design->machines()->count());
     }
 
     public function test_batch_page_shows_the_uploaded_sketches(): void

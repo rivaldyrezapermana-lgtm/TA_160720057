@@ -8,7 +8,7 @@ class ProductionStage extends Model
 {
     protected $fillable = [
         'production_id', 'phase', 'sort_order', 'stage', 'status',
-        'input_qty', 'output_qty', 'production_machine_id', 'started_at', 'finished_at', 'notes',
+        'input_qty', 'output_qty', 'started_at', 'finished_at', 'notes',
     ];
 
     protected $casts = [
@@ -34,9 +34,12 @@ class ProductionStage extends Model
         return $this->belongsTo(Production::class);
     }
 
-    public function machine()
+    /** Mesin yang dipakai tahap ini; satu tahap dapat memakai beberapa mesin. */
+    public function machines()
     {
-        return $this->belongsTo(ProductionMachine::class, 'production_machine_id');
+        return $this->belongsToMany(ProductionMachine::class, 'production_stage_machine')
+            ->withTimestamps()
+            ->orderBy('kode_mesin');
     }
 
     /** Rincian per ukuran (hanya tahap massal pada batch berukuran). */

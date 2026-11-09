@@ -99,6 +99,8 @@ return [
         'contact_person' => 'narahubung',
 
         'production_machine_id' => 'mesin',
+        'production_machine_ids' => 'mesin',
+        'production_machine_ids.*' => 'mesin',
         'machine_category_id' => 'kategori mesin',
         'capacity' => 'kapasitas',
         'stage' => 'tahap',

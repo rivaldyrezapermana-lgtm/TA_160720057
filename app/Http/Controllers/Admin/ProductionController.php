@@ -322,7 +322,7 @@ class ProductionController extends Controller
             'product.materials.material',
             'machine',
             'stages' => fn ($q) => $q->orderBy('sort_order'),
-            'stages.machine',
+            'stages.machines',
             'stages.sizeRows',
             'productionMaterials.material',
             'sampleRevisions.user',
@@ -590,7 +590,6 @@ class ProductionController extends Controller
             $data = $request->validate([
                 'size_qty' => ['nullable', 'array'],
                 'size_qty.*' => ['nullable', 'integer', 'min:0'],
-                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ]);
 
             foreach ($stage->sizeRows as $row) {
@@ -611,7 +610,6 @@ class ProductionController extends Controller
 
             $data = $request->validate([
                 'qty' => ['nullable', 'integer', 'min:0', 'max:'.$remaining],
-                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ], [
                 'qty.max' => 'Maksimal '.$remaining.' pcs (sisa tahap ini).',
             ]);
@@ -619,26 +617,33 @@ class ProductionController extends Controller
             $data = $request->validate([
                 'input_qty' => ['nullable', 'integer', 'in:1'],
                 'output_qty' => ['nullable', 'integer', 'in:1'],
-                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
             ], [
                 'input_qty.in' => 'Tahap sampel selalu 1 pcs.',
                 'output_qty.in' => 'Tahap sampel selalu 1 pcs.',
             ]);
         } else {
-            $data = $request->validate([
-                'production_machine_id' => ['nullable', 'exists:production_machines,id'],
-            ]);
+            $data = [];
         }
 
-        // Tahap tanpa mesin (Desain) mengabaikan pilihan mesin yang terkirim.
-        if (! $stage->usesMachine()) {
-            $data['production_machine_id'] = null;
-        }
+        $request->validate([
+            'production_machine_ids' => ['nullable', 'array'],
+            'production_machine_ids.*' => ['nullable', 'integer', 'exists:production_machines,id'],
+        ]);
 
-        // Machine must belong to the category mapped to this stage.
-        if (! empty($data['production_machine_id'])) {
-            $machine = ProductionMachine::with('category')->find($data['production_machine_id']);
-            if (! $machine || $machine->category?->stage !== $stage->stage) {
+        // Null berarti pilihan mesin tidak terkirim, jadi mesin tahap dibiarkan.
+        // Form selalu mengirim satu nilai kosong, jadi daftar kosong berarti tanpa mesin.
+        // Tahap tanpa mesin (Desain) mengabaikan pilihan yang terkirim.
+        $machineIds = null;
+        if ($stage->usesMachine() && $request->has('production_machine_ids')) {
+            $machineIds = collect($request->input('production_machine_ids', []))
+                ->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
+
+            // Mesin baru harus sesuai kategori tahap. Mesin yang sudah terpasang
+            // tetap boleh, walaupun kategorinya berubah setelah dipilih.
+            $added = array_diff($machineIds, $stage->machines()->pluck('production_machines.id')->all());
+            $mismatch = ProductionMachine::with('category')->whereKey($added)->get()
+                ->contains(fn (ProductionMachine $m) => $m->category?->stage !== $stage->stage);
+            if ($mismatch) {
                 return back()->with('error', 'Mesin yang dipilih tidak sesuai dengan tahap ini.');
             }
         }
@@ -661,7 +666,7 @@ class ProductionController extends Controller
             }
         }
 
-        DB::transaction(function () use ($production, $stage, $action, $data, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput) {
+        DB::transaction(function () use ($production, $stage, $action, $data, $machineIds, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput) {
             if ($sizedStage) {
                 foreach ($sizeQty as $size => $qty) {
                     $this->addSizeOutput($production, $stage, $size, $qty);
@@ -683,9 +688,9 @@ class ProductionController extends Controller
                 $this->addStageOutput($production, $stage, (int) ($data['qty'] ?? 0));
             }
 
-            $stage->production_machine_id = $stage->usesMachine()
-                ? ($data['production_machine_id'] ?? $stage->production_machine_id)
-                : null;
+            if ($machineIds !== null) {
+                $stage->machines()->sync($machineIds);
+            }
 
             if ($action === 'start' && $stage->status === 'pending') {
                 $stage->status = 'in_progress';
