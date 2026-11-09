@@ -22,7 +22,8 @@ class MaterialController extends Controller
             'code' => $material->code,
             'name' => $material->name,
             'unit' => $material->unit,
-            'stock' => $material->stock,
+            'stock' => $material->stock_label,
+            'stock_value' => (float) $material->stock,
             'min_stock' => $material->min_stock,
             'unit_cost' => number_format((float) $material->unit_cost, 0, ',', '.'),
             'status' => $material->isLowStock() ? 'low' : 'ok',
@@ -56,9 +57,10 @@ class MaterialController extends Controller
 
     public function update(Request $request, Material $material)
     {
-        $data = $request->validate($this->rules($material));
-        unset($data['stock']); // stock only moves via purchases/production
-        $material->update($data);
+        // Stok hanya bergerak lewat pembelian dan produksi, jadi form ubah tidak mengirimnya.
+        $rules = $this->rules($material);
+        unset($rules['stock']);
+        $material->update($request->validate($rules));
 
         return redirect()->route('admin.materials.index')
             ->with('success', 'Bahan baku berhasil diperbarui.');
@@ -84,7 +86,7 @@ class MaterialController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:255', Rule::unique('materials', 'code')->ignore($material)],
             'unit' => ['required', 'string', 'max:20'],
-            'stock' => ['required', 'integer', 'min:0'],
+            'stock' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
             'min_stock' => ['required', 'integer', 'min:0'],
             'unit_cost' => ['required', 'numeric', 'min:0'],
         ];

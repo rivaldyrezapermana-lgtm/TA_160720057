@@ -53,9 +53,9 @@ class StockLockTest extends TestCase
             ->put(route('admin.products.update', $product), [
                 'name' => 'Gamis A', 'sku' => 'GA-1', 'category_id' => $cat->id,
                 'price' => 50000, 'is_active' => 1,
-                'materials' => [$kain->id => ['use' => 1, 'qty_required' => 3]], // HPP = 75000 > 50000
+                'materials' => [['material_id' => $kain->id, 'qty' => ['M' => 3]]], // HPP = 75000 > 50000
             ])
-            ->assertSessionHas('warning');
+            ->assertSessionHas('warning', 'Harga jual (Rp 50.000) di bawah HPP ukuran M (Rp 75.000). Periksa kembali margin.');
 
         $this->assertEquals(75000, (int) $product->fresh()->hpp);
     }
@@ -74,5 +74,21 @@ class StockLockTest extends TestCase
         $fresh = $material->fresh();
         $this->assertEquals(30, $fresh->stock);      // unchanged
         $this->assertEquals(8, $fresh->min_stock);   // other fields still update
+    }
+
+    public function test_material_edit_form_saves_without_a_stock_field(): void
+    {
+        $material = Material::create(['name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'stock' => 12.5, 'min_stock' => 5, 'unit_cost' => 25000]);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.materials.update', $material), [
+                'name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'min_stock' => 5, 'unit_cost' => 30000,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $fresh = $material->fresh();
+        $this->assertEquals(12.5, (float) $fresh->stock);
+        $this->assertEquals(30000, (float) $fresh->unit_cost);
     }
 }

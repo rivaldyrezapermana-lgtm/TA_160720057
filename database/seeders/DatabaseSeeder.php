@@ -98,11 +98,15 @@ class DatabaseSeeder extends Seeder
         ];
         foreach ($boms as $productId => $lines) {
             foreach ($lines as $materialId => $qty) {
-                ProductMaterial::create([
-                    'product_id' => $productId,
-                    'material_id' => $materialId,
-                    'qty_required' => $qty,
-                ]);
+                // Kain (bahan 1 dan 2) menyesuaikan ukuran: S lebih sedikit, XL lebih banyak.
+                foreach ($sizeNames->values() as $j => $size) {
+                    ProductMaterial::create([
+                        'product_id' => $productId,
+                        'material_id' => $materialId,
+                        'size' => $size,
+                        'qty_required' => in_array($materialId, [1, 2], true) ? $qty + ($j - 1) * 0.25 : $qty,
+                    ]);
+                }
             }
         }
 

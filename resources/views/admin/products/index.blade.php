@@ -6,6 +6,12 @@
 @endsection
 
 @section('content')
+@if (session('warning'))
+    <div class="mb-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
+        {{ session('warning') }}
+    </div>
+@endif
+
 <div class="bg-white border border-ink-100 rounded-xl overflow-hidden">
     <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-ink-100">
         <p class="text-sm text-ink-500">Daftar seluruh produk yang tersedia di toko.</p>
@@ -19,6 +25,7 @@
                     <th>Nama</th>
                     <th>Kategori</th>
                     <th class="text-right">Harga</th>
+                    <th class="text-right">HPP</th>
                     <th class="text-right">Stok</th>
                     <th>Ukuran</th>
                     <th>Status</th>
@@ -40,6 +47,7 @@ $(function () {
             { data: 'name' },
             { data: 'category' },
             { data: 'price', className: 'text-right tabular-nums', render: d => 'Rp ' + d },
+            { data: 'hpp', orderable: false, className: 'text-right tabular-nums whitespace-nowrap' },
             { data: 'stock', className: 'text-right tabular-nums' },
             { data: 'sizes', orderable: false, render: (sizes, type) => {
                 if (! sizes.length) return type === 'display' ? '<span class="text-ink-400">—</span>' : '';

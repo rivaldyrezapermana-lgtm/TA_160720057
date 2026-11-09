@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProductMaterial extends Model
 {
-    protected $fillable = ['product_id', 'material_id', 'qty_required'];
+    /** `size` kosong berarti baris ini berlaku untuk ukuran yang tidak punya resep sendiri. */
+    protected $fillable = ['product_id', 'material_id', 'size', 'qty_required'];
+
+    protected $casts = ['qty_required' => 'decimal:2'];
 
     public function product()
     {

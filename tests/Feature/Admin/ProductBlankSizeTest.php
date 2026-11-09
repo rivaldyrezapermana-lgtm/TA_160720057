@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Category;
+use App\Models\Material;
 use App\Models\Product;
 use App\Models\ProductSize;
 use App\Models\User;
@@ -35,23 +36,44 @@ class ProductBlankSizeTest extends TestCase
     public function test_blank_rows_do_not_create_variants_on_store(): void
     {
         $this->actingAs($this->admin())->post(route('admin.products.store'), $this->payload([
-            'S' => ['size' => 'S', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => ''],
-            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => '5'],
-            'L' => ['size' => 'L', 'chest_cm' => '96', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => ''],
-            'XL' => ['size' => 'XL', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => '0'],
+            'S' => ['size' => 'S', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+            'L' => ['size' => 'L', 'chest_cm' => '96', 'length_cm' => '', 'sleeve_cm' => ''],
         ]))->assertRedirect(route('admin.products.index'));
 
         $sizes = Product::firstOrFail()->sizes()->pluck('size')->sort()->values()->all();
 
-        $this->assertSame(['L', 'M', 'XL'], $sizes);
+        $this->assertSame(['L'], $sizes);
+    }
+
+    public function test_a_posted_stock_value_does_not_make_a_row_used(): void
+    {
+        $this->actingAs($this->admin())->post(route('admin.products.store'), $this->payload([
+            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => '5'],
+        ]))->assertRedirect(route('admin.products.index'));
+
+        $this->assertSame(0, Product::firstOrFail()->sizes()->count());
+    }
+
+    public function test_a_size_used_only_by_the_recipe_gets_a_variant_at_stock_zero(): void
+    {
+        $kain = Material::create(['name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'stock' => 0, 'min_stock' => 0, 'unit_cost' => 1000]);
+
+        $this->actingAs($this->admin())->post(route('admin.products.store'), $this->payload([
+            'S' => ['size' => 'S', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+        ]) + ['materials' => [['material_id' => $kain->id, 'qty' => ['S' => '', 'M' => '1.5']]]])
+            ->assertRedirect(route('admin.products.index'));
+
+        $product = Product::firstOrFail();
+        $this->assertSame(['M' => 0], $product->sizes()->pluck('stock', 'size')->all());
     }
 
     public function test_existing_variant_is_kept_when_its_row_is_blank_on_update(): void
     {
         $admin = $this->admin();
         $payload = $this->payload([
-            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => ''],
-            'L' => ['size' => 'L', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => ''],
+            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+            'L' => ['size' => 'L', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
         ]);
         $product = Product::create([
             'category_id' => $payload['category_id'],
@@ -62,6 +84,6 @@ class ProductBlankSizeTest extends TestCase
         $this->actingAs($admin)->put(route('admin.products.update', $product), $payload)
             ->assertRedirect(route('admin.products.index'));
 
-        $this->assertSame(['M'], $product->sizes()->pluck('size')->all());
+        $this->assertSame(['M' => 3], $product->sizes()->pluck('stock', 'size')->all());
     }
 }

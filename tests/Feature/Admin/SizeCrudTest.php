@@ -230,7 +230,7 @@ class SizeCrudTest extends TestCase
         $this->actingAs($this->admin())
             ->post(route('admin.products.store'), [
                 'name' => 'Gamis Baru', 'category_id' => $category->id, 'price' => 1000,
-                'sizes' => ['Jumbo' => ['size' => 'Jumbo', 'stock' => 1]],
+                'sizes' => ['Jumbo' => ['size' => 'Jumbo']],
             ])
             ->assertSessionHasErrors('sizes.Jumbo.size');
 
@@ -244,11 +244,11 @@ class SizeCrudTest extends TestCase
         $this->actingAs($this->admin())
             ->put(route('admin.products.update', $product), [
                 'name' => $product->name, 'category_id' => $product->category_id, 'price' => 1000,
-                'sizes' => ['Jumbo' => ['size' => 'Jumbo', 'stock' => 7]],
+                'sizes' => ['Jumbo' => ['size' => 'Jumbo', 'chest_cm' => 120]],
             ])
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('product_sizes', ['product_id' => $product->id, 'size' => 'Jumbo', 'stock' => 7]);
+        $this->assertDatabaseHas('product_sizes', ['product_id' => $product->id, 'size' => 'Jumbo', 'chest_cm' => 120, 'stock' => 1]);
     }
 
     public function test_shop_size_filter_follows_master_order_with_unknown_sizes_last(): void

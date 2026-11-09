@@ -140,7 +140,7 @@ class ReportController extends Controller
         $materials = Material::orderBy('name')->get()->map(fn (Material $m) => [
             'type' => 'Bahan Baku',
             'name' => $m->name,
-            'stock' => $m->stock,
+            'stock' => $m->stock_label,
             'min' => $m->min_stock,
             'unit' => $m->unit,
             'status' => $m->isLowStock() ? 'low' : 'ok',

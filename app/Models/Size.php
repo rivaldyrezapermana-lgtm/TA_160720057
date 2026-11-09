@@ -26,6 +26,7 @@ class Size extends Model
     {
         return DB::table('product_sizes')->where('size', $this->getOriginal('name'))->exists()
             || DB::table('production_sizes')->where('size', $this->getOriginal('name'))->exists()
-            || DB::table('order_items')->where('size', $this->getOriginal('name'))->exists();
+            || DB::table('order_items')->where('size', $this->getOriginal('name'))->exists()
+            || DB::table('product_materials')->where('size', $this->getOriginal('name'))->exists();
     }
 }

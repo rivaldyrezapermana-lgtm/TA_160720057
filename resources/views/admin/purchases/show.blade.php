@@ -6,6 +6,10 @@
 @endsection
 
 @section('content')
+@php
+    // Harga diketik manual: rupiah bulat tanpa sen, selain itu tampilkan dua desimal.
+    $rupiah = fn ($value) => 'Rp '.number_format((float) $value, fmod((float) $value, 1) == 0 ? 0 : 2, ',', '.');
+@endphp
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
         <x-ui.card title="Detail Pesanan Pembelian">
@@ -26,13 +30,13 @@
                             <td class="font-medium">{{ $i->material?->name ?? '—' }}</td>
                             <td class="text-right tabular-nums">{{ $i->qty }}</td>
                             <td class="text-ink-500">{{ $i->material?->unit ?? '-' }}</td>
-                            <td class="text-right tabular-nums">Rp {{ number_format((float) $i->unit_cost, 0, ',', '.') }}</td>
-                            <td class="text-right tabular-nums font-medium">Rp {{ number_format((float) $i->subtotal, 0, ',', '.') }}</td>
+                            <td class="text-right tabular-nums">{{ $rupiah($i->unit_cost) }}</td>
+                            <td class="text-right tabular-nums font-medium">{{ $rupiah($i->subtotal) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
                 <tfoot class="border-t-2 border-ink-200">
-                    <tr><td colspan="4" class="px-4 py-3 text-right font-semibold">Total</td><td class="px-4 py-3 text-right font-display text-lg font-semibold">Rp {{ number_format((float) $purchase->total, 0, ',', '.') }}</td></tr>
+                    <tr><td colspan="4" class="px-4 py-3 text-right font-semibold">Total</td><td class="px-4 py-3 text-right font-display text-lg font-semibold">{{ $rupiah($purchase->total) }}</td></tr>
                 </tfoot>
             </table>
         </x-ui.card>

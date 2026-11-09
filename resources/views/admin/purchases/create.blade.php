@@ -6,7 +6,14 @@
 @endsection
 
 @section('content')
-<form action="{{ route('admin.purchases.store') }}" method="POST" class="max-w-4xl space-y-4">
+@php
+    // Baris dari old() memakai indeks aslinya agar pesan galat per kolom tetap menempel.
+    $oldItems = old('items');
+    $rows = is_array($oldItems) ? array_filter($oldItems, 'is_array') : [];
+    $rows = $rows ?: [0 => []];
+    $nextIndex = max(array_map('intval', array_keys($rows))) + 1;
+@endphp
+<form action="{{ route('admin.purchases.store') }}" method="POST" class="max-w-5xl space-y-4">
     @csrf
     <x-ui.card title="Informasi Pesanan Pembelian">
         <div class="grid md:grid-cols-3 gap-4">
@@ -16,26 +23,37 @@
         </div>
     </x-ui.card>
 
-    <x-ui.card title="Item Pembelian" subtitle="Daftar bahan yang dibeli.">
-        <table class="table-clean">
-            <thead><tr><th>Bahan</th><th class="text-right">Jumlah</th><th>Satuan</th><th class="text-right">Harga per Unit</th><th class="text-right">Subtotal</th></tr></thead>
-            <tbody>
-                @foreach ($materials as $m)
+    <x-ui.card title="Item Pembelian" subtitle="Daftar bahan yang dibeli. Harga per unit diisi sesuai harga dari pemasok.">
+        <div class="overflow-x-auto">
+            <table class="table-clean">
+                <thead>
                     <tr>
-                        <td>
-                            <label class="flex items-center gap-2">
-                                <input type="checkbox" name="items[{{ $m->id }}][selected]" value="1" class="rounded">
-                                <span>{{ $m->name }}</span>
-                            </label>
-                        </td>
-                        <td><input type="number" name="items[{{ $m->id }}][qty]" class="input text-right" placeholder="0"></td>
-                        <td class="text-ink-500">{{ $m->unit }}</td>
-                        <td class="text-right tabular-nums">Rp {{ number_format($m->unit_cost, 0, ',', '.') }}</td>
-                        <td class="text-right tabular-nums text-ink-500">—</td>
+                        <th class="w-[32%]">Bahan</th>
+                        <th class="w-[14%] !text-right">Jumlah</th>
+                        <th>Satuan</th>
+                        <th class="w-[20%] !text-right">Harga per Unit</th>
+                        <th class="!text-right">Subtotal</th>
+                        <th><span class="sr-only">Aksi</span></th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody id="purchase-items" data-next-index="{{ $nextIndex }}">
+                    @foreach ($rows as $index => $row)
+                        @include('admin.purchases._item-row', ['index' => $index, 'row' => $row])
+                    @endforeach
+                </tbody>
+                <tfoot class="border-t-2 border-ink-200">
+                    <tr>
+                        <td colspan="4" class="px-4 py-3 text-right font-semibold">Total</td>
+                        <td class="px-4 py-3 text-right font-display text-lg font-semibold tabular-nums whitespace-nowrap" id="purchase-total">Rp 0</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        @error('items')<p class="field-error">{{ $message }}</p>@enderror
+        <div class="mt-3">
+            <button type="button" id="purchase-add-item" class="btn btn-secondary">+ Tambah Bahan</button>
+        </div>
     </x-ui.card>
 
     <x-ui.card>
@@ -43,8 +61,72 @@
     </x-ui.card>
 
     <div class="flex justify-end gap-3">
-        <a href="{{ route('admin.purchases.index') }}" class="btn-secondary">Batal</a>
-        <button class="btn-primary">Simpan Pesanan Pembelian</button>
+        <a href="{{ route('admin.purchases.index') }}" class="btn btn-secondary">Batal</a>
+        <button class="btn btn-primary">Simpan Pesanan Pembelian</button>
     </div>
 </form>
+
+<template id="purchase-item-template">
+    @include('admin.purchases._item-row', ['index' => '__INDEX__', 'row' => []])
+</template>
 @endsection
+
+@push('scripts')
+<script>
+    $(function () {
+        const $body = $('#purchase-items');
+        let nextIndex = Number($body.data('next-index'));
+
+        function rupiah(value) {
+            const rounded = Math.round(value * 100) / 100;
+            const digits = Number.isInteger(rounded) ? 0 : 2;
+
+            return 'Rp ' + rounded.toLocaleString('id-ID', { minimumFractionDigits: digits, maximumFractionDigits: 2 });
+        }
+
+        function refresh() {
+            let total = 0;
+
+            $body.find('[data-item-row]').each(function () {
+                const $row = $(this);
+                const unit = $row.find('[data-item-material] option:selected').data('unit');
+                const subtotal = (Number($row.find('[data-item-qty]').val()) || 0)
+                    * (Number($row.find('[data-item-cost]').val()) || 0);
+
+                $row.find('[data-item-unit]').text(unit || '—');
+                $row.find('[data-item-subtotal]').text(rupiah(subtotal));
+                total += subtotal;
+            });
+
+            $('#purchase-total').text(rupiah(total));
+        }
+
+        $('#purchase-add-item').on('click', function () {
+            const html = $('#purchase-item-template').html().replaceAll('__INDEX__', nextIndex++);
+            const $row = $($.parseHTML(html.trim())).filter('[data-item-row]');
+
+            $body.append($row);
+            $row.find('[data-item-material]').trigger('focus');
+            refresh();
+        });
+
+        $body.on('click', '[data-item-remove]', function () {
+            const $row = $(this).closest('[data-item-row]');
+
+            // Baris terakhir dikosongkan saja agar formulir selalu punya satu baris.
+            if ($body.find('[data-item-row]').length > 1) {
+                $row.remove();
+            } else {
+                $row.find('select, input').val('');
+                $row.find('.field-error').remove();
+            }
+
+            refresh();
+        });
+
+        $body.on('input change', 'select, input', refresh);
+
+        refresh();
+    });
+</script>
+@endpush

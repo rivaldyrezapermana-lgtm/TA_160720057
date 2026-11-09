@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Size;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -28,6 +29,7 @@ class ProductController extends Controller
             'name' => $product->name,
             'category' => $product->category?->name ?? '—',
             'price' => number_format((float) $product->price, 0, ',', '.'),
+            'hpp' => $this->hppRange($product),
             'stock' => $product->stock,
             'sizes' => $product->sizes->sortBy('id')->map(fn ($s) => ['size' => $s->size, 'stock' => $s->stock])->values(),
             'status' => $product->is_active ? 'active' : 'inactive',
@@ -42,7 +44,9 @@ class ProductController extends Controller
         $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
         $sizes = Size::ordered()->pluck('name');
 
-        return view('admin.products.create', compact('categories', 'materials', 'sizes'));
+        $bomRows = [];
+
+        return view('admin.products.create', compact('categories', 'materials', 'sizes', 'bomRows'));
     }
 
     public function store(Request $request)
@@ -55,16 +59,14 @@ class ProductController extends Controller
             'sku' => Product::nextSku(),
             'description' => $data['description'] ?? null,
             'price' => $data['price'],
-            'stock' => (int) ($data['stock'] ?? 0),
+            'stock' => 0, // stok hanya bertambah dari hasil produksi
             'is_active' => $request->boolean('is_active'),
             'image' => $request->hasFile('image')
                 ? $request->file('image')->store('products', 'public')
                 : null,
         ]);
 
-        $this->syncSizes($product, $request->input('sizes', []));
-        $this->syncMaterials($product, $request->input('materials', []));
-        $this->refreshHpp($product);
+        $this->syncRecipe($product, $data);
 
         return redirect()->route('admin.products.index')
             ->with('success', 'Produk berhasil ditambahkan.')
@@ -75,7 +77,25 @@ class ProductController extends Controller
     {
         $product->load('category', 'sizes', 'materials.material');
 
-        return view('admin.products.show', compact('product'));
+        // Produk lama tanpa varian tetap memakai resep tanpa ukuran.
+        $lines = $product->materials;
+        $hppRows = $product->hppBySize();
+        $isGeneric = $hppRows === [] && $lines->isNotEmpty();
+        if ($isGeneric) {
+            $hppRows = ['Semua Ukuran' => $product->computeHpp()];
+        }
+
+        // Jumlah per ukuran mengikuti resep yang dipakai HPP, jadi kedua tabel selalu cocok.
+        $recipes = collect($hppRows)->map(
+            fn ($hpp, $size) => $product->recipeForSize($isGeneric ? null : (string) $size, $lines)->keyBy('material_id')
+        );
+        $recipeRows = $lines->unique('material_id')->map(fn ($line) => [
+            'name' => $line->material?->name ?? '—',
+            'unit' => $line->material?->unit ?? '-',
+            'qty' => $recipes->map(fn ($recipe) => $recipe->get($line->material_id)?->qty_required),
+        ]);
+
+        return view('admin.products.show', compact('product', 'hppRows', 'recipeRows'));
     }
 
     public function edit(Product $product)
@@ -85,7 +105,9 @@ class ProductController extends Controller
         $materials = Material::orderBy('name')->get(['id', 'name', 'unit', 'unit_cost']);
         $sizes = $this->sizesForEdit($product);
 
-        return view('admin.products.edit', compact('product', 'categories', 'materials', 'sizes'));
+        $bomRows = $this->bomFormRows($product, $sizes);
+
+        return view('admin.products.edit', compact('product', 'categories', 'materials', 'sizes', 'bomRows'));
     }
 
     public function update(Request $request, Product $product)
@@ -108,9 +130,7 @@ class ProductController extends Controller
         }
 
         $product->save();
-        $this->syncSizes($product, $request->input('sizes', []));
-        $this->syncMaterials($product, $request->input('materials', []));
-        $this->refreshHpp($product);
+        $this->syncRecipe($product, $data);
 
         return redirect()->route('admin.products.index')
             ->with('success', 'Produk berhasil diperbarui.')
@@ -137,13 +157,16 @@ class ProductController extends Controller
     }
 
     /**
-     * Master sizes in order, then any size only this product has. A row spelled
-     * differently from the master (xl vs XL) keeps its own spelling so the form
-     * edits that row instead of adding a second one.
+     * Master sizes in order, then any size only this product has, on a variant
+     * or on a recipe line. A row spelled differently from the master (xl vs XL)
+     * keeps its own spelling so the form edits that row instead of adding a
+     * second one.
      */
     private function sizesForEdit(Product $product): Collection
     {
-        $own = $product->sizes->pluck('size')->keyBy(fn (string $size) => mb_strtolower($size));
+        $own = $product->materials->whereNotNull('size')->pluck('size')
+            ->merge($product->sizes->pluck('size'))
+            ->keyBy(fn (string $size) => mb_strtolower($size));
 
         return Size::ordered()->pluck('name')
             ->map(fn (string $name) => $own->get(mb_strtolower($name), $name))
@@ -152,90 +175,178 @@ class ProductController extends Controller
             ->values();
     }
 
+    /**
+     * Recipe rows for the edit form, one per material. A line without a size
+     * fills every size column so saving the form does not drop it.
+     *
+     * @return array<int, array{material_id: int, qty: array<string, float>}>
+     */
+    private function bomFormRows(Product $product, Collection $sizes): array
+    {
+        $columns = $sizes->keyBy(fn (string $size) => mb_strtolower($size));
+
+        return $product->materials->groupBy('material_id')
+            ->map(function ($lines, $materialId) use ($sizes, $columns) {
+                $qty = [];
+                foreach ($lines->whereNull('size') as $line) {
+                    $qty = $sizes->mapWithKeys(fn (string $size) => [$size => (float) $line->qty_required])->all();
+                }
+                foreach ($lines->whereNotNull('size') as $line) {
+                    $qty[$columns[mb_strtolower($line->size)]] = (float) $line->qty_required;
+                }
+
+                return ['material_id' => $materialId, 'qty' => $qty];
+            })
+            ->values()
+            ->all();
+    }
+
     /** Validation rules shared by store and update. */
     private function rules(?Product $product = null): array
     {
-        $allowedSizes = Size::pluck('name')->merge($product?->sizes()->pluck('size') ?? [])->all();
+        $allowedSizes = Size::pluck('name')
+            ->merge($product?->sizes()->pluck('size') ?? [])
+            ->merge($product?->materials()->whereNotNull('size')->pluck('size') ?? [])
+            ->all();
 
         return [
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['required', Rule::exists('categories', 'id')],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
-            'stock' => ['nullable', 'integer', 'min:0'],
             'image' => ['nullable', 'image', 'max:2048'],
             'sizes' => ['nullable', 'array'],
             'sizes.*.size' => ['required', 'string', 'max:10', Rule::in($allowedSizes)],
             'sizes.*.chest_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.length_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.sleeve_cm' => ['nullable', 'integer', 'min:0'],
-            'sizes.*.stock' => ['nullable', 'integer', 'min:0'],
-            'materials' => ['nullable', 'array'],
-            'materials.*.use' => ['nullable'],
-            'materials.*.qty_required' => ['nullable', 'integer', 'min:1'],
+            'materials' => ['nullable', 'array', function ($attribute, $value, $fail) use ($allowedSizes) {
+                $lines = $this->recipeLines(is_array($value) ? $value : []);
+
+                if ($lines->pluck('material_id')->duplicates()->isNotEmpty()) {
+                    $fail('Bahan baku yang sama tidak boleh dipilih lebih dari satu kali.');
+                }
+
+                $unknown = $lines->flatMap(fn (array $line) => array_keys($line['qty']))
+                    ->map(fn ($size) => (string) $size)
+                    ->unique()
+                    ->diff($allowedSizes);
+                if ($unknown->isNotEmpty()) {
+                    $fail('Ukuran '.$unknown->implode(', ').' tidak terdaftar pada master ukuran.');
+                }
+            }],
+            'materials.*' => ['array'],
+            'materials.*.material_id' => ['nullable', 'integer', Rule::exists('materials', 'id')],
+            'materials.*.qty' => ['nullable', 'array'],
+            'materials.*.qty.*' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
         ];
     }
 
     private function messages(): array
     {
-        return ['sizes.*.size.in' => 'Ukuran :input tidak terdaftar pada master ukuran.'];
+        return [
+            'sizes.*.size.in' => 'Ukuran :input tidak terdaftar pada master ukuran.',
+            'materials.*.material_id.exists' => 'Bahan baku yang dipilih tidak terdaftar.',
+            'materials.*.qty.*.numeric' => 'Jumlah bahan harus berupa angka.',
+            'materials.*.qty.*.min' => 'Jumlah bahan tidak boleh kurang dari 0.',
+            'materials.*.qty.*.max' => 'Jumlah bahan terlalu besar.',
+        ];
     }
 
-    /** Create or update each size variant submitted with the product. */
-    private function syncSizes(Product $product, array $sizes): void
+    /**
+     * The submitted recipe rows that count: a material with at least one
+     * positive quantity. Quantities round to the two decimals the column keeps.
+     *
+     * @return Collection<int, array{material_id: int, qty: array<string, float>}>
+     */
+    private function recipeLines(array $rows): Collection
     {
+        return collect($rows)
+            ->filter(fn ($row) => is_array($row) && is_numeric($row['material_id'] ?? null))
+            ->map(fn (array $row) => [
+                'material_id' => (int) $row['material_id'],
+                'qty' => collect(is_array($row['qty'] ?? null) ? $row['qty'] : [])
+                    ->filter(fn ($qty) => is_numeric($qty))
+                    ->map(fn ($qty) => round((float) $qty, 2))
+                    ->filter(fn (float $qty) => $qty > 0)
+                    ->all(),
+            ])
+            ->filter(fn (array $line) => $line['qty'] !== [])
+            ->values();
+    }
+
+    /** Save the size variants and recipe together, then refresh the HPP snapshot. */
+    private function syncRecipe(Product $product, array $data): void
+    {
+        $lines = $this->recipeLines($data['materials'] ?? []);
+
+        DB::transaction(function () use ($product, $data, $lines) {
+            $this->syncSizes($product, $data['sizes'] ?? [], $lines);
+            $this->syncMaterials($product, $lines);
+            $this->refreshHpp($product);
+        });
+    }
+
+    /**
+     * Create or update each size variant submitted with the product. Stock only
+     * moves through production and sales: an update never touches it and a new
+     * variant starts at 0.
+     */
+    private function syncSizes(Product $product, array $sizes, Collection $lines): void
+    {
+        $recipeSizes = $lines->flatMap(fn (array $line) => array_keys($line['qty']))
+            ->map(fn ($size) => (string) $size)
+            ->unique();
+
         foreach ($sizes as $size) {
             if (empty($size['size'])) {
                 continue;
             }
 
-            // Baris kosong berarti produk tidak memakai ukuran ini. Varian baru
-            // tetap bisa muncul saat ukuran tersebut dipilih pada batch produksi.
-            $isBlank = collect(['chest_cm', 'length_cm', 'sleeve_cm', 'stock'])
-                ->every(fn (string $field) => $this->intOrNull($size[$field] ?? null) === null);
-            if ($isBlank && ! $product->sizes()->where('size', $size['size'])->exists()) {
+            $measurements = [
+                'chest_cm' => $this->intOrNull($size['chest_cm'] ?? null),
+                'length_cm' => $this->intOrNull($size['length_cm'] ?? null),
+                'sleeve_cm' => $this->intOrNull($size['sleeve_cm'] ?? null),
+            ];
+
+            $variant = $product->sizes()->where('size', $size['size'])->first();
+            if ($variant) {
+                $variant->update($measurements);
+
                 continue;
             }
 
-            $product->sizes()->updateOrCreate(
-                ['size' => $size['size']],
-                [
-                    'chest_cm' => $this->intOrNull($size['chest_cm'] ?? null),
-                    'length_cm' => $this->intOrNull($size['length_cm'] ?? null),
-                    'sleeve_cm' => $this->intOrNull($size['sleeve_cm'] ?? null),
-                    'stock' => $this->intOrNull($size['stock'] ?? null) ?? 0,
-                ],
-            );
+            // Baris kosong berarti produk tidak memakai ukuran ini. Varian baru
+            // tetap bisa muncul saat ukuran tersebut dipilih pada batch produksi.
+            $hasMeasurement = array_filter($measurements, fn (?int $value) => $value !== null) !== [];
+            if ($hasMeasurement) {
+                $product->sizes()->create(['size' => $size['size'], 'stock' => 0] + $measurements);
+            }
+        }
+
+        foreach ($recipeSizes as $size) {
+            $product->sizes()->firstOrCreate(['size' => $size], ['stock' => 0]);
         }
     }
 
     /**
-     * Replace the product's bill of materials with the submitted rows.
-     * Each checked material with a positive qty becomes one BOM line.
+     * Replace the product's bill of materials with the submitted rows: one line
+     * per material per size. Anything else goes, including old lines without a size.
      */
-    private function syncMaterials(Product $product, array $materials): void
+    private function syncMaterials(Product $product, Collection $lines): void
     {
         $keep = [];
 
-        foreach ($materials as $materialId => $row) {
-            if (empty($row['use'])) {
-                continue;
+        foreach ($lines as $line) {
+            foreach ($line['qty'] as $size => $qty) {
+                $keep[] = $product->materials()->updateOrCreate(
+                    ['material_id' => $line['material_id'], 'size' => (string) $size],
+                    ['qty_required' => $qty],
+                )->id;
             }
-
-            $qty = $this->intOrNull($row['qty_required'] ?? null);
-            if ($qty === null || $qty <= 0) {
-                continue;
-            }
-
-            $product->materials()->updateOrCreate(
-                ['material_id' => $materialId],
-                ['qty_required' => $qty],
-            );
-
-            $keep[] = $materialId;
         }
 
-        $product->materials()->whereNotIn('material_id', $keep ?: [0])->delete();
+        $product->materials()->whereNotIn('id', $keep)->delete();
     }
 
     /** Cast a form value to an integer, treating blank input as null. */
@@ -250,14 +361,33 @@ class ProductController extends Controller
         $product->forceFill(['hpp' => $product->computeHpp()])->save();
     }
 
-    /** Build a flash payload warning when the selling price is below HPP. */
-    private function hppWarning(Product $product): array
+    /** HPP range across sizes for the product list, e.g. "Rp 81.000 – Rp 101.000". */
+    private function hppRange(Product $product): string
     {
-        if ((float) $product->hpp > 0 && (float) $product->price < (float) $product->hpp) {
-            return ['warning' => 'Harga jual (Rp '.number_format((float) $product->price, 0, ',', '.').
-                ') di bawah HPP (Rp '.number_format((float) $product->hpp, 0, ',', '.').'). Periksa kembali margin.'];
+        $costs = array_filter($product->hppBySize(), fn (float $hpp) => $hpp > 0);
+        if ($costs === []) {
+            return '—';
         }
 
-        return [];
+        $low = 'Rp '.number_format(min($costs), 0, ',', '.');
+        $high = 'Rp '.number_format(max($costs), 0, ',', '.');
+
+        return $low === $high ? $low : $low.' – '.$high;
+    }
+
+    /** Build a flash payload naming every size whose HPP is above the selling price. */
+    private function hppWarning(Product $product): array
+    {
+        $price = (float) $product->price;
+        $under = collect($product->hppBySize())
+            ->filter(fn (float $hpp) => $hpp > 0 && $price < $hpp)
+            ->map(fn (float $hpp, $size) => $size.' (Rp '.number_format($hpp, 0, ',', '.').')');
+
+        if ($under->isEmpty()) {
+            return [];
+        }
+
+        return ['warning' => 'Harga jual (Rp '.number_format($price, 0, ',', '.').
+            ') di bawah HPP ukuran '.$under->implode(', ').'. Periksa kembali margin.'];
     }
 }

@@ -99,16 +99,15 @@ class MasterDataTest extends TestCase
                 'name' => 'Gamis Navy',
                 'category_id' => $category->id,
                 'price' => 225000,
-                'stock' => 10,
                 'is_active' => '1',
                 'sizes' => [
-                    'M' => ['size' => 'M', 'chest_cm' => 96, 'length_cm' => 137, 'sleeve_cm' => 57, 'stock' => 5],
+                    'M' => ['size' => 'M', 'chest_cm' => 96, 'length_cm' => 137, 'sleeve_cm' => 57],
                 ],
             ])
             ->assertRedirectToRoute('admin.products.index');
 
         $this->assertDatabaseHas('products', ['name' => 'Gamis Navy', 'sku' => 'SKU-0001', 'is_active' => true]);
-        $this->assertDatabaseHas('product_sizes', ['size' => 'M', 'stock' => 5]);
+        $this->assertDatabaseHas('product_sizes', ['size' => 'M', 'chest_cm' => 96, 'stock' => 0]);
     }
 
     public function test_product_datatable_returns_json_rows(): void
@@ -122,7 +121,7 @@ class MasterDataTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson(route('admin.datatables.products'))
             ->assertOk()
-            ->assertJsonStructure(['data' => [['id', 'sku', 'name', 'category', 'price', 'stock', 'sizes', 'status']]]);
+            ->assertJsonStructure(['data' => [['id', 'sku', 'name', 'category', 'price', 'hpp', 'stock', 'sizes', 'status']]]);
     }
 
     public function test_product_with_sales_history_cannot_be_deleted(): void
@@ -188,6 +187,39 @@ class MasterDataTest extends TestCase
             ->getJson(route('admin.datatables.materials'))
             ->assertOk()
             ->assertJsonFragment(['code' => 'MAT-LOW', 'status' => 'low']);
+    }
+
+    public function test_material_stock_is_shown_without_trailing_zeros(): void
+    {
+        $material = Material::create([
+            'name' => 'Kain', 'code' => 'MAT-DEC', 'unit' => 'm',
+            'stock' => 12.5, 'min_stock' => 20, 'unit_cost' => 1,
+        ]);
+        Material::create([
+            'name' => 'Benang', 'code' => 'MAT-INT', 'unit' => 'rol',
+            'stock' => 12, 'min_stock' => 20, 'unit_cost' => 1,
+        ]);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->getJson(route('admin.datatables.materials'))
+            ->assertJsonFragment(['code' => 'MAT-DEC', 'stock' => '12,5', 'stock_value' => 12.5])
+            ->assertJsonFragment(['code' => 'MAT-INT', 'stock' => '12', 'stock_value' => 12]);
+
+        $this->actingAs($admin)->get(route('admin.materials.edit', $material))
+            ->assertSee('value="12,5"', false);
+
+        $this->actingAs($admin)->get(route('admin.dashboard'))
+            ->assertSee('12,5 m')
+            ->assertSee('12 rol')
+            ->assertDontSee('12.00');
+
+        $this->actingAs($admin)->get(route('admin.reports.inventory'))
+            ->assertSee('12,5')
+            ->assertDontSee('12.50');
+
+        $csv = $this->actingAs($admin)->get(route('admin.reports.export', 'inventory'))->streamedContent();
+        $this->assertStringContainsString('"12,5"', $csv);
+        $this->assertStringNotContainsString('12.50', $csv);
     }
 
     // ---- Suppliers ----------------------------------------------------

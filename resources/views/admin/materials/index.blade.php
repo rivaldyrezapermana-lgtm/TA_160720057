@@ -28,7 +28,7 @@ $(function() {
             { data: 'code' },
             { data: 'name' },
             { data: 'unit' },
-            { data: 'stock', className: 'text-right tabular-nums' },
+            { data: 'stock', className: 'text-right tabular-nums', render: (d, type, row) => type === 'sort' || type === 'type' ? row.stock_value : d },
             { data: 'min_stock', className: 'text-right tabular-nums text-ink-500' },
             { data: 'unit_cost', className: 'text-right tabular-nums', render: d => 'Rp ' + d },
             { data: 'status', render: d => d === 'low'

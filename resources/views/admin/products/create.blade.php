@@ -17,7 +17,6 @@
             </div>
             <x-ui.select name="category_id" label="Kategori" required :options="$categories->pluck('name','id')->toArray()" />
             <x-ui.input name="price" type="number" label="Harga (Rp)" required />
-            <x-ui.input name="stock" type="number" label="Stok Awal" />
             <div class="md:col-span-2"><x-ui.textarea name="description" label="Deskripsi" rows="4" /></div>
             <div class="md:col-span-2">
                 <label class="label">Foto Produk</label>
@@ -32,58 +31,26 @@
         </div>
     </x-ui.card>
 
-    <x-ui.card title="Ukuran" subtitle="Tambahkan varian ukuran beserta stok masing-masing.">
+    <x-ui.card title="Ukuran" subtitle="Isi ukuran yang dipakai produk ini. Stok bertambah otomatis dari hasil produksi.">
         <div id="sizes-wrapper" class="space-y-2">
             <div class="grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">
-                <div class="col-span-2">Ukuran</div>
-                <div class="col-span-2">Lingkar Dada</div>
-                <div class="col-span-2">Panjang</div>
-                <div class="col-span-2">Lengan</div>
-                <div class="col-span-3">Stok</div>
-                <div class="col-span-1"></div>
+                <div class="col-span-3">Ukuran</div>
+                <div class="col-span-3">Lingkar Dada</div>
+                <div class="col-span-3">Panjang</div>
+                <div class="col-span-3">Lengan</div>
             </div>
             @foreach ($sizes as $sz)
                 <div class="grid grid-cols-12 gap-2">
-                    <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input col-span-2" readonly>
-                    <input type="number" name="sizes[{{ $sz }}][chest_cm]" placeholder="cm" class="input col-span-2">
-                    <input type="number" name="sizes[{{ $sz }}][length_cm]" placeholder="cm" class="input col-span-2">
-                    <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" placeholder="cm" class="input col-span-2">
-                    <input type="number" name="sizes[{{ $sz }}][stock]" placeholder="0" class="input col-span-3">
-                    <div class="col-span-1"></div>
+                    <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input col-span-3" readonly>
+                    <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm') }}" placeholder="cm" class="input col-span-3">
+                    <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm') }}" placeholder="cm" class="input col-span-3">
+                    <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm') }}" placeholder="cm" class="input col-span-3">
                 </div>
             @endforeach
         </div>
     </x-ui.card>
 
-    <x-ui.card title="Bahan Baku (Resep)" subtitle="Centang bahan yang dibutuhkan untuk membuat 1 unit produk ini.">
-        <table class="table-clean">
-            <thead><tr><th>Bahan</th><th class="text-right">Jumlah per Unit</th><th>Satuan</th></tr></thead>
-            <tbody>
-                @foreach ($materials as $m)
-                    <tr>
-                        <td>
-                            <label class="flex items-center gap-2">
-                                <input type="checkbox" name="materials[{{ $m->id }}][use]" value="1" @checked(old('materials.'.$m->id.'.use')) class="rounded js-bom-use">
-                                <span>{{ $m->name }}</span>
-                            </label>
-                        </td>
-                        <td><input type="number" min="1" name="materials[{{ $m->id }}][qty_required]" value="{{ old('materials.'.$m->id.'.qty_required') }}" class="input text-right js-bom-qty" data-unit-cost="{{ (float) $m->unit_cost }}" placeholder="0"></td>
-                        <td class="text-ink-500">{{ $m->unit }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </x-ui.card>
-
-    <x-ui.card title="HPP (Harga Pokok)" subtitle="Dihitung otomatis dari resep bahan baku.">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-ink-500">Total biaya bahan per unit</p>
-            <p class="font-display text-2xl font-semibold tabular-nums">Rp <span id="hpp-total">0</span></p>
-        </div>
-        <p id="hpp-warning" class="hidden mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            ⚠ Harga jual di bawah HPP. Periksa kembali margin.
-        </p>
-    </x-ui.card>
+    @include('admin.products._recipe')
 
     <div class="flex justify-end gap-3">
         <a href="{{ route('admin.products.index') }}" class="btn-secondary">Batal</a>
@@ -91,26 +58,4 @@
     </div>
 </form>
 
-@push('scripts')
-<script>
-$(function () {
-    function fmt(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
-    function recalc() {
-        let hpp = 0;
-        $('.js-bom-qty').each(function () {
-            const $row = $(this).closest('tr');
-            const used = $row.find('.js-bom-use').is(':checked');
-            const qty = parseFloat($(this).val()) || 0;
-            const cost = parseFloat($(this).data('unit-cost')) || 0;
-            if (used && qty > 0) hpp += qty * cost;
-        });
-        $('#hpp-total').text(fmt(hpp));
-        const price = parseFloat($('#price').val()) || 0;
-        $('#hpp-warning').toggleClass('hidden', !(hpp > 0 && price < hpp));
-    }
-    $(document).on('input change', '.js-bom-qty, .js-bom-use, #price', recalc);
-    recalc();
-});
-</script>
-@endpush
 @endsection

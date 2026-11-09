@@ -329,6 +329,7 @@ class ProductionController extends Controller
             'sizes',
             'designSketches',
             'logs.user',
+            'logs.stage',
         ]);
 
         // Machines available per stage: those whose category maps to the stage.
@@ -342,15 +343,17 @@ class ProductionController extends Controller
                 ->toArray();
         }
 
-        // Estimated material usage: recipe × (target + sampel yang dibuat).
-        $units = (int) $production->planned_qty + $production->sampleUnits();
+        // Perkiraan pemakaian bahan: resep tiap ukuran × target ukuran itu, plus sampel.
+        $plannedUnits = $production->sizes->isNotEmpty()
+            ? $production->sizes->pluck('planned_qty', 'size')->map(fn ($qty) => (int) $qty)->all()
+            : ['' => (int) $production->planned_qty];
+        $materialNames = $production->product->materials->pluck('material', 'material_id');
 
-        $bahan = $production->product->materials->map(fn ($line) => [
-            'name' => $line->material?->name ?? '—',
-            'unit' => $line->material?->unit ?? '',
-            'per_unit' => (int) $line->qty_required,
-            'est' => (int) $line->qty_required * $units,
-        ]);
+        $bahan = collect($production->materialUsage($plannedUnits))->map(fn (float $qty, int $materialId) => [
+            'name' => $materialNames[$materialId]?->name ?? '—',
+            'unit' => $materialNames[$materialId]?->unit ?? '',
+            'est' => $qty,
+        ])->values();
 
         // Untuk tombol Cek Sampel: sampel produk ini dari batch lain, kalau ada.
         $production->load('sampleSource.designSketches');
@@ -556,7 +559,7 @@ class ProductionController extends Controller
      * Update a stage's quantities and machine. Tahap fase massal tunduk pada gate
      * 50%; tahap lain menunggu tahap sebelumnya selesai. Menyelesaikan QC & Packing
      * fase massal menutup batch: stok produk bertambah dan bahan resep dipotong,
-     * tepat satu kali.
+     * tepat satu kali. Setiap pcs yang tercatat di tahap massal masuk ke log harian.
      */
     public function updateStage(Request $request, Production $production, ProductionStage $stage)
     {
@@ -667,6 +670,8 @@ class ProductionController extends Controller
         }
 
         DB::transaction(function () use ($production, $stage, $action, $data, $machineIds, $qtyEditable, $sizedStage, $sizeQty, &$sizeOutput) {
+            $remainingBefore = (int) ($sizedStage ? $stage->sizeRows->sum('input_qty') : $stage->input_qty);
+
             if ($sizedStage) {
                 foreach ($sizeQty as $size => $qty) {
                     $this->addSizeOutput($production, $stage, $size, $qty);
@@ -713,6 +718,19 @@ class ProductionController extends Controller
 
             $stage->save();
 
+            $recorded = $sizedStage ? array_sum($sizeQty) : ($qtyEditable ? (int) ($data['qty'] ?? 0) : 0);
+            if ($recorded > 0) {
+                $production->logs()->create([
+                    'production_stage_id' => $stage->id,
+                    'waktu' => now(),
+                    'user_id' => auth()->id(),
+                    'input_qty' => $remainingBefore,
+                    'output_qty' => $recorded,
+                    'sisa_qty' => (int) $stage->input_qty,
+                    'keterangan' => $sizedStage ? $this->sizeBreakdown($sizeQty) : null,
+                ]);
+            }
+
             $isMassQc = $stage->phase === 'mass' && $stage->stage === 'qc_packing';
 
             if ($isMassQc && $action === 'start' && $production->status !== 'completed') {
@@ -729,6 +747,19 @@ class ProductionController extends Controller
         }
 
         return back()->with('success', 'Tahap diperbarui.');
+    }
+
+    /**
+     * Rincian ukuran untuk keterangan log, mis. "M 30, L 20".
+     *
+     * @param  array<string, int>  $sizeQty
+     */
+    private function sizeBreakdown(array $sizeQty): string
+    {
+        return collect($sizeQty)
+            ->filter(fn (int $qty) => $qty > 0)
+            ->map(fn (int $qty, $size) => $size.' '.$qty)
+            ->implode(', ');
     }
 
     /**
@@ -989,20 +1020,24 @@ class ProductionController extends Controller
             }
         }
 
-        $units = $actual + $production->sampleUnits();
+        // Pemakaian bahan mengikuti hasil per ukuran, karena resep tiap ukuran berbeda.
+        $units = array_filter($sizeOutput);
+        if ($units === []) {
+            $sizes = $production->sizes()->pluck('size');
+            $units = [($sizes->count() === 1 ? (string) $sizes->first() : '') => $actual];
+        }
 
-        foreach ($production->product->materials as $line) {
-            $used = (int) $line->qty_required * $units;
+        foreach ($production->materialUsage($units) as $materialId => $used) {
             if ($used <= 0) {
                 continue;
             }
 
             $production->productionMaterials()->create([
-                'material_id' => $line->material_id,
+                'material_id' => $materialId,
                 'qty_used' => $used,
             ]);
 
-            Material::where('id', $line->material_id)->decrement('stock', $used);
+            Material::where('id', $materialId)->decrement('stock', $used);
         }
     }
 }

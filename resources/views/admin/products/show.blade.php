@@ -39,22 +39,55 @@
             @endif
         </x-ui.card>
 
-        <x-ui.card title="Bahan Baku (Resep)" subtitle="Bahan yang dibutuhkan per 1 unit produk.">
-            @if ($product->materials->isEmpty())
-                <p class="text-sm text-ink-500">Belum ada resep bahan baku.</p>
+        <x-ui.card title="HPP per Ukuran" subtitle="Dihitung dari resep dan harga bahan baku terbaru.">
+            @if ($hppRows === [])
+                <p class="text-sm text-ink-500">Belum ada varian ukuran atau resep bahan baku.</p>
             @else
                 <table class="table-clean">
-                    <thead><tr><th>Bahan</th><th class="text-right">Jumlah per Unit</th><th>Satuan</th></tr></thead>
+                    <thead><tr><th>Ukuran</th><th class="!text-right">HPP</th><th class="!text-right">Harga Jual</th><th class="!text-right">Margin</th></tr></thead>
                     <tbody>
-                        @foreach ($product->materials as $bom)
+                        @foreach ($hppRows as $size => $hpp)
+                            @php $margin = (float) $product->price - $hpp; @endphp
                             <tr>
-                                <td class="font-medium">{{ $bom->material?->name ?? '—' }}</td>
-                                <td class="text-right tabular-nums">{{ $bom->qty_required }}</td>
-                                <td class="text-ink-500">{{ $bom->material?->unit ?? '-' }}</td>
+                                <td class="font-medium">{{ $size }}</td>
+                                <td class="text-right tabular-nums">Rp {{ number_format($hpp, 0, ',', '.') }}</td>
+                                <td class="text-right tabular-nums">Rp {{ number_format((float) $product->price, 0, ',', '.') }}</td>
+                                <td class="text-right tabular-nums {{ $margin < 0 ? 'text-red-700 font-semibold' : '' }}">{{ $margin < 0 ? '-' : '' }}Rp {{ number_format(abs($margin), 0, ',', '.') }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+            @endif
+        </x-ui.card>
+
+        <x-ui.card title="Bahan Baku (Resep)" subtitle="Bahan yang dibutuhkan per 1 unit produk pada tiap ukuran.">
+            @if ($recipeRows->isEmpty())
+                <p class="text-sm text-ink-500">Belum ada resep bahan baku.</p>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="table-clean">
+                        <thead>
+                            <tr>
+                                <th>Bahan</th>
+                                @foreach (array_keys($hppRows) as $size)
+                                    <th class="!text-right">{{ $size }}</th>
+                                @endforeach
+                                <th>Satuan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($recipeRows as $row)
+                                <tr>
+                                    <td class="font-medium">{{ $row['name'] }}</td>
+                                    @foreach ($row['qty'] as $qty)
+                                        <td class="text-right tabular-nums">{{ $qty === null ? '—' : \App\Models\Material::formatQty($qty) }}</td>
+                                    @endforeach
+                                    <td class="text-ink-500">{{ $row['unit'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @endif
         </x-ui.card>
     </div>

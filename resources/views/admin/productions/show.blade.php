@@ -125,6 +125,11 @@
                             $isOldStage = (int) old('_stage') === (int) $stage->id;
                             $needsSizeOutput = ! $sizedStage && $stage->phase === 'mass' && $stage->stage === 'qc_packing'
                                 && $stage->status === 'in_progress' && $production->sizes->count() > 1 && ! $locked;
+                            // Pcs harian: input terkunci sampai operator menekan Selesai Hari Ini,
+                            // kecuali form kembali dari error validasi dengan isian lamanya.
+                            $needsDailyGate = $qtyEditable && $stage->status === 'in_progress' && ! $locked;
+                            $gatedQty = $needsDailyGate && ! $isOldStage;
+                            $confirmsPcs = $qtyEditable && $stage->status !== 'pending' && ! $locked;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
                                 'in_progress' => ['bg-ink-50 border-ink-200', 'Berjalan'],
@@ -151,7 +156,8 @@
                                     @endswitch
                                 </p>
                             @else
-                                <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
+                                <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="grid grid-cols-2 md:grid-cols-4 gap-2 items-end"
+                                    @if ($confirmsPcs) data-daily-form data-stage-label="{{ $stage->label() }}" @endif>
                                     @csrf @method('PATCH')
                                     <input type="hidden" name="_stage" value="{{ $stage->id }}">
                                     @if ($sizedStage)
@@ -175,7 +181,7 @@
                                         </div>
                                         <div class="field !mb-0">
                                             <label class="label text-xs">Kurangi Sisa</label>
-                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input" {{ $locked ? 'disabled' : '' }}>
+                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $locked || $stage->status === 'pending' || $gatedQty ? 'disabled' : '' }}>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
                                                 Pcs yang baru dikerjakan · menambah output,
                                                 @if ($production->nextQtyStage($stage))
@@ -243,7 +249,7 @@
                                                             <td class="py-1.5 text-right">
                                                                 <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $row->input_qty }}"
                                                                     value="{{ $isOldStage ? old('size_qty.'.$row->size) : '' }}" placeholder="0"
-                                                                    class="input !py-1 text-right tabular-nums" {{ $locked || $stage->status === 'pending' ? 'disabled' : '' }}>
+                                                                    class="input !py-1 text-right tabular-nums disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $locked || $stage->status === 'pending' || $gatedQty ? 'disabled' : '' }}>
                                                             </td>
                                                         </tr>
                                                     @endforeach
@@ -269,7 +275,10 @@
                                         </div>
                                     @endif
                                     @unless ($locked)
-                                        <div class="col-span-2 md:col-span-4 flex justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
+                                        <div class="col-span-2 md:col-span-4 flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
+                                            @if ($needsDailyGate)
+                                                <button type="button" data-daily-unlock class="btn-secondary text-xs mr-auto disabled:opacity-50 disabled:cursor-not-allowed" title="Membuka isian pcs yang diselesaikan hari ini" {{ $gatedQty ? '' : 'disabled' }}>Selesai Hari Ini</button>
+                                            @endif
                                             @if ($stage->status === 'pending')
                                                 <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
                                             @elseif ($stage->status === 'in_progress')
@@ -352,6 +361,27 @@
             </x-ui.card>
         @endforeach
 
+        <x-ui.card title="Log Hari Ini" subtitle="{{ now('Asia/Jakarta')->locale('id')->translatedFormat('l, j F Y') }} (WIB)">
+            @php $todayLogs = $production->todayLogSummary(); @endphp
+            @if ($todayLogs === [])
+                <p class="text-sm text-ink-400">Belum ada hasil produksi yang dicatat hari ini.</p>
+            @else
+                <table class="table-clean">
+                    <thead><tr><th>Tahap</th><th class="text-right">Input</th><th class="text-right">Output</th><th class="text-right">Sisa</th></tr></thead>
+                    <tbody>
+                        @foreach ($todayLogs as $row)
+                            <tr>
+                                <td class="font-medium">{{ $row['stage'] }}</td>
+                                <td class="text-right tabular-nums">{{ $row['input'] }} pcs</td>
+                                <td class="text-right tabular-nums">{{ $row['output'] }} pcs</td>
+                                <td class="text-right tabular-nums">{{ $row['sisa'] }} pcs</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </x-ui.card>
+
         @if ($production->sampleRevisions->isNotEmpty())
             <x-ui.card title="Riwayat Revisi Sampel" subtitle="{{ $production->sample_revision_count }} kali diperbaiki sebelum disetujui">
                 <ul class="space-y-3">
@@ -370,14 +400,13 @@
         <x-ui.card title="Bahan Terpakai" subtitle="{{ $production->status === 'completed' ? 'Aktual (batch selesai)' : 'Estimasi dari resep × (target + sampel)' }}">
             @php $consumed = $production->productionMaterials; @endphp
             <table class="table-clean">
-                <thead><tr><th>Bahan</th><th class="text-right">Per Unit</th><th class="text-right">Total</th><th>Satuan</th></tr></thead>
+                <thead><tr><th>Bahan</th><th class="text-right">Total</th><th>Satuan</th></tr></thead>
                 <tbody>
                     @if ($production->status === 'completed' && $consumed->isNotEmpty())
                         @foreach ($consumed as $c)
                             <tr>
                                 <td>{{ $c->material?->name ?? '—' }}</td>
-                                <td class="text-right tabular-nums">-</td>
-                                <td class="text-right tabular-nums">{{ number_format($c->qty_used, 0, ',', '.') }}</td>
+                                <td class="text-right tabular-nums">{{ \App\Models\Material::formatQty($c->qty_used) }}</td>
                                 <td class="text-ink-500">{{ $c->material?->unit }}</td>
                             </tr>
                         @endforeach
@@ -385,13 +414,12 @@
                         @foreach ($bahan as $b)
                             <tr>
                                 <td>{{ $b['name'] }}</td>
-                                <td class="text-right tabular-nums">{{ $b['per_unit'] }}</td>
-                                <td class="text-right tabular-nums">{{ number_format($b['est'], 0, ',', '.') }}</td>
+                                <td class="text-right tabular-nums">{{ \App\Models\Material::formatQty($b['est']) }}</td>
                                 <td class="text-ink-500">{{ $b['unit'] }}</td>
                             </tr>
                         @endforeach
                     @else
-                        <tr><td colspan="4" class="text-ink-400 text-center">Produk ini belum memiliki resep bahan.</td></tr>
+                        <tr><td colspan="3" class="text-ink-400 text-center">Produk ini belum memiliki resep bahan.</td></tr>
                     @endif
                 </tbody>
             </table>
@@ -442,7 +470,13 @@
                     @foreach ($production->logs as $log)
                         <li class="border-l-2 border-ink-200 pl-3">
                             <p class="text-xs text-ink-500">{{ $log->waktu_label }}</p>
-                            <p class="text-sm text-ink-800 break-words">{{ $log->keterangan }}</p>
+                            @if ($log->output_qty !== null)
+                                <p class="text-sm font-medium text-ink-800">{{ $log->stage?->label() ?? 'Tahap dihapus' }}</p>
+                                <p class="text-xs text-ink-700 tabular-nums">Input {{ $log->input_qty }} · Output {{ $log->output_qty }} · Sisa {{ $log->sisa_qty }}</p>
+                            @endif
+                            @if (filled($log->keterangan))
+                                <p class="text-sm text-ink-800 break-words">{{ $log->keterangan }}</p>
+                            @endif
                             <p class="text-xs text-ink-400">{{ $log->user?->name ?? '—' }}</p>
                         </li>
                     @endforeach
@@ -513,4 +547,73 @@
         @endif
     </x-ui.modal>
 @endif
+
+@unless ($locked)
+    <x-ui.modal id="modal-konfirmasi-harian" title="Konfirmasi Hasil Harian">
+        <p id="konfirmasi-harian-teks" class="text-sm text-ink-800"></p>
+        <div class="flex justify-end gap-2 mt-4">
+            <button type="button" id="konfirmasi-harian-batal" class="btn btn-secondary">Batal</button>
+            <button type="button" id="konfirmasi-harian-ya" class="btn btn-primary">Ya</button>
+        </div>
+    </x-ui.modal>
+@endunless
 @endsection
+
+@push('scripts')
+<script>
+$(function () {
+    const MODAL = 'modal-konfirmasi-harian';
+    let pending = null;
+
+    $('[data-daily-unlock]').on('click', function () {
+        const inputs = $(this).closest('form').find('[data-daily-qty]').prop('disabled', false);
+        $(this).prop('disabled', true);
+        inputs.first().trigger('focus');
+    });
+
+    // Event submit baru muncul setelah validasi min/max browser lolos, dan menekan
+    // Enter di isian pcs memakai tombol submit pertama (Simpan) sebagai submitter.
+    $(document).on('submit', 'form[data-daily-form]', function (e) {
+        const form = $(this);
+        form.find('input.js-daily-action').remove();
+
+        let total = 0;
+        form.find('[data-daily-qty]:enabled').each(function () {
+            total += parseInt(this.value, 10) || 0;
+        });
+        if (total <= 0) {
+            return;
+        }
+
+        e.preventDefault();
+        pending = { form: this, submitter: e.originalEvent ? e.originalEvent.submitter : null };
+        $('#konfirmasi-harian-teks').text('Yakin menyelesaikan ' + total + ' pcs pada tahap ' + form.data('stage-label') + ' hari ini?');
+        openModal(MODAL);
+        // Fokus di Batal: Enter yang tertahan dari isian tidak langsung menyimpan.
+        $('#konfirmasi-harian-batal').trigger('focus');
+    });
+
+    $('#konfirmasi-harian-batal').on('click', function () {
+        closeModal(MODAL);
+    });
+
+    $('#konfirmasi-harian-ya').on('click', function () {
+        if (pending === null) {
+            return;
+        }
+        const { form, submitter } = pending;
+        pending = null;
+        closeModal(MODAL);
+
+        // form.submit() tidak mengirim nilai tombol, jadi aksinya dibawa input tersembunyi.
+        $('<input>', {
+            type: 'hidden',
+            class: 'js-daily-action',
+            name: 'action',
+            value: submitter && submitter.name === 'action' ? submitter.value : 'save',
+        }).appendTo(form);
+        form.submit();
+    });
+});
+</script>
+@endpush

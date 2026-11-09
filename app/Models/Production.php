@@ -52,10 +52,42 @@ class Production extends Model
         return $this->hasMany(ProductionSize::class)->orderBy('id');
     }
 
-    /** Catatan tombol Pause, urut dari yang paling lama. */
+    /** Catatan tombol Pause dan hasil harian tahap, urut dari yang paling lama. */
     public function logs()
     {
         return $this->hasMany(ProductionLog::class, 'produksi_id')->orderBy('waktu')->orderBy('id');
+    }
+
+    /**
+     * Rekap Log Hari Ini per tahap. "Hari ini" adalah tanggal kalender WIB, karena
+     * waktu log tersimpan dalam UTC. Output adalah jumlah pcs hari ini, sisa diambil
+     * dari catatan terakhir hari ini, dan input = output + sisa supaya tiap baris
+     * selalu cocok walaupun tahap menerima pcs tambahan di tengah hari.
+     *
+     * @return list<array{stage: string, input: int, output: int, sisa: int}>
+     */
+    public function todayLogSummary(): array
+    {
+        $today = now('Asia/Jakarta')->toDateString();
+
+        return $this->logs
+            ->filter(fn (ProductionLog $log) => $log->stage !== null
+                && $log->waktu->copy()->timezone('Asia/Jakarta')->toDateString() === $today)
+            ->groupBy('production_stage_id')
+            ->sortBy(fn ($entries) => $entries->first()->stage->sort_order)
+            ->map(function ($entries) {
+                $output = (int) $entries->sum('output_qty');
+                $sisa = (int) $entries->last()->sisa_qty;
+
+                return [
+                    'stage' => $entries->first()->stage->label(),
+                    'input' => $output + $sisa,
+                    'output' => $output,
+                    'sisa' => $sisa,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function sampleRevisions()
@@ -152,6 +184,32 @@ class Production extends Model
         }
 
         return 1 + (int) $this->sample_revision_count;
+    }
+
+    /**
+     * Total pemakaian bahan untuk pcs per ukuran, plus sampel yang sudah dibuat.
+     * Kunci kosong berarti pcs yang tidak dirinci per ukuran.
+     *
+     * @param  array<string, int>  $unitsBySize
+     * @return array<int, float> material_id => jumlah
+     */
+    public function materialUsage(array $unitsBySize): array
+    {
+        $samples = $this->sampleUnits();
+        if ($samples > 0) {
+            $key = (string) ($this->sample_size ?? '');
+            $unitsBySize[$key] = ($unitsBySize[$key] ?? 0) + $samples;
+        }
+
+        $usage = [];
+        foreach ($unitsBySize as $size => $units) {
+            $size = (string) $size;
+            foreach ($this->product->recipeForSize($size === '' ? null : $size) as $line) {
+                $usage[$line->material_id] = ($usage[$line->material_id] ?? 0) + (float) $line->qty_required * (int) $units;
+            }
+        }
+
+        return $usage;
     }
 
     /** Half the planned quantity, rounded up — the handoff threshold. */

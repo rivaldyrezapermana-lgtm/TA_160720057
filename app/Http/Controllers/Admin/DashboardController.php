@@ -72,7 +72,7 @@ class DashboardController extends Controller
             ->map(fn (Material $m) => [
                 'id' => $m->id,
                 'name' => $m->name,
-                'stock' => $m->stock,
+                'stock' => $m->stock_label,
                 'min' => $m->min_stock,
                 'unit' => $m->unit,
             ])

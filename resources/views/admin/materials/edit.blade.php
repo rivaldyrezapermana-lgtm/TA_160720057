@@ -15,7 +15,7 @@
             <x-ui.input name="unit" label="Satuan" :value="$material->unit" required />
             <div class="field">
                 <label class="label">Stok</label>
-                <input type="number" value="{{ $material->stock }}" class="input bg-ink-50" readonly disabled>
+                <input type="text" value="{{ $material->stock_label }}" class="input bg-ink-50" readonly disabled>
                 <p class="field-help">Stok hanya berubah melalui pembelian dan produksi.</p>
             </div>
             <x-ui.input name="min_stock" type="number" label="Stok Minimum" :value="$material->min_stock" required />

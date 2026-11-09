@@ -10,8 +10,31 @@ class Material extends Model
 
     protected $casts = ['unit_cost' => 'decimal:2'];
 
-    public function purchaseItems() { return $this->hasMany(PurchaseItem::class); }
-    public function productMaterials() { return $this->hasMany(ProductMaterial::class); }
+    public function purchaseItems()
+    {
+        return $this->hasMany(PurchaseItem::class);
+    }
 
-    public function isLowStock(): bool { return $this->stock <= $this->min_stock; }
+    public function productMaterials()
+    {
+        return $this->hasMany(ProductMaterial::class);
+    }
+
+    public function isLowStock(): bool
+    {
+        return (float) $this->stock <= (float) $this->min_stock;
+    }
+
+    /** Jumlah bahan tanpa nol di belakang koma, mis. 12 atau 12,5. */
+    public static function formatQty(float|string|int|null $qty): string
+    {
+        $formatted = number_format((float) $qty, 2, ',', '.');
+
+        return rtrim(rtrim($formatted, '0'), ',');
+    }
+
+    public function getStockLabelAttribute(): string
+    {
+        return self::formatQty($this->stock);
+    }
 }
