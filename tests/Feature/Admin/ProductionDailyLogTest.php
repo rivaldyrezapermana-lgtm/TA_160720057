@@ -273,18 +273,48 @@ class ProductionDailyLogTest extends TestCase
         return str_replace('disabled:', '', $match[0]);
     }
 
+    /** @return array<string, bool> teks tombol => nonaktif */
+    private function stageButtons(string $html, int $stageId): array
+    {
+        preg_match_all('/<button[^>]*>[^<]*<\/button>/s', $this->stageForm($html, $stageId), $matches);
+
+        $buttons = [];
+        foreach ($matches[0] as $button) {
+            $tag = str_replace('disabled:', '', $button);
+            $buttons[trim(strip_tags($button))] = (bool) preg_match('/\sdisabled(\s|>|=)/', $tag);
+        }
+
+        return $buttons;
+    }
+
     public function test_running_stage_inputs_are_open_and_saving_asks_for_confirmation(): void
     {
         $prod = $this->sizedBatch();
 
         $html = $this->showPage($prod)
-            ->assertDontSee('Selesai Hari Ini')
             ->assertSee('id="modal-konfirmasi-harian"', false)
             ->assertSee('Yakin menyelesaikan', false)
             ->assertSee('data-stage-label="Cutting"', false)
             ->getContent();
 
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+        $this->assertSame(
+            ['Selesai Hari Ini' => false, 'Simpan' => false, 'Selesai' => false],
+            $this->stageButtons($html, $this->stage($prod)->id),
+        );
+    }
+
+    public function test_selesai_hari_ini_records_the_pcs_like_a_save(): void
+    {
+        $prod = $this->sizedBatch();
+
+        $html = $this->showPage($prod)->getContent();
+        $this->assertMatchesRegularExpression('/<button name="action" value="save" data-daily-today/', $html);
+
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5]])->assertSessionHasNoErrors();
+
+        $this->assertSame(5, (int) $this->stage($prod)->output_qty);
+        $this->assertSame('in_progress', $this->stage($prod)->status);
     }
 
     public function test_unsized_running_stage_input_is_open(): void
@@ -322,7 +352,12 @@ class ProductionDailyLogTest extends TestCase
 
         $html = $this->showPage($prod)->getContent();
         $this->assertMatchesRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
-        $this->assertStringNotContainsString('value="save" class="btn-secondary text-xs">Simpan</button>', $this->stageForm($html, $stage->id));
+
+        // Tombol tetap terlihat, hanya nonaktif.
+        $this->assertSame(
+            ['Selesai Hari Ini' => true, 'Simpan' => true, 'Selesai' => true],
+            $this->stageButtons($html, $stage->id),
+        );
     }
 
     public function test_finished_stage_with_pcs_still_remaining_stays_open_with_a_notice(): void
@@ -333,6 +368,10 @@ class ProductionDailyLogTest extends TestCase
 
         $html = $this->showPage($prod)->assertSee('Isian terkunci setelah sisanya habis.')->getContent();
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+        $this->assertSame(
+            ['Selesai Hari Ini' => false, 'Simpan' => false, 'Selesai' => true],
+            $this->stageButtons($html, $this->stage($prod)->id),
+        );
 
         // Pcs yang masih tersisa tetap dapat dikerjakan sampai habis, lalu isiannya terkunci.
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 40, 'L' => 30]])->assertSessionHasNoErrors();
@@ -367,14 +406,19 @@ class ProductionDailyLogTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', str_replace('disabled:', '', $match[0]));
     }
 
-    public function test_completed_batch_has_no_unlock_button_or_popup(): void
+    public function test_completed_batch_keeps_its_buttons_disabled_and_has_no_popup(): void
     {
         $prod = $this->sizedBatch();
         $prod->forceFill(['status' => 'completed'])->save();
 
-        $this->showPage($prod)
-            ->assertDontSee('Selesai Hari Ini')
-            ->assertDontSee('id="modal-konfirmasi-harian"', false);
+        $html = $this->showPage($prod)
+            ->assertDontSee('id="modal-konfirmasi-harian"', false)
+            ->getContent();
+
+        $this->assertSame(
+            ['Selesai Hari Ini' => true, 'Simpan' => true, 'Selesai' => true],
+            $this->stageButtons($html, $this->stage($prod)->id),
+        );
     }
 
     public function test_pause_still_has_null_quantities_and_is_left_out_of_the_summary(): void

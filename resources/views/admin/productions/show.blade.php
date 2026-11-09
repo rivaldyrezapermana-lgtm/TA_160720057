@@ -278,18 +278,19 @@
                                     @if ($qtyEditable && $stage->status === 'completed' && ! $stageClosed)
                                         <p class="col-span-2 md:col-span-4 text-xs text-amber-700">Tahap sudah selesai, tetapi masih ada sisa {{ $stage->input_qty }} pcs. Isian terkunci setelah sisanya habis.</p>
                                     @endif
-                                    @unless ($stageClosed)
-                                        <div class="col-span-2 md:col-span-4 flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
-                                            @if ($stage->status === 'pending')
-                                                <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
-                                            @elseif ($stage->status === 'in_progress')
-                                                <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
-                                                <button name="action" value="finish" class="btn-primary text-xs">Selesai</button>
-                                            @else
-                                                <button name="action" value="save" class="btn-secondary text-xs">Simpan</button>
-                                            @endif
-                                        </div>
-                                    @endunless
+                                    {{-- Tombol selalu terlihat dan baru nonaktif setelah tahapnya selesai. --}}
+                                    @php $buttonState = 'disabled:opacity-50 disabled:cursor-not-allowed'; @endphp
+                                    <div class="col-span-2 md:col-span-4 flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
+                                        @if ($qtyEditable)
+                                            <button name="action" value="{{ $stage->status === 'pending' ? 'start' : 'save' }}" data-daily-today class="btn-secondary text-xs mr-auto {{ $buttonState }}" title="Menyimpan pcs yang diselesaikan hari ini" @disabled($stageClosed)>Selesai Hari Ini</button>
+                                        @endif
+                                        @if ($stage->status === 'pending' && ! $stageClosed)
+                                            <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
+                                        @else
+                                            <button name="action" value="save" class="btn-secondary text-xs {{ $buttonState }}" @disabled($stageClosed)>Simpan</button>
+                                            <button name="action" value="finish" class="btn-primary text-xs {{ $buttonState }}" @disabled($stageClosed || $stage->status === 'completed')>Selesai</button>
+                                        @endif
+                                    </div>
                                 </form>
 
                                 @if ($stage->stage === 'design')
