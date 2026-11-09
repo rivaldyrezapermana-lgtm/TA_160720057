@@ -13,9 +13,13 @@
             <div class="md:col-span-2"><x-ui.input name="name" label="Nama Bahan" required /></div>
             <x-ui.input name="code" label="Kode" required />
             <x-ui.input name="unit" label="Satuan" placeholder="meter, roll, pcs..." required />
-            <x-ui.input name="stock" type="number" label="Stok Awal" required />
+            <div class="field">
+                <label class="label">Stok Awal</label>
+                <input type="text" value="0" class="input bg-ink-50" readonly disabled>
+                <p class="field-help">Stok bertambah otomatis saat pembelian diterima.</p>
+            </div>
             <x-ui.input name="min_stock" type="number" label="Stok Minimum" required help="Digunakan untuk peringatan stok rendah." />
-            <x-ui.input name="unit_cost" type="number" label="Harga per Unit (Rp)" required />
+            <x-ui.input name="unit_cost" type="number" label="Harga Awal per Unit (Rp)" required help="Perkiraan untuk HPP sampai pembelian pertama diterima." />
         </div>
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">

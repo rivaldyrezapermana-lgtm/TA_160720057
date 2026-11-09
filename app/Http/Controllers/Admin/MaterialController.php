@@ -39,7 +39,8 @@ class MaterialController extends Controller
 
     public function store(Request $request)
     {
-        Material::create($request->validate($this->rules()));
+        // Stok awal selalu 0; stok hanya masuk lewat pembelian yang diterima.
+        Material::create($request->validate($this->rules()) + ['stock' => 0]);
 
         return redirect()->route('admin.materials.index')
             ->with('success', 'Bahan baku berhasil ditambahkan.');
@@ -57,10 +58,11 @@ class MaterialController extends Controller
 
     public function update(Request $request, Material $material)
     {
-        // Stok hanya bergerak lewat pembelian dan produksi, jadi form ubah tidak mengirimnya.
-        $rules = $this->rules($material);
-        unset($rules['stock']);
-        $material->update($request->validate($rules));
+        $material->update($request->validate($this->rules($material)));
+
+        if ($material->wasChanged('unit_cost')) {
+            $material->refreshProductHpp();
+        }
 
         return redirect()->route('admin.materials.index')
             ->with('success', 'Bahan baku berhasil diperbarui.');
@@ -79,14 +81,13 @@ class MaterialController extends Controller
             ->with('success', 'Bahan baku berhasil dihapus.');
     }
 
-    /** Validation rules shared by store and update. */
+    /** Validation rules shared by store and update. Stock is never accepted from a form. */
     private function rules(?Material $material = null): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:255', Rule::unique('materials', 'code')->ignore($material)],
             'unit' => ['required', 'string', 'max:20'],
-            'stock' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
             'min_stock' => ['required', 'integer', 'min:0'],
             'unit_cost' => ['required', 'numeric', 'min:0'],
         ];

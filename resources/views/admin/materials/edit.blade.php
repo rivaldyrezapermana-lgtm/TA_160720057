@@ -19,7 +19,7 @@
                 <p class="field-help">Stok hanya berubah melalui pembelian dan produksi.</p>
             </div>
             <x-ui.input name="min_stock" type="number" label="Stok Minimum" :value="$material->min_stock" required />
-            <x-ui.input name="unit_cost" type="number" label="Harga per Unit (Rp)" :value="$material->unit_cost" required />
+            <x-ui.input name="unit_cost" type="number" label="Harga Rata-Rata per Unit (Rp)" :value="$material->unit_cost" required help="Dihitung ulang otomatis saat pembelian diterima. Ubah hanya untuk koreksi." />
         </div>
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">

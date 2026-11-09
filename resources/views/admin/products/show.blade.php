@@ -39,7 +39,7 @@
             @endif
         </x-ui.card>
 
-        <x-ui.card title="HPP per Ukuran" subtitle="Dihitung dari resep dan harga bahan baku terbaru.">
+        <x-ui.card title="HPP per Ukuran" subtitle="Jumlah bahan pada resep tiap ukuran × harga rata-rata bahan. Belum termasuk upah dan biaya lain.">
             @if ($hppRows === [])
                 <p class="text-sm text-ink-500">Belum ada varian ukuran atau resep bahan baku.</p>
             @else

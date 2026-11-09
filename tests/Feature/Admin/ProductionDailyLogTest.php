@@ -266,28 +266,86 @@ class ProductionDailyLogTest extends TestCase
             ->assertSee('Input 80');
     }
 
-    public function test_running_stage_renders_disabled_inputs_with_unlock_button_and_popup(): void
+    private function inputTag(string $html, string $name): string
+    {
+        preg_match('/<input[^>]*name="'.preg_quote($name, '/').'"[^>]*>/s', $html, $match);
+
+        return str_replace('disabled:', '', $match[0]);
+    }
+
+    public function test_running_stage_inputs_are_open_and_saving_asks_for_confirmation(): void
     {
         $prod = $this->sizedBatch();
 
         $html = $this->showPage($prod)
-            ->assertSee('Selesai Hari Ini')
+            ->assertDontSee('Selesai Hari Ini')
             ->assertSee('id="modal-konfirmasi-harian"', false)
             ->assertSee('Yakin menyelesaikan', false)
             ->assertSee('data-stage-label="Cutting"', false)
             ->getContent();
 
-        $this->assertMatchesRegularExpression('/<input[^>]*name="size_qty\[M\]"[^>]*\sdisabled\s*>/s', $html);
-        $this->assertMatchesRegularExpression('/<button type="button" data-daily-unlock/', $html);
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
     }
 
-    public function test_unsized_running_stage_input_starts_disabled(): void
+    public function test_unsized_running_stage_input_is_open(): void
     {
-        $prod = $this->unsizedBatch();
+        $html = $this->showPage($this->unsizedBatch())->getContent();
+
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'qty'));
+    }
+
+    public function test_pending_stage_input_is_open_because_it_is_not_finished(): void
+    {
+        $prod = $this->sizedBatch();
+        $this->stage($prod)->update(['status' => 'pending']);
 
         $html = $this->showPage($prod)->getContent();
 
-        $this->assertMatchesRegularExpression('/<input[^>]*name="qty"[^>]*\sdisabled\s*>/s', $html);
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+    }
+
+    public function test_every_save_subtracts_until_the_stage_is_finished_then_inputs_lock(): void
+    {
+        $prod = $this->sizedBatch();
+
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 30, 'L' => 10]])->assertSessionHasNoErrors();
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 20, 'L' => 20]])->assertSessionHasNoErrors();
+
+        $stage = $this->stage($prod)->fresh();
+        $this->assertSame(0, (int) $stage->input_qty);
+        $this->assertSame(80, (int) $stage->output_qty);
+
+        $html = $this->showPage($prod)->getContent();
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+
+        $this->saveStage($prod, ['action' => 'finish'])->assertSessionHasNoErrors();
+
+        $html = $this->showPage($prod)->getContent();
+        $this->assertMatchesRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+        $this->assertStringNotContainsString('value="save" class="btn-secondary text-xs">Simpan</button>', $this->stageForm($html, $stage->id));
+    }
+
+    public function test_finished_stage_with_pcs_still_remaining_stays_open_with_a_notice(): void
+    {
+        $prod = $this->sizedBatch();
+
+        $this->saveStage($prod, ['action' => 'finish', 'size_qty' => ['M' => 10]])->assertSessionHasNoErrors();
+
+        $html = $this->showPage($prod)->assertSee('Isian terkunci setelah sisanya habis.')->getContent();
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+
+        // Pcs yang masih tersisa tetap dapat dikerjakan sampai habis, lalu isiannya terkunci.
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 40, 'L' => 30]])->assertSessionHasNoErrors();
+
+        $html = $this->showPage($prod)->assertDontSee('Isian terkunci setelah sisanya habis.')->getContent();
+        $this->assertMatchesRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+    }
+
+    private function stageForm(string $html, int $stageId): string
+    {
+        preg_match('/<form[^>]*\/stage\/'.$stageId.'"[^>]*>.*?<\/form>/s', $html, $match);
+
+        return $match[0] ?? '';
     }
 
     public function test_validation_error_reopens_inputs_with_the_old_values(): void

@@ -35,7 +35,7 @@
     </template>
 </x-ui.card>
 
-<x-ui.card title="HPP (Harga Pokok)" subtitle="Total biaya bahan per unit, dihitung otomatis dari resep pada tiap ukuran.">
+<x-ui.card title="HPP (Harga Pokok)" subtitle="Jumlah bahan pada resep tiap ukuran × harga rata-rata bahan. Belum termasuk upah dan biaya lain.">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         @foreach ($sizes as $col => $sz)
             <div class="border border-ink-100 rounded-lg px-3 py-2">

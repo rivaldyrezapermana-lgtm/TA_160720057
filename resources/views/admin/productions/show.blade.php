@@ -125,11 +125,12 @@
                             $isOldStage = (int) old('_stage') === (int) $stage->id;
                             $needsSizeOutput = ! $sizedStage && $stage->phase === 'mass' && $stage->stage === 'qc_packing'
                                 && $stage->status === 'in_progress' && $production->sizes->count() > 1 && ! $locked;
-                            // Pcs harian: input terkunci sampai operator menekan Selesai Hari Ini,
-                            // kecuali form kembali dari error validasi dengan isian lamanya.
-                            $needsDailyGate = $qtyEditable && $stage->status === 'in_progress' && ! $locked;
-                            $gatedQty = $needsDailyGate && ! $isOldStage;
-                            $confirmsPcs = $qtyEditable && $stage->status !== 'pending' && ! $locked;
+                            // Isian terbuka selama tahap belum selesai. Tahap massal yang selesai
+                            // lebih dulu tetap terbuka kalau tahap sebelumnya masih mengirim pcs,
+                            // supaya pcs itu tidak tersangkut di sisa.
+                            $stageClosed = $locked
+                                || ($stage->status === 'completed' && (! $qtyEditable || (int) $stage->input_qty === 0));
+                            $confirmsPcs = $qtyEditable && ! $stageClosed;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
                                 'in_progress' => ['bg-ink-50 border-ink-200', 'Berjalan'],
@@ -181,7 +182,7 @@
                                         </div>
                                         <div class="field !mb-0">
                                             <label class="label text-xs">Kurangi Sisa</label>
-                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $locked || $stage->status === 'pending' || $gatedQty ? 'disabled' : '' }}>
+                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $stageClosed ? 'disabled' : '' }}>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
                                                 Pcs yang baru dikerjakan · menambah output,
                                                 @if ($production->nextQtyStage($stage))
@@ -216,7 +217,7 @@
                                             <input type="hidden" name="production_machine_ids[]" value="">
                                             @forelse ($machines as $mid => $mname)
                                                 <label class="flex items-center gap-2 text-sm text-ink-800 py-0.5 cursor-pointer">
-                                                    <input type="checkbox" name="production_machine_ids[]" value="{{ $mid }}" @checked(in_array($mid, $selectedMachines, true)) class="rounded" {{ $locked ? 'disabled' : '' }}>
+                                                    <input type="checkbox" name="production_machine_ids[]" value="{{ $mid }}" @checked(in_array($mid, $selectedMachines, true)) class="rounded" {{ $stageClosed ? 'disabled' : '' }}>
                                                     <span>{{ $mname }}</span>
                                                 </label>
                                             @empty
@@ -249,7 +250,7 @@
                                                             <td class="py-1.5 text-right">
                                                                 <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $row->input_qty }}"
                                                                     value="{{ $isOldStage ? old('size_qty.'.$row->size) : '' }}" placeholder="0"
-                                                                    class="input !py-1 text-right tabular-nums disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $locked || $stage->status === 'pending' || $gatedQty ? 'disabled' : '' }}>
+                                                                    class="input !py-1 text-right tabular-nums disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $stageClosed ? 'disabled' : '' }}>
                                                             </td>
                                                         </tr>
                                                     @endforeach
@@ -274,11 +275,11 @@
                                             @error('size_output')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                                         </div>
                                     @endif
-                                    @unless ($locked)
+                                    @if ($qtyEditable && $stage->status === 'completed' && ! $stageClosed)
+                                        <p class="col-span-2 md:col-span-4 text-xs text-amber-700">Tahap sudah selesai, tetapi masih ada sisa {{ $stage->input_qty }} pcs. Isian terkunci setelah sisanya habis.</p>
+                                    @endif
+                                    @unless ($stageClosed)
                                         <div class="col-span-2 md:col-span-4 flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
-                                            @if ($needsDailyGate)
-                                                <button type="button" data-daily-unlock class="btn-secondary text-xs mr-auto disabled:opacity-50 disabled:cursor-not-allowed" title="Membuka isian pcs yang diselesaikan hari ini" {{ $gatedQty ? '' : 'disabled' }}>Selesai Hari Ini</button>
-                                            @endif
                                             @if ($stage->status === 'pending')
                                                 <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
                                             @elseif ($stage->status === 'in_progress')
@@ -564,12 +565,6 @@
 $(function () {
     const MODAL = 'modal-konfirmasi-harian';
     let pending = null;
-
-    $('[data-daily-unlock]').on('click', function () {
-        const inputs = $(this).closest('form').find('[data-daily-qty]').prop('disabled', false);
-        $(this).prop('disabled', true);
-        inputs.first().trigger('focus');
-    });
 
     // Event submit baru muncul setelah validasi min/max browser lolos, dan menekan
     // Enter di isian pcs memakai tombol submit pertama (Simpan) sebagai submitter.

@@ -59,6 +59,39 @@ class ProductRecipePerSizeTest extends TestCase
         $this->assertEquals(101000.0, $this->product->hppBySize()['S']);
     }
 
+    public function test_receiving_a_purchase_averages_the_price_and_updates_hpp(): void
+    {
+        // Stok 100 @ Rp 40.000 + 100 @ Rp 50.000 = rata-rata Rp 45.000.
+        $this->kain->receivePurchase(100, 50000);
+
+        $this->assertEquals(200.0, (float) $this->kain->stock);
+        $this->assertEquals(45000.0, (float) $this->kain->fresh()->unit_cost);
+        // S: 2 × 45.000 + 1 × 1.000. L: 2,5 × 45.000 + 1.000 menjadi catatan HPP produk.
+        $this->assertEquals(91000.0, $this->product->hppBySize()['S']);
+        $this->assertEquals(113500.0, (float) $this->product->fresh()->hpp);
+    }
+
+    public function test_empty_or_negative_stock_takes_the_purchase_price(): void
+    {
+        $this->kain->update(['stock' => -5]);
+
+        $this->kain->receivePurchase(10, 50000);
+
+        $this->assertEquals(5.0, (float) $this->kain->fresh()->stock);
+        $this->assertEquals(50000.0, (float) $this->kain->fresh()->unit_cost);
+    }
+
+    public function test_correcting_a_material_price_updates_product_hpp(): void
+    {
+        $admin = User::create(['name' => 'Op', 'email' => 'op2@labasa.test', 'password' => 'password', 'role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($admin)->put(route('admin.materials.update', $this->kain), [
+            'name' => 'Kain', 'code' => 'K1', 'unit' => 'm', 'min_stock' => 0, 'unit_cost' => 50000,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertEquals(126000.0, (float) $this->product->fresh()->hpp);
+    }
+
     public function test_a_size_without_its_own_recipe_uses_the_generic_lines(): void
     {
         ProductSize::create(['product_id' => $this->product->id, 'size' => 'XL', 'stock' => 0]);

@@ -257,7 +257,10 @@ class PurchaseFormTest extends TestCase
         $this->assertSame('received', $purchase->fresh()->status);
         $this->assertEquals(15.5, (float) $this->kain->fresh()->stock);
         $this->assertEquals(10, (float) $this->kancing->fresh()->stock);
-        $this->assertEquals(25000, (float) $this->kain->fresh()->unit_cost);
+
+        // Rata-rata bergerak: (12,5 × 25.000 + 3 × 30.000) / 15,5. Stok kosong mengikuti pembelian.
+        $this->assertEquals(25967.74, (float) $this->kain->fresh()->unit_cost);
+        $this->assertEquals(450, (float) $this->kancing->fresh()->unit_cost);
 
         // Receiving twice must not add the stock again.
         $this->actingAs($this->admin)
@@ -265,5 +268,6 @@ class PurchaseFormTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertEquals(15.5, (float) $this->kain->fresh()->stock);
+        $this->assertEquals(25967.74, (float) $this->kain->fresh()->unit_cost);
     }
 }

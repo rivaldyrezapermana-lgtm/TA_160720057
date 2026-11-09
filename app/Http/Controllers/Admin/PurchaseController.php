@@ -192,7 +192,8 @@ class PurchaseController extends Controller
     }
 
     /**
-     * Mark a PO as received and credit each item's qty to material stock.
+     * Mark a PO as received: stock goes up and each material's price becomes
+     * the moving average, which flows into product HPP.
      */
     public function receive(Purchase $purchase)
     {
@@ -207,13 +208,14 @@ class PurchaseController extends Controller
         DB::transaction(function () use ($purchase) {
             $purchase->load('items');
             foreach ($purchase->items as $item) {
-                Material::where('id', $item->material_id)->increment('stock', $item->qty);
+                Material::whereKey($item->material_id)->lockForUpdate()->first()
+                    ?->receivePurchase((int) $item->qty, (float) $item->unit_cost);
             }
             $purchase->status = 'received';
             $purchase->save();
         });
 
-        return back()->with('success', 'Pesanan Pembelian ditandai diterima dan stok bahan diperbarui.');
+        return back()->with('success', 'Pesanan Pembelian ditandai diterima. Stok dan harga rata-rata bahan diperbarui.');
     }
 
     public function cancel(Purchase $purchase)

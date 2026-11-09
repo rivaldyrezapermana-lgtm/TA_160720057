@@ -158,7 +158,8 @@ class MasterDataTest extends TestCase
             ])
             ->assertRedirectToRoute('admin.materials.index');
 
-        $this->assertDatabaseHas('materials', ['code' => 'MAT-001']);
+        // Stok awal dikunci: nilai yang terkirim diabaikan.
+        $this->assertEquals(0, (float) Material::where('code', 'MAT-001')->value('stock'));
     }
 
     public function test_material_code_must_be_unique(): void
