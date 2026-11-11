@@ -260,4 +260,63 @@ class SizeCrudTest extends TestCase
             ->assertOk()
             ->assertViewHas('sizes', ['XL', 's', 'M', 'Jumbo']);
     }
+
+    public function test_size_pages_do_not_show_the_sort_number(): void
+    {
+        $admin = $this->admin();
+        $size = $this->masterSize('M');
+
+        $this->actingAs($admin)->get(route('admin.sizes.index'))->assertOk()->assertDontSee('Urutan</th>', false);
+        $this->actingAs($admin)->get(route('admin.sizes.create'))->assertOk()->assertDontSee('name="sort_order"', false);
+        $this->actingAs($admin)->get(route('admin.sizes.edit', $size))->assertOk()->assertDontSee('name="sort_order"', false);
+
+        $rows = $this->actingAs($admin)->getJson(route('admin.datatables.sizes'))->json('data');
+        $this->assertArrayNotHasKey('sort_order', $rows[0]);
+        $this->assertTrue($rows[0]['first']);
+        $this->assertTrue(end($rows)['last']);
+    }
+
+    public function test_arrows_move_a_size_one_place(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->patch(route('admin.sizes.move', $this->masterSize('L')), ['direction' => 'up'])
+            ->assertRedirect(route('admin.sizes.index'));
+        $this->assertSame(['S', 'L', 'M', 'XL'], Size::ordered()->pluck('name')->all());
+
+        $this->actingAs($admin)->patch(route('admin.sizes.move', $this->masterSize('S')), ['direction' => 'down']);
+        $this->assertSame(['L', 'S', 'M', 'XL'], Size::ordered()->pluck('name')->all());
+    }
+
+    public function test_moving_past_either_end_changes_nothing(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->patch(route('admin.sizes.move', $this->masterSize('S')), ['direction' => 'up']);
+        $this->actingAs($admin)->patch(route('admin.sizes.move', $this->masterSize('XL')), ['direction' => 'down']);
+
+        $this->assertSame(['S', 'M', 'L', 'XL'], Size::ordered()->pluck('name')->all());
+        $this->actingAs($admin)->patch(route('admin.sizes.move', $this->masterSize('M')), ['direction' => 'sideways'])
+            ->assertSessionHasErrors('direction');
+    }
+
+    public function test_moving_works_when_two_sizes_share_a_sort_number(): void
+    {
+        Size::create(['name' => 'XXL', 'sort_order' => 40]);
+        $before = Size::ordered()->pluck('name')->all();
+        $last = end($before);
+
+        $this->actingAs($this->admin())->patch(route('admin.sizes.move', $this->masterSize($last)), ['direction' => 'up']);
+
+        $after = Size::ordered()->pluck('name')->all();
+        $this->assertSame($last, $after[3]);
+        $this->assertSame([10, 20, 30, 40, 50], Size::ordered()->pluck('sort_order')->all());
+    }
+
+    public function test_a_new_size_goes_last_without_a_sort_field(): void
+    {
+        $this->actingAs($this->admin())->post(route('admin.sizes.store'), ['name' => 'XXL'])->assertSessionHasNoErrors();
+
+        $this->assertSame('XXL', Size::ordered()->pluck('name')->last());
+    }
 }

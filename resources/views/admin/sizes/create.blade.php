@@ -10,8 +10,7 @@
     @csrf
     <x-ui.card>
         <div class="grid md:grid-cols-2 gap-4">
-            <x-ui.input name="name" label="Nama Ukuran" maxlength="10" required />
-            <x-ui.input name="sort_order" type="number" min="0" label="Urutan" help="Kosongkan untuk menempatkan ukuran ini di urutan terakhir." />
+            <x-ui.input name="name" label="Nama Ukuran" maxlength="10" required help="Ukuran baru ditempatkan di urutan terakhir." />
         </div>
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">

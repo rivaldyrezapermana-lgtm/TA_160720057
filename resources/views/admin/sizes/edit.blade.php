@@ -13,7 +13,6 @@
             <x-ui.input name="name" label="Nama Ukuran" :value="$size->name" maxlength="10" required
                 :readonly="$used" :class="$used ? 'bg-ink-50' : ''"
                 :help="$used ? 'Nama tidak dapat diubah karena sudah digunakan pada produk, produksi, atau pesanan.' : null" />
-            <x-ui.input name="sort_order" type="number" min="0" label="Urutan" :value="$size->sort_order" help="Kosongkan untuk mempertahankan urutan saat ini." />
         </div>
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">

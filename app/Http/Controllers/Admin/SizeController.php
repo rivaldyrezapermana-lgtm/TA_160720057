@@ -17,11 +17,13 @@ class SizeController extends Controller
     /** AJAX endpoint for DataTables. */
     public function data(Request $request)
     {
-        $rows = Size::ordered()->get()->map(fn (Size $size) => [
+        $sizes = Size::ordered()->get();
+        $rows = $sizes->values()->map(fn (Size $size, int $i) => [
             'id' => $size->id,
             'name' => $size->name,
-            'sort_order' => $size->sort_order,
             'used' => $size->isUsed(),
+            'first' => $i === 0,
+            'last' => $i === $sizes->count() - 1,
         ]);
 
         return response()->json(['data' => $rows]);
@@ -57,6 +59,30 @@ class SizeController extends Controller
 
         return redirect()->route('admin.sizes.index')
             ->with('success', 'Ukuran berhasil diperbarui.');
+    }
+
+    /**
+     * Geser ukuran satu posisi ke atas atau ke bawah. Urutan semua ukuran ditulis
+     * ulang berjarak 10 supaya nilai yang sama tidak membuat pertukaran gagal.
+     */
+    public function move(Request $request, Size $size)
+    {
+        $direction = $request->validate(['direction' => ['required', 'in:up,down']])['direction'];
+
+        $sizes = Size::ordered()->get()->values();
+        $from = $sizes->search(fn (Size $s) => $s->is($size));
+        $to = $direction === 'up' ? $from - 1 : $from + 1;
+
+        if ($to >= 0 && $to < $sizes->count()) {
+            $order = $sizes->all();
+            [$order[$from], $order[$to]] = [$order[$to], $order[$from]];
+
+            foreach ($order as $i => $s) {
+                $s->update(['sort_order' => ($i + 1) * 10]);
+            }
+        }
+
+        return redirect()->route('admin.sizes.index');
     }
 
     public function destroy(Size $size)

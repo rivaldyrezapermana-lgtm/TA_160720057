@@ -112,6 +112,7 @@ Route::middleware(['auth', 'role:admin,karyawan'])
         Route::resource('production-machines', ProductionMachineController::class);
         Route::resource('machine-categories', MachineCategoryController::class);
         Route::resource('sizes', SizeController::class)->except('show');
+        Route::patch('sizes/{size}/move', [SizeController::class, 'move'])->name('sizes.move');
 
         // DataTables AJAX endpoints
         Route::prefix('datatables')->name('datatables.')->group(function () {
