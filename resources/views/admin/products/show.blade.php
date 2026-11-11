@@ -12,7 +12,7 @@
             <div class="grid md:grid-cols-2 gap-4 text-sm">
                 <div><p class="text-ink-500">SKU</p><p class="font-medium text-ink-900">{{ $product->sku }}</p></div>
                 <div><p class="text-ink-500">Kategori</p><p class="font-medium text-ink-900">{{ $product->category?->name ?? '—' }}</p></div>
-                <div><p class="text-ink-500">Harga</p><p class="font-medium text-ink-900">Rp {{ number_format((float) $product->price, 0, ',', '.') }}</p></div>
+                <div><p class="text-ink-500">Harga</p><p class="font-medium text-ink-900">{{ $product->priceLabel() }}</p></div>
                 <div><p class="text-ink-500">Total Stok</p><p class="font-medium text-ink-900">{{ $product->stock }} pcs</p></div>
                 <div class="md:col-span-2"><p class="text-ink-500">Deskripsi</p><p class="text-ink-800 mt-1">{{ $product->description ?: '—' }}</p></div>
             </div>
@@ -47,11 +47,14 @@
                     <thead><tr><th>Ukuran</th><th class="!text-right">HPP</th><th class="!text-right">Harga Jual</th><th class="!text-right">Margin</th></tr></thead>
                     <tbody>
                         @foreach ($hppRows as $size => $hpp)
-                            @php $margin = (float) $product->price - $hpp; @endphp
+                            @php
+                                $sizePrice = $product->priceForSize((string) $size);
+                                $margin = $sizePrice - $hpp;
+                            @endphp
                             <tr>
                                 <td class="font-medium">{{ $size }}</td>
                                 <td class="text-right tabular-nums">Rp {{ number_format($hpp, 0, ',', '.') }}</td>
-                                <td class="text-right tabular-nums">Rp {{ number_format((float) $product->price, 0, ',', '.') }}</td>
+                                <td class="text-right tabular-nums">Rp {{ number_format($sizePrice, 0, ',', '.') }}</td>
                                 <td class="text-right tabular-nums {{ $margin < 0 ? 'text-red-700 font-semibold' : '' }}">{{ $margin < 0 ? '-' : '' }}Rp {{ number_format(abs($margin), 0, ',', '.') }}</td>
                             </tr>
                         @endforeach

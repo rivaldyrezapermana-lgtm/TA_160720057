@@ -30,7 +30,8 @@
         <div>
             <p class="text-xs uppercase tracking-[0.18em] text-ink-500 font-semibold">{{ $product->category->name }}</p>
             <h1 class="font-display text-4xl font-semibold mt-2">{{ $product->name }}</h1>
-            <p class="font-display text-3xl font-semibold mt-4">Rp {{ number_format($product->price, 0, ',', '.') }}</p>
+            @php $firstInStock = $product->sizes->firstWhere(fn ($s) => $s->stock > 0); @endphp
+            <p id="product-price" class="font-display text-3xl font-semibold mt-4">{{ $firstInStock ? 'Rp '.number_format($product->priceForSize($firstInStock->size), 0, ',', '.') : $product->priceLabel() }}</p>
 
             <div class="h-px bg-ink-100 my-6"></div>
 
@@ -46,7 +47,7 @@
                         <div class="grid grid-cols-4 gap-2">
                             @foreach ($product->sizes as $s)
                                 <label class="cursor-pointer">
-                                    <input type="radio" name="size" value="{{ $s->size }}" class="peer sr-only" {{ $loop->first ? 'checked' : '' }} {{ $s->stock <= 0 ? 'disabled' : '' }}>
+                                    <input type="radio" name="size" value="{{ $s->size }}" data-price="{{ $product->priceForSize($s->size) }}" class="peer sr-only js-size-option" {{ $firstInStock?->is($s) ? 'checked' : '' }} {{ $s->stock <= 0 ? 'disabled' : '' }}>
                                     <div class="border border-ink-200 rounded-lg py-3 text-center peer-checked:border-ink-900 peer-checked:bg-ink-900 peer-checked:text-white peer-disabled:opacity-40 peer-disabled:cursor-not-allowed transition">
                                         <p class="font-medium">{{ $s->size }}</p>
                                         <p class="text-[10px] opacity-70">{{ $s->stock }} pcs</p>
@@ -103,4 +104,15 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    document.querySelectorAll('.js-size-option').forEach(function (option) {
+        option.addEventListener('change', function () {
+            document.getElementById('product-price').textContent =
+                'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(option.dataset.price));
+        });
+    });
+</script>
+@endpush
 @endsection

@@ -81,7 +81,7 @@
                             <p class="text-xs uppercase tracking-wider text-ink-500">{{ $p->category->name }}</p>
                             <p class="font-medium text-ink-900 mt-1 group-hover:underline underline-offset-2">{{ $p->name }}</p>
                             <div class="flex items-center justify-between mt-1">
-                                <p class="font-display text-lg font-semibold">Rp {{ number_format($p->price, 0, ',', '.') }}</p>
+                                <p class="font-display text-lg font-semibold">{{ $p->priceLabel() }}</p>
                                 @if ($p->stock > 0 && $p->stock < 10)
                                     <span class="badge-amber">Stok Terbatas</span>
                                 @endif

@@ -51,6 +51,27 @@ class Product extends Model
         return $this->hasMany(SalesHistory::class);
     }
 
+    /** Harga jual satu ukuran. Ukuran tanpa harga sendiri mengikuti harga utama produk. */
+    public function priceForSize(?string $size): float
+    {
+        $own = $size === null ? null : $this->sizes->firstWhere('size', $size)?->price;
+
+        return (float) ($own ?? $this->price);
+    }
+
+    /** Harga untuk tampilan: satu angka, atau rentang kalau harga antarukuran berbeda. */
+    public function priceLabel(): string
+    {
+        $prices = $this->sizes->isEmpty()
+            ? collect([(float) $this->price])
+            : $this->sizes->map(fn (ProductSize $size) => (float) ($size->price ?? $this->price));
+
+        $low = 'Rp '.number_format($prices->min(), 0, ',', '.');
+        $high = 'Rp '.number_format($prices->max(), 0, ',', '.');
+
+        return $low === $high ? $low : $low.' – '.$high;
+    }
+
     /**
      * Resep yang berlaku untuk satu ukuran: baris ukuran itu, atau baris tanpa
      * ukuran kalau ukuran itu belum punya resep sendiri. Tanpa ukuran (batch

@@ -46,7 +46,7 @@ $(function () {
             { data: 'sku' },
             { data: 'name' },
             { data: 'category' },
-            { data: 'price', className: 'text-right tabular-nums', render: d => 'Rp ' + d },
+            { data: 'price', className: 'text-right tabular-nums' },
             { data: 'hpp', orderable: false, className: 'text-right tabular-nums whitespace-nowrap' },
             { data: 'stock', className: 'text-right tabular-nums' },
             { data: 'sizes', orderable: false, render: (sizes, type) => {

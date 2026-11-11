@@ -16,7 +16,7 @@
                 <input type="text" value="Dibuat otomatis saat disimpan" class="input bg-ink-50" readonly disabled>
             </div>
             <x-ui.select name="category_id" label="Kategori" required :options="$categories->pluck('name','id')->toArray()" />
-            <x-ui.input name="price" type="number" label="Harga (Rp)" required />
+            <x-ui.input name="price" type="number" label="Harga Utama (Rp)" required />
             <div class="md:col-span-2"><x-ui.textarea name="description" label="Deskripsi" rows="4" /></div>
             <div class="md:col-span-2">
                 <label class="label">Foto Produk</label>
@@ -33,20 +33,24 @@
 
     <x-ui.card title="Ukuran" subtitle="Isi ukuran yang dipakai produk ini. Stok bertambah otomatis dari hasil produksi.">
         <div id="sizes-wrapper" class="space-y-2">
-            <div class="grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">
-                <div class="col-span-3">Ukuran</div>
-                <div class="col-span-3">Lingkar Dada</div>
-                <div class="col-span-3">Panjang</div>
-                <div class="col-span-3">Lengan</div>
+            <div class="grid grid-cols-5 gap-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">
+                <div>Ukuran</div>
+                <div>Harga Jual</div>
+                <div>Lingkar Dada</div>
+                <div>Panjang</div>
+                <div>Lengan</div>
             </div>
             @foreach ($sizes as $sz)
-                <div class="grid grid-cols-12 gap-2">
-                    <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input col-span-3" readonly>
-                    <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm') }}" placeholder="cm" class="input col-span-3">
-                    <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm') }}" placeholder="cm" class="input col-span-3">
-                    <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm') }}" placeholder="cm" class="input col-span-3">
+                <div class="grid grid-cols-5 gap-2">
+                    <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input" readonly>
+                    <input type="number" min="0" name="sizes[{{ $sz }}][price]" value="{{ old('sizes.'.$sz.'.price') }}" placeholder="Harga utama" data-col="{{ $loop->index }}" class="input js-size-price">
+                    <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm') }}" placeholder="cm" class="input">
+                    <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm') }}" placeholder="cm" class="input">
+                    <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm') }}" placeholder="cm" class="input">
                 </div>
             @endforeach
+            @error('sizes.*.price')<p class="field-error">{{ $message }}</p>@enderror
+            <p class="field-help">Kosongkan Harga Jual jika ukuran tersebut mengikuti Harga Utama.</p>
         </div>
     </x-ui.card>
 

@@ -32,6 +32,11 @@ class CartController extends Controller
             return back()->with('error', 'Produk tidak tersedia.');
         }
 
+        // Harga mengikuti ukuran, jadi ukuran yang dikirim harus benar-benar ada.
+        if ($product->sizes()->exists() && ! $product->sizes()->where('size', $data['size'] ?? '')->exists()) {
+            return back()->with('error', 'Silakan pilih ukuran yang tersedia.');
+        }
+
         $this->cart->add(
             (int) $data['product_id'],
             $data['size'] ?? null,

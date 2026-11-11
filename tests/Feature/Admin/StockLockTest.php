@@ -55,7 +55,7 @@ class StockLockTest extends TestCase
                 'price' => 50000, 'is_active' => 1,
                 'materials' => [['material_id' => $kain->id, 'qty' => ['M' => 3]]], // HPP = 75000 > 50000
             ])
-            ->assertSessionHas('warning', 'Harga jual (Rp 50.000) di bawah HPP ukuran M (Rp 75.000). Periksa kembali margin.');
+            ->assertSessionHas('warning', 'Harga jual di bawah HPP pada ukuran M (harga Rp 50.000, HPP Rp 75.000). Periksa kembali margin.');
 
         $this->assertEquals(75000, (int) $product->fresh()->hpp);
     }

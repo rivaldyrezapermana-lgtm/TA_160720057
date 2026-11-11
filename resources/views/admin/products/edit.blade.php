@@ -18,7 +18,7 @@
                 <p class="field-help">SKU dibuat otomatis dan tidak dapat diubah.</p>
             </div>
             <x-ui.select name="category_id" label="Kategori" required :selected="$product->category_id" :options="$categories->pluck('name','id')->toArray()" />
-            <x-ui.input name="price" type="number" label="Harga (Rp)" :value="$product->price" required />
+            <x-ui.input name="price" type="number" label="Harga Utama (Rp)" :value="$product->price" required />
             <div class="field">
                 <label class="label">Stok</label>
                 <input type="number" value="{{ $product->stock }}" class="input bg-ink-50" readonly disabled>
@@ -45,24 +45,27 @@
 
     <x-ui.card title="Ukuran" subtitle="Perbarui ukuran yang dipakai produk ini.">
         <div class="space-y-2">
-            <div class="grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">
-                <div class="col-span-2">Ukuran</div>
-                <div class="col-span-3">Lingkar Dada</div>
-                <div class="col-span-3">Panjang</div>
-                <div class="col-span-2">Lengan</div>
-                <div class="col-span-2 text-right">Stok</div>
+            <div class="grid grid-cols-6 gap-2 text-xs uppercase tracking-wider text-ink-500 font-semibold">
+                <div>Ukuran</div>
+                <div>Harga Jual</div>
+                <div>Lingkar Dada</div>
+                <div>Panjang</div>
+                <div>Lengan</div>
+                <div class="text-right">Stok</div>
             </div>
             @foreach ($sizes as $sz)
                 @php $row = $sizeRows->get($sz); @endphp
-                <div class="grid grid-cols-12 gap-2">
-                    <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input col-span-2" readonly>
-                    <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm', $row->chest_cm ?? '') }}" placeholder="cm" class="input col-span-3">
-                    <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm', $row->length_cm ?? '') }}" placeholder="cm" class="input col-span-3">
-                    <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm', $row->sleeve_cm ?? '') }}" placeholder="cm" class="input col-span-2">
-                    <input type="text" value="{{ $row->stock ?? 0 }}" aria-label="Stok ukuran {{ $sz }}" class="input col-span-2 bg-ink-50 text-right tabular-nums js-size-stock" readonly disabled>
+                <div class="grid grid-cols-6 gap-2">
+                    <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input" readonly>
+                    <input type="number" min="0" name="sizes[{{ $sz }}][price]" value="{{ old('sizes.'.$sz.'.price', $row->price ?? '') }}" placeholder="Harga utama" data-col="{{ $loop->index }}" class="input js-size-price">
+                    <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm', $row->chest_cm ?? '') }}" placeholder="cm" class="input">
+                    <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm', $row->length_cm ?? '') }}" placeholder="cm" class="input">
+                    <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm', $row->sleeve_cm ?? '') }}" placeholder="cm" class="input">
+                    <input type="text" value="{{ $row->stock ?? 0 }}" aria-label="Stok ukuran {{ $sz }}" class="input bg-ink-50 text-right tabular-nums js-size-stock" readonly disabled>
                 </div>
             @endforeach
-            <p class="field-help">Stok bertambah otomatis dari hasil produksi.</p>
+            @error('sizes.*.price')<p class="field-error">{{ $message }}</p>@enderror
+            <p class="field-help">Kosongkan Harga Jual jika ukuran tersebut mengikuti Harga Utama. Stok bertambah otomatis dari hasil produksi.</p>
         </div>
     </x-ui.card>
 

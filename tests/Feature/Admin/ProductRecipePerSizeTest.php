@@ -328,7 +328,7 @@ class ProductRecipePerSizeTest extends TestCase
             ['material_id' => $this->kain->id, 'qty' => ['S' => '2', 'M' => '2.25', 'L' => '2.5']],
         ], ['price' => 95000]))->assertSessionHas(
             'warning',
-            'Harga jual (Rp 95.000) di bawah HPP ukuran L (Rp 100.000). Periksa kembali margin.'
+            'Harga jual di bawah HPP pada ukuran L (harga Rp 95.000, HPP Rp 100.000). Periksa kembali margin.'
         );
     }
 

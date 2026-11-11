@@ -99,7 +99,7 @@ class CartService
                 continue;
             }
 
-            $price = (float) $product->price;
+            $price = $product->priceForSize($row['size'] ?? null);
             $items->push((object) [
                 'id' => $key,
                 'product_id' => $product->id,

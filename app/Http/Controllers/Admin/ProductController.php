@@ -28,7 +28,7 @@ class ProductController extends Controller
             'sku' => $product->sku,
             'name' => $product->name,
             'category' => $product->category?->name ?? '—',
-            'price' => number_format((float) $product->price, 0, ',', '.'),
+            'price' => $product->priceLabel(),
             'hpp' => $this->hppRange($product),
             'stock' => $product->stock,
             'sizes' => $product->sizes->sortBy('id')->map(fn ($s) => ['size' => $s->size, 'stock' => $s->stock])->values(),
@@ -217,6 +217,7 @@ class ProductController extends Controller
             'image' => ['nullable', 'image', 'max:2048'],
             'sizes' => ['nullable', 'array'],
             'sizes.*.size' => ['required', 'string', 'max:10', Rule::in($allowedSizes)],
+            'sizes.*.price' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'sizes.*.chest_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.length_cm' => ['nullable', 'integer', 'min:0'],
             'sizes.*.sleeve_cm' => ['nullable', 'integer', 'min:0'],
@@ -246,6 +247,9 @@ class ProductController extends Controller
     {
         return [
             'sizes.*.size.in' => 'Ukuran :input tidak terdaftar pada master ukuran.',
+            'sizes.*.price.numeric' => 'Harga ukuran harus berupa angka.',
+            'sizes.*.price.min' => 'Harga ukuran tidak boleh kurang dari 0.',
+            'sizes.*.price.max' => 'Harga ukuran terlalu besar.',
             'materials.*.material_id.exists' => 'Bahan baku yang dipilih tidak terdaftar.',
             'materials.*.qty.*.numeric' => 'Jumlah bahan harus berupa angka.',
             'materials.*.qty.*.min' => 'Jumlah bahan tidak boleh kurang dari 0.',
@@ -303,24 +307,27 @@ class ProductController extends Controller
                 continue;
             }
 
-            $measurements = [
+            $attributes = [
                 'chest_cm' => $this->intOrNull($size['chest_cm'] ?? null),
                 'length_cm' => $this->intOrNull($size['length_cm'] ?? null),
                 'sleeve_cm' => $this->intOrNull($size['sleeve_cm'] ?? null),
             ];
+            if (array_key_exists('price', $size)) {
+                $attributes['price'] = $size['price'];
+            }
 
             $variant = $product->sizes()->where('size', $size['size'])->first();
             if ($variant) {
-                $variant->update($measurements);
+                $variant->update($attributes);
 
                 continue;
             }
 
             // Baris kosong berarti produk tidak memakai ukuran ini. Varian baru
             // tetap bisa muncul saat ukuran tersebut dipilih pada batch produksi.
-            $hasMeasurement = array_filter($measurements, fn (?int $value) => $value !== null) !== [];
-            if ($hasMeasurement) {
-                $product->sizes()->create(['size' => $size['size'], 'stock' => 0] + $measurements);
+            $isFilled = array_filter($attributes, fn ($value) => $value !== null) !== [];
+            if ($isFilled) {
+                $product->sizes()->create(['size' => $size['size'], 'stock' => 0] + $attributes);
             }
         }
 
@@ -375,19 +382,20 @@ class ProductController extends Controller
         return $low === $high ? $low : $low.' – '.$high;
     }
 
-    /** Build a flash payload naming every size whose HPP is above the selling price. */
+    /** Build a flash payload naming every size whose HPP is above that size's selling price. */
     private function hppWarning(Product $product): array
     {
-        $price = (float) $product->price;
+        $product->load('sizes');
+
         $under = collect($product->hppBySize())
-            ->filter(fn (float $hpp) => $hpp > 0 && $price < $hpp)
-            ->map(fn (float $hpp, $size) => $size.' (Rp '.number_format($hpp, 0, ',', '.').')');
+            ->filter(fn (float $hpp, $size) => $hpp > 0 && $product->priceForSize((string) $size) < $hpp)
+            ->map(fn (float $hpp, $size) => $size.' (harga Rp '.number_format($product->priceForSize((string) $size), 0, ',', '.')
+                .', HPP Rp '.number_format($hpp, 0, ',', '.').')');
 
         if ($under->isEmpty()) {
             return [];
         }
 
-        return ['warning' => 'Harga jual (Rp '.number_format($price, 0, ',', '.').
-            ') di bawah HPP ukuran '.$under->implode(', ').'. Periksa kembali margin.'];
+        return ['warning' => 'Harga jual di bawah HPP pada ukuran '.$under->implode(', ').'. Periksa kembali margin.'];
     }
 }
