@@ -76,17 +76,120 @@ class ProductionStageMachinesTest extends TestCase
         );
     }
 
-    public function test_the_form_shows_every_selected_machine_as_ticked(): void
+    private function cuttingForm(): string
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.productions.show', $this->batch))->assertOk()->getContent();
+        $action = route('admin.productions.stage', [$this->batch, $this->cutting]);
+        $start = strpos($html, 'action="'.$action.'"');
+        $this->assertNotFalse($start, 'Form tahap cutting tidak ditemukan.');
+
+        return substr($html, $start, strpos($html, '</form>', $start) - $start);
+    }
+
+    /** Baris mesin yang dirender, tanpa template baris kosong. */
+    private function machineRows(string $form): array
+    {
+        $form = preg_replace('/<template.*?<\/template>/s', '', $form);
+        preg_match_all('/<div class="[^"]*\bjs-machine-row(?:\s[^"]*)?">.*?<\/div>/s', $form, $rows);
+
+        return $rows[0];
+    }
+
+    public function test_the_form_shows_one_selected_row_per_machine(): void
     {
         $first = $this->machine('Potong A');
         $second = $this->machine('Potong B');
         $this->machine('Potong C');
         $this->cutting->machines()->sync([$first->id, $second->id]);
 
-        $response = $this->actingAs($this->admin)->get(route('admin.productions.show', $this->batch))->assertOk();
+        $form = $this->cuttingForm();
+        $rows = $this->machineRows($form);
 
-        $response->assertSee('name="production_machine_ids[]"', false);
-        $this->assertSame(2, preg_match_all('/name="production_machine_ids\[\]" value="\d+"\s+checked/', $response->getContent()));
+        $this->assertStringContainsString('<input type="hidden" name="production_machine_ids[]" value="">', $form);
+        $this->assertStringNotContainsString('type="checkbox"', $form);
+        $this->assertCount(2, $rows);
+        foreach ([$first, $second] as $i => $machine) {
+            $this->assertStringContainsString('<select name="production_machine_ids[]"', $rows[$i]);
+            $this->assertSame(1, preg_match_all('/<option value="\d+"\s+selected/', $rows[$i]));
+            $this->assertMatchesRegularExpression('/<option value="'.$machine->id.'"\s+selected/', $rows[$i]);
+            $this->assertStringContainsString('js-machine-remove', $rows[$i]);
+        }
+        $this->assertStringContainsString('+ Tambah Mesin', $form);
+        $this->assertDoesNotMatchRegularExpression('/<button[^>]*js-machine-add[^>]*disabled/', $form);
+    }
+
+    public function test_a_stage_without_machines_starts_with_no_rows_and_an_add_button(): void
+    {
+        $this->machine('Potong A');
+
+        $form = $this->cuttingForm();
+
+        $this->assertCount(0, $this->machineRows($form));
+        $this->assertStringContainsString('Belum ada mesin dipilih.', $form);
+        $this->assertStringContainsString('+ Tambah Mesin', $form);
+        // Template baris baru ikut dirender agar tombol tambah bisa menyalinnya.
+        $this->assertStringContainsString('js-machine-template', $form);
+    }
+
+    public function test_the_add_button_is_disabled_when_every_machine_is_chosen(): void
+    {
+        $only = $this->machine('Potong A');
+        $this->cutting->machines()->sync([$only->id]);
+
+        $this->assertMatchesRegularExpression('/<button[^>]*js-machine-add[^>]*disabled/s', $this->cuttingForm());
+    }
+
+    public function test_a_closed_stage_shows_its_machines_with_every_control_disabled(): void
+    {
+        $machine = $this->machine('Potong A');
+        $this->machine('Potong B');
+        $this->cutting->machines()->sync([$machine->id]);
+        $this->cutting->update(['status' => 'completed', 'input_qty' => 0]);
+
+        $form = $this->cuttingForm();
+        $rows = $this->machineRows($form);
+
+        $this->assertStringContainsString('data-closed', $form);
+        $this->assertCount(1, $rows);
+        $this->assertMatchesRegularExpression('/<select name="production_machine_ids\[\]"[^>]*disabled/', $rows[0]);
+        $this->assertMatchesRegularExpression('/<option value="'.$machine->id.'"\s+selected/', $rows[0]);
+        $this->assertMatchesRegularExpression('/<button[^>]*js-machine-remove[^>]*disabled/s', $rows[0]);
+        $this->assertMatchesRegularExpression('/<button[^>]*js-machine-add[^>]*disabled/s', $form);
+    }
+
+    public function test_a_stage_with_no_machine_available_keeps_the_message(): void
+    {
+        $form = $this->cuttingForm();
+
+        $this->assertStringContainsString('Belum ada mesin untuk tahap ini.', $form);
+        $this->assertStringNotContainsString('+ Tambah Mesin', $form);
+    }
+
+    public function test_rows_from_a_failed_submit_are_shown_again(): void
+    {
+        $machine = $this->machine('Potong A');
+
+        $this->saveStage(['_stage' => $this->cutting->id, 'production_machine_ids' => ['', $machine->id, 999]])
+            ->assertSessionHasErrors('production_machine_ids.2');
+
+        $rows = $this->machineRows($this->cuttingForm());
+
+        $this->assertCount(2, $rows);
+        $this->assertMatchesRegularExpression('/<option value="'.$machine->id.'"\s+selected/', $rows[0]);
+    }
+
+    public function test_two_rows_and_an_empty_row_save_both_machines(): void
+    {
+        $first = $this->machine('Potong A');
+        $second = $this->machine('Potong B');
+
+        // Penanda kosong, dua baris terpilih, dan satu baris yang belum dipilih.
+        $this->saveStage(['production_machine_ids' => ['', $second->id, '', $first->id]])->assertSessionHasNoErrors();
+
+        $this->assertEqualsCanonicalizing(
+            [$first->id, $second->id],
+            $this->cutting->machines()->pluck('production_machines.id')->all(),
+        );
     }
 
     public function test_unticking_every_machine_clears_the_stage(): void

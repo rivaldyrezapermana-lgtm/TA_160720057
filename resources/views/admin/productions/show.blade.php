@@ -208,21 +208,30 @@
                                     @endif
                                     @if ($stage->usesMachine())
                                         @php
+                                            // Satu baris per mesin; nilai kosong (penanda dan baris yang belum dipilih) dibuang.
                                             $selectedMachines = $isOldStage
-                                                ? array_map('intval', array_filter((array) old('production_machine_ids', [])))
+                                                ? array_values(array_map('intval', array_filter((array) old('production_machine_ids', []), 'is_numeric')))
                                                 : $stage->machines->pluck('id')->all();
                                         @endphp
-                                        <div class="field !mb-0 col-span-2 self-start">
+                                        <div class="field !mb-0 col-span-2 self-start" data-machine-picker data-machine-count="{{ count($machines) }}" @if ($stageClosed) data-closed @endif>
                                             <label class="label text-xs">Mesin <span class="text-ink-400 font-normal">(dapat memilih lebih dari satu)</span></label>
+                                            {{-- Selalu terkirim: daftar yang hanya berisi nilai kosong berarti "tidak ada mesin". --}}
                                             <input type="hidden" name="production_machine_ids[]" value="">
-                                            @forelse ($machines as $mid => $mname)
-                                                <label class="flex items-center gap-2 text-sm text-ink-800 py-0.5 cursor-pointer">
-                                                    <input type="checkbox" name="production_machine_ids[]" value="{{ $mid }}" @checked(in_array($mid, $selectedMachines, true)) class="rounded" {{ $stageClosed ? 'disabled' : '' }}>
-                                                    <span>{{ $mname }}</span>
-                                                </label>
-                                            @empty
+                                            @if (empty($machines))
                                                 <p class="text-sm text-ink-500">Belum ada mesin untuk tahap ini.</p>
-                                            @endforelse
+                                            @else
+                                                <div class="space-y-2 js-machine-rows">
+                                                    @foreach ($selectedMachines as $mid)
+                                                        @include('admin.productions._machine_row', ['selectedId' => $mid, 'disabled' => $stageClosed])
+                                                    @endforeach
+                                                </div>
+                                                <p class="text-sm text-ink-500 js-machine-empty {{ $selectedMachines === [] ? '' : 'hidden' }}">Belum ada mesin dipilih.</p>
+                                                <button type="button" class="btn btn-secondary text-xs mt-2 disabled:opacity-50 disabled:cursor-not-allowed js-machine-add"
+                                                    @disabled($stageClosed || count($selectedMachines) >= count($machines))>+ Tambah Mesin</button>
+                                                <template class="js-machine-template">
+                                                    @include('admin.productions._machine_row', ['selectedId' => null, 'disabled' => false])
+                                                </template>
+                                            @endif
                                             @if ($isOldStage)
                                                 @error('production_machine_ids.*')<p class="text-xs text-red-600 mt-0.5">{{ $message }}</p>@enderror
                                             @endif
@@ -566,6 +575,47 @@
 $(function () {
     const MODAL = 'modal-konfirmasi-harian';
     let pending = null;
+
+    // Pilihan mesin per form tahap: mesin yang sudah dipilih di baris lain tidak bisa dipilih lagi,
+    // dan tombol tambah nonaktif bila barisnya sudah sebanyak mesin yang tersedia.
+    function refreshMachines(picker) {
+        const selects = picker.find('.js-machine-select');
+        const chosen = selects.map(function () { return this.value; }).get().filter(Boolean);
+        selects.each(function () {
+            const own = this.value;
+            $(this).find('option').each(function () {
+                this.disabled = this.value !== '' && this.value !== own && chosen.includes(this.value);
+            });
+        });
+        const closed = picker.is('[data-closed]');
+        picker.find('.js-machine-add').prop('disabled', closed || selects.length >= Number(picker.data('machine-count')));
+        picker.find('.js-machine-empty').toggleClass('hidden', selects.length > 0);
+    }
+
+    $('[data-machine-picker]').each(function () {
+        refreshMachines($(this));
+    });
+
+    $(document).on('click', '[data-machine-picker]:not([data-closed]) .js-machine-add', function () {
+        const picker = $(this).closest('[data-machine-picker]');
+        if (picker.find('.js-machine-select').length >= Number(picker.data('machine-count'))) {
+            return;
+        }
+        const row = $(picker.find('template.js-machine-template').html().trim());
+        picker.find('.js-machine-rows').append(row);
+        refreshMachines(picker);
+        row.find('.js-machine-select').trigger('focus');
+    });
+
+    $(document).on('click', '[data-machine-picker]:not([data-closed]) .js-machine-remove', function () {
+        const picker = $(this).closest('[data-machine-picker]');
+        $(this).closest('.js-machine-row').remove();
+        refreshMachines(picker);
+    });
+
+    $(document).on('change', '[data-machine-picker] .js-machine-select', function () {
+        refreshMachines($(this).closest('[data-machine-picker]'));
+    });
 
     // Event submit baru muncul setelah validasi min/max browser lolos, dan menekan
     // Enter di isian pcs memakai tombol submit pertama (Simpan) sebagai submitter.
