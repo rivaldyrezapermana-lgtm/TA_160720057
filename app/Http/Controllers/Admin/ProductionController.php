@@ -688,21 +688,21 @@ class ProductionController extends Controller
             'production_machine_ids.*' => ['nullable', 'integer', 'exists:production_machines,id'],
         ]);
 
-        // Null berarti pilihan mesin tidak terkirim, jadi mesin tahap dibiarkan.
-        // Form selalu mengirim satu nilai kosong, jadi daftar kosong berarti tanpa mesin.
-        // Tahap tanpa mesin (Desain) mengabaikan pilihan yang terkirim.
+        // Null berarti pilihan alat tidak terkirim, jadi alat tahap dibiarkan.
+        // Form selalu mengirim satu nilai kosong, jadi daftar kosong berarti tanpa alat.
+        // Tahap tanpa alat (Desain) mengabaikan pilihan yang terkirim.
         $machineIds = null;
         if ($stage->usesMachine() && $request->has('production_machine_ids')) {
             $machineIds = collect($request->input('production_machine_ids', []))
                 ->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
 
-            // Mesin baru harus sesuai kategori tahap. Mesin yang sudah terpasang
+            // Alat baru harus sesuai kategori tahap. Alat yang sudah terpasang
             // tetap boleh, walaupun kategorinya berubah setelah dipilih.
             $added = array_diff($machineIds, $stage->machines()->pluck('production_machines.id')->all());
             $mismatch = ProductionMachine::with('category')->whereKey($added)->get()
                 ->contains(fn (ProductionMachine $m) => $m->category?->stage !== $stage->stage);
             if ($mismatch) {
-                return back()->with('error', 'Mesin yang dipilih tidak sesuai dengan tahap ini.');
+                return back()->with('error', 'Alat yang dipilih tidak sesuai dengan tahap ini.');
             }
         }
 

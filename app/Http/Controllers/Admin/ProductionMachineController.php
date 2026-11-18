@@ -42,7 +42,7 @@ class ProductionMachineController extends Controller
         ProductionMachine::create($request->validate($this->rules()));
 
         return redirect()->route('admin.production-machines.index')
-            ->with('success', 'Mesin produksi berhasil ditambahkan.');
+            ->with('success', 'Alat produksi berhasil ditambahkan.');
     }
 
     public function show(ProductionMachine $production_machine)
@@ -63,20 +63,20 @@ class ProductionMachineController extends Controller
         $production_machine->update($request->validate($this->rules()));
 
         return redirect()->route('admin.production-machines.index')
-            ->with('success', 'Mesin produksi berhasil diperbarui.');
+            ->with('success', 'Alat produksi berhasil diperbarui.');
     }
 
     public function destroy(ProductionMachine $production_machine)
     {
         if ($production_machine->productions()->exists()) {
             return redirect()->route('admin.production-machines.index')
-                ->with('error', 'Mesin tidak dapat dihapus karena sudah digunakan pada batch produksi.');
+                ->with('error', 'Alat tidak dapat dihapus karena sudah digunakan pada batch produksi.');
         }
 
         $production_machine->delete();
 
         return redirect()->route('admin.production-machines.index')
-            ->with('success', 'Mesin produksi berhasil dihapus.');
+            ->with('success', 'Alat produksi berhasil dihapus.');
     }
 
     /** Validation rules shared by store and update. kode_mesin dibuat sistem, jadi sengaja tidak diterima dari form. */

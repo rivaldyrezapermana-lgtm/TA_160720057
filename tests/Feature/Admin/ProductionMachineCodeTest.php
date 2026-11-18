@@ -112,7 +112,7 @@ class ProductionMachineCodeTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('admin.production-machines.index'))
             ->assertOk()
-            ->assertSee('ID Mesin')
+            ->assertSee('ID Alat')
             ->assertSee("{ data: 'kode_mesin' }", false)
             ->assertSee('order: [[0,', false);
     }
@@ -124,7 +124,7 @@ class ProductionMachineCodeTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('admin.production-machines.create'))
             ->assertOk()
-            ->assertSee('ID Mesin')
+            ->assertSee('ID Alat')
             ->assertSee('Dibuat otomatis')
             ->assertSee('value="MSN-002"', false)
             ->assertDontSee('name="kode_mesin"', false)

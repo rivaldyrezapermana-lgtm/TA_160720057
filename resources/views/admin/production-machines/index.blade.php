@@ -1,19 +1,19 @@
 @extends('layouts.admin')
-@section('title', 'Mesin Produksi')
+@section('title', 'Alat Produksi')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Mesin Produksi']]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Mesin Produksi</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Alat Produksi']]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Alat Produksi</h1>
 @endsection
 
 @section('content')
 <div class="bg-white border border-ink-100 rounded-xl overflow-hidden">
     <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-ink-100">
-        <p class="text-sm text-ink-500">Pengelolaan mesin yang digunakan pada batch produksi.</p>
-        <a href="{{ route('admin.production-machines.create') }}" class="btn-primary">+ Tambah Mesin</a>
+        <p class="text-sm text-ink-500">Pengelolaan alat yang digunakan pada batch produksi.</p>
+        <a href="{{ route('admin.production-machines.create') }}" class="btn-primary">+ Tambah Alat</a>
     </div>
     <div class="p-5">
         <table id="tbl-machines" class="table-clean" style="width:100%">
-            <thead><tr><th>ID Mesin</th><th>Nama</th><th class="text-right">Kapasitas</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>ID Alat</th><th>Nama</th><th class="text-right">Kapasitas</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>

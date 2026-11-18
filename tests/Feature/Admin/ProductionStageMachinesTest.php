@@ -46,6 +46,8 @@ class ProductionStageMachinesTest extends TestCase
         $this->batch->stages()->where('phase', '!=', 'mass')->update(['status' => 'completed']);
         $this->batch->forceFill(['sample_approved_at' => now()])->save();
         $this->cutting = $this->batch->stages()->where('phase', 'mass')->where('stage', 'cutting')->first();
+        // Tahap sudah dimulai, jadi isian alat terbuka.
+        $this->cutting->update(['status' => 'in_progress']);
     }
 
     private function machine(string $name, string $stage = 'cutting', string $status = 'active'): ProductionMachine
@@ -114,7 +116,7 @@ class ProductionStageMachinesTest extends TestCase
             $this->assertMatchesRegularExpression('/<option value="'.$machine->id.'"\s+selected/', $rows[$i]);
             $this->assertStringContainsString('js-machine-remove', $rows[$i]);
         }
-        $this->assertStringContainsString('+ Tambah Mesin', $form);
+        $this->assertStringContainsString('+ Tambah Alat', $form);
         $this->assertDoesNotMatchRegularExpression('/<button[^>]*js-machine-add[^>]*disabled/', $form);
     }
 
@@ -125,8 +127,8 @@ class ProductionStageMachinesTest extends TestCase
         $form = $this->cuttingForm();
 
         $this->assertCount(0, $this->machineRows($form));
-        $this->assertStringContainsString('Belum ada mesin dipilih.', $form);
-        $this->assertStringContainsString('+ Tambah Mesin', $form);
+        $this->assertStringContainsString('Belum ada alat dipilih.', $form);
+        $this->assertStringContainsString('+ Tambah Alat', $form);
         // Template baris baru ikut dirender agar tombol tambah bisa menyalinnya.
         $this->assertStringContainsString('js-machine-template', $form);
     }
@@ -161,8 +163,8 @@ class ProductionStageMachinesTest extends TestCase
     {
         $form = $this->cuttingForm();
 
-        $this->assertStringContainsString('Belum ada mesin untuk tahap ini.', $form);
-        $this->assertStringNotContainsString('+ Tambah Mesin', $form);
+        $this->assertStringContainsString('Belum ada alat untuk tahap ini.', $form);
+        $this->assertStringNotContainsString('+ Tambah Alat', $form);
     }
 
     public function test_rows_from_a_failed_submit_are_shown_again(): void
@@ -239,6 +241,26 @@ class ProductionStageMachinesTest extends TestCase
         $this->saveStage(['production_machine_ids' => [$machine->id]])->assertSessionHasNoErrors();
 
         $this->assertSame(1, $this->cutting->machines()->count());
+    }
+
+    public function test_pending_stage_shows_its_tools_disabled_and_mulai_keeps_them(): void
+    {
+        $machine = $this->machine('Potong A');
+        $this->cutting->machines()->sync([$machine->id]);
+        $this->cutting->update(['status' => 'pending']);
+
+        $form = $this->cuttingForm();
+
+        $this->assertMatchesRegularExpression('/<select name="production_machine_ids\[\]"[^>]*\sdisabled(?=[\s>])/', $form);
+        $this->assertStringNotContainsString('type="hidden" name="production_machine_ids[]"', $form);
+
+        // Mulai tidak mengirim pilihan alat, jadi alat yang terpasang tetap ada.
+        $this->actingAs($this->admin)
+            ->patch(route('admin.productions.stage', [$this->batch, $this->cutting]), ['action' => 'start'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('in_progress', $this->cutting->fresh()->status);
+        $this->assertSame([$machine->id], $this->cutting->machines()->pluck('production_machines.id')->all());
     }
 
     public function test_deleting_a_machine_removes_it_from_the_stage(): void

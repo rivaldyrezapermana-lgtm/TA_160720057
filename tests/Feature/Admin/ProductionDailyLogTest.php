@@ -301,14 +301,22 @@ class ProductionDailyLogTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'qty'));
     }
 
-    public function test_pending_stage_input_is_open_because_it_is_not_finished(): void
+    public function test_stage_stays_disabled_until_mulai_is_clicked(): void
     {
         $prod = $this->sizedBatch();
-        $this->stage($prod)->update(['status' => 'pending']);
+        $stage = $this->stage($prod);
+        $stage->update(['status' => 'pending']);
 
-        $html = $this->showPage($prod)->getContent();
+        $html = $this->showPage($prod)->assertSee('Tahap ini belum dimulai. Klik Mulai untuk membuka isian.')->getContent();
 
+        $this->assertMatchesRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+        $this->assertSame(['Mulai' => false, 'Simpan' => true, 'Selesai' => true], $this->stageButtons($html, $stage->id));
+
+        $this->saveStage($prod, ['action' => 'start'])->assertSessionHasNoErrors();
+
+        $html = $this->showPage($prod)->assertDontSee('Tahap ini belum dimulai.')->getContent();
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+        $this->assertSame(['Simpan' => false, 'Selesai' => false], $this->stageButtons($html, $stage->id));
     }
 
     public function test_every_save_subtracts_until_the_stage_is_finished_then_inputs_lock(): void

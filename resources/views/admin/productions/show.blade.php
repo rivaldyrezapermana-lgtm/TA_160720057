@@ -11,7 +11,7 @@
         <x-ui.card title="Informasi Batch">
             <div class="grid md:grid-cols-2 gap-4 text-sm">
                 <div><p class="text-ink-500">Produk</p><p class="font-medium">{{ $production->product?->name ?? '—' }}</p></div>
-                <div><p class="text-ink-500">Mesin</p><p class="font-medium">{{ $production->machine?->display_name ?? '—' }}</p></div>
+                <div><p class="text-ink-500">Alat</p><p class="font-medium">{{ $production->machine?->display_name ?? '—' }}</p></div>
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$production->status" /></div>
                 <div><p class="text-ink-500">Target</p><p class="font-medium tabular-nums">{{ $production->planned_qty }} pcs</p></div>
                 <div><p class="text-ink-500">Aktual</p><p class="font-medium tabular-nums">{{ $production->actual_qty }} pcs</p></div>
@@ -112,7 +112,7 @@
                             $pct = ($hasQty && $stage->phase === 'mass')
                                 ? $production->stageProgressPct($stage)
                                 : ($stage->status === 'completed' ? 100 : 0);
-                            // Mesin yang sudah terpasang tetap tampil walaupun sedang tidak aktif,
+                            // Alat yang sudah terpasang tetap tampil walaupun sedang tidak aktif,
                             // supaya tidak terlepas saat form disimpan.
                             $machines = ($machinesByStage[$stage->stage] ?? [])
                                 + $stage->machines->mapWithKeys(fn ($m) => [$m->id => $m->display_name])->all();
@@ -130,6 +130,9 @@
                             // supaya pcs itu tidak tersangkut di sisa.
                             $stageClosed = $locked
                                 || ($stage->status === 'completed' && (! $qtyEditable || (int) $stage->input_qty === 0));
+                            // Sebelum Mulai diklik isian juga nonaktif, supaya terlihat tahap ini belum berjalan.
+                            $notStarted = $stage->status === 'pending' && ! $locked;
+                            $inputsLocked = $stageClosed || $notStarted;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
                                 'in_progress' => ['bg-ink-50 border-ink-200', 'Berjalan'],
@@ -180,7 +183,7 @@
                                         </div>
                                         <div class="field !mb-0">
                                             <label class="label text-xs">Kurangi Sisa</label>
-                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $stageClosed ? 'disabled' : '' }}>
+                                            <input type="number" name="qty" min="0" max="{{ $stage->input_qty }}" value="{{ $isOldStage ? old('qty') : '' }}" placeholder="0" class="input disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $inputsLocked ? 'disabled' : '' }}>
                                             <p class="text-[11px] text-ink-400 mt-0.5">
                                                 Pcs yang baru dikerjakan · menambah output,
                                                 @if ($production->nextQtyStage($stage))
@@ -206,26 +209,29 @@
                                     @endif
                                     @if ($stage->usesMachine())
                                         @php
-                                            // Satu baris per mesin; nilai kosong (penanda dan baris yang belum dipilih) dibuang.
+                                            // Satu baris per alat; nilai kosong (penanda dan baris yang belum dipilih) dibuang.
                                             $selectedMachines = $isOldStage
                                                 ? array_values(array_map('intval', array_filter((array) old('production_machine_ids', []), 'is_numeric')))
                                                 : $stage->machines->pluck('id')->all();
                                         @endphp
-                                        <div class="field !mb-0 col-span-2 self-start" data-machine-picker data-machine-count="{{ count($machines) }}" @if ($stageClosed) data-closed @endif>
-                                            <label class="label text-xs">Mesin <span class="text-ink-400 font-normal">(dapat memilih lebih dari satu)</span></label>
-                                            {{-- Selalu terkirim: daftar yang hanya berisi nilai kosong berarti "tidak ada mesin". --}}
-                                            <input type="hidden" name="production_machine_ids[]" value="">
+                                        <div class="field !mb-0 col-span-2 self-start" data-machine-picker data-machine-count="{{ count($machines) }}" @if ($inputsLocked) data-closed @endif>
+                                            <label class="label text-xs">Alat <span class="text-ink-400 font-normal">(dapat memilih lebih dari satu)</span></label>
+                                            {{-- Terkirim saat isian terbuka: daftar yang hanya berisi nilai kosong berarti "tidak ada alat".
+                                                 Saat terkunci (termasuk tombol Mulai) tidak dikirim, jadi alat yang terpasang tidak terhapus. --}}
+                                            @unless ($inputsLocked)
+                                                <input type="hidden" name="production_machine_ids[]" value="">
+                                            @endunless
                                             @if (empty($machines))
-                                                <p class="text-sm text-ink-500">Belum ada mesin untuk tahap ini.</p>
+                                                <p class="text-sm text-ink-500">Belum ada alat untuk tahap ini.</p>
                                             @else
                                                 <div class="space-y-2 js-machine-rows">
                                                     @foreach ($selectedMachines as $mid)
-                                                        @include('admin.productions._machine_row', ['selectedId' => $mid, 'disabled' => $stageClosed])
+                                                        @include('admin.productions._machine_row', ['selectedId' => $mid, 'disabled' => $inputsLocked])
                                                     @endforeach
                                                 </div>
-                                                <p class="text-sm text-ink-500 js-machine-empty {{ $selectedMachines === [] ? '' : 'hidden' }}">Belum ada mesin dipilih.</p>
+                                                <p class="text-sm text-ink-500 js-machine-empty {{ $selectedMachines === [] ? '' : 'hidden' }}">Belum ada alat dipilih.</p>
                                                 <button type="button" class="btn btn-secondary text-xs mt-2 disabled:opacity-50 disabled:cursor-not-allowed js-machine-add"
-                                                    @disabled($stageClosed || count($selectedMachines) >= count($machines))>+ Tambah Mesin</button>
+                                                    @disabled($inputsLocked || count($selectedMachines) >= count($machines))>+ Tambah Alat</button>
                                                 <template class="js-machine-template">
                                                     @include('admin.productions._machine_row', ['selectedId' => null, 'disabled' => false])
                                                 </template>
@@ -257,7 +263,7 @@
                                                             <td class="py-1.5 text-right">
                                                                 <input type="number" name="size_qty[{{ $row->size }}]" min="0" max="{{ $row->input_qty }}"
                                                                     value="{{ $isOldStage ? old('size_qty.'.$row->size) : '' }}" placeholder="0"
-                                                                    class="input !py-1 text-right tabular-nums disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $stageClosed ? 'disabled' : '' }}>
+                                                                    class="input !py-1 text-right tabular-nums disabled:bg-ink-50 disabled:cursor-not-allowed" data-daily-qty {{ $inputsLocked ? 'disabled' : '' }}>
                                                             </td>
                                                         </tr>
                                                     @endforeach
@@ -285,15 +291,17 @@
                                     @if ($qtyEditable && $stage->status === 'completed' && ! $stageClosed)
                                         <p class="col-span-2 md:col-span-4 text-xs text-amber-700">Tahap sudah selesai, tetapi masih ada sisa {{ $stage->input_qty }} pcs. Isian terkunci setelah sisanya habis.</p>
                                     @endif
-                                    {{-- Tombol selalu terlihat dan baru nonaktif setelah tahapnya selesai. --}}
+                                    @if ($notStarted)
+                                        <p class="col-span-2 md:col-span-4 text-xs text-ink-500">Tahap ini belum dimulai. Klik Mulai untuk membuka isian.</p>
+                                    @endif
+                                    {{-- Tombol selalu terlihat. Sebelum Mulai hanya Mulai yang aktif; setelah tahap selesai semuanya nonaktif. --}}
                                     @php $buttonState = 'disabled:opacity-50 disabled:cursor-not-allowed'; @endphp
                                     <div class="col-span-2 md:col-span-4 flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
-                                        @if ($stage->status === 'pending' && ! $stageClosed)
+                                        @if ($notStarted)
                                             <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
-                                        @else
-                                            <button name="action" value="save" class="btn-secondary text-xs {{ $buttonState }}" @disabled($stageClosed)>Simpan</button>
-                                            <button name="action" value="finish" class="btn-primary text-xs {{ $buttonState }}" @disabled($stageClosed || $stage->status === 'completed')>Selesai</button>
                                         @endif
+                                        <button name="action" value="save" class="btn-secondary text-xs {{ $buttonState }}" @disabled($inputsLocked)>Simpan</button>
+                                        <button name="action" value="finish" class="btn-primary text-xs {{ $buttonState }}" @disabled($inputsLocked || $stage->status === 'completed')>Selesai</button>
                                     </div>
                                 </form>
 
@@ -358,7 +366,7 @@
                                 @endif
 
                                 @if (empty($machines) && $hasQty)
-                                    <p class="text-xs text-amber-600 mt-1">Belum ada mesin aktif untuk tahap ini. Tambahkan kategori mesin dengan tahap "{{ $stage->label() }}".</p>
+                                    <p class="text-xs text-amber-600 mt-1">Belum ada alat aktif untuk tahap ini. Tambahkan kategori alat dengan tahap "{{ $stage->label() }}".</p>
                                 @endif
                             @endif
                         </div>
@@ -493,7 +501,7 @@
                 <form action="{{ route('admin.productions.pause', $production->id) }}" method="POST" class="space-y-2">
                     @csrf
                     <label for="keterangan" class="label text-xs">Keterangan <span class="text-ink-400 font-normal">(opsional)</span></label>
-                    <textarea name="keterangan" id="keterangan" rows="2" maxlength="500" class="input" placeholder="Contoh: istirahat, mesin diperbaiki">{{ old('keterangan') }}</textarea>
+                    <textarea name="keterangan" id="keterangan" rows="2" maxlength="500" class="input" placeholder="Contoh: istirahat, alat diperbaiki">{{ old('keterangan') }}</textarea>
                     <p class="text-[11px] text-ink-400">Jika dikosongkan, posisi tahap saat ini dicatat otomatis.</p>
                     @error('keterangan')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
                     <button class="btn-secondary w-full justify-center">Pause</button>
@@ -613,8 +621,8 @@
 $(function () {
     const MODAL = 'modal-konfirmasi-harian';
 
-    // Pilihan mesin per form tahap: mesin yang sudah dipilih di baris lain tidak bisa dipilih lagi,
-    // dan tombol tambah nonaktif bila barisnya sudah sebanyak mesin yang tersedia.
+    // Pilihan alat per form tahap: alat yang sudah dipilih di baris lain tidak bisa dipilih lagi,
+    // dan tombol tambah nonaktif bila barisnya sudah sebanyak alat yang tersedia.
     function refreshMachines(picker) {
         const selects = picker.find('.js-machine-select');
         const chosen = selects.map(function () { return this.value; }).get().filter(Boolean);
