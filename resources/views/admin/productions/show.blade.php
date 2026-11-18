@@ -11,7 +11,7 @@
         <x-ui.card title="Informasi Batch">
             <div class="grid md:grid-cols-2 gap-4 text-sm">
                 <div><p class="text-ink-500">Produk</p><p class="font-medium">{{ $production->product?->name ?? '—' }}</p></div>
-                <div><p class="text-ink-500">Alat</p><p class="font-medium">{{ $production->machine?->display_name ?? '—' }}</p></div>
+                <div><p class="text-ink-500">Alat/Mesin</p><p class="font-medium">{{ $production->machine?->display_name ?? '—' }}</p></div>
                 <div><p class="text-ink-500">Status</p><x-ui.status-badge :status="$production->status" /></div>
                 <div><p class="text-ink-500">Target</p><p class="font-medium tabular-nums">{{ $production->planned_qty }} pcs</p></div>
                 <div><p class="text-ink-500">Aktual</p><p class="font-medium tabular-nums">{{ $production->actual_qty }} pcs</p></div>
@@ -215,23 +215,23 @@
                                                 : $stage->machines->pluck('id')->all();
                                         @endphp
                                         <div class="field !mb-0 col-span-2 self-start" data-machine-picker data-machine-count="{{ count($machines) }}" @if ($inputsLocked) data-closed @endif>
-                                            <label class="label text-xs">Alat <span class="text-ink-400 font-normal">(dapat memilih lebih dari satu)</span></label>
+                                            <label class="label text-xs">Alat/Mesin <span class="text-ink-400 font-normal">(dapat memilih lebih dari satu)</span></label>
                                             {{-- Terkirim saat isian terbuka: daftar yang hanya berisi nilai kosong berarti "tidak ada alat".
                                                  Saat terkunci (termasuk tombol Mulai) tidak dikirim, jadi alat yang terpasang tidak terhapus. --}}
                                             @unless ($inputsLocked)
                                                 <input type="hidden" name="production_machine_ids[]" value="">
                                             @endunless
                                             @if (empty($machines))
-                                                <p class="text-sm text-ink-500">Belum ada alat untuk tahap ini.</p>
+                                                <p class="text-sm text-ink-500">Belum ada alat/mesin untuk tahap ini.</p>
                                             @else
                                                 <div class="space-y-2 js-machine-rows">
                                                     @foreach ($selectedMachines as $mid)
                                                         @include('admin.productions._machine_row', ['selectedId' => $mid, 'disabled' => $inputsLocked])
                                                     @endforeach
                                                 </div>
-                                                <p class="text-sm text-ink-500 js-machine-empty {{ $selectedMachines === [] ? '' : 'hidden' }}">Belum ada alat dipilih.</p>
+                                                <p class="text-sm text-ink-500 js-machine-empty {{ $selectedMachines === [] ? '' : 'hidden' }}">Belum ada alat/mesin dipilih.</p>
                                                 <button type="button" class="btn btn-secondary text-xs mt-2 disabled:opacity-50 disabled:cursor-not-allowed js-machine-add"
-                                                    @disabled($inputsLocked || count($selectedMachines) >= count($machines))>+ Tambah Alat</button>
+                                                    @disabled($inputsLocked || count($selectedMachines) >= count($machines))>+ Tambah Alat/Mesin</button>
                                                 <template class="js-machine-template">
                                                     @include('admin.productions._machine_row', ['selectedId' => null, 'disabled' => false])
                                                 </template>
@@ -366,7 +366,7 @@
                                 @endif
 
                                 @if (empty($machines) && $hasQty)
-                                    <p class="text-xs text-amber-600 mt-1">Belum ada alat aktif untuk tahap ini. Tambahkan kategori alat dengan tahap "{{ $stage->label() }}".</p>
+                                    <p class="text-xs text-amber-600 mt-1">Belum ada alat/mesin aktif untuk tahap ini. Tambahkan kategori alat dan mesin dengan tahap "{{ $stage->label() }}".</p>
                                 @endif
                             @endif
                         </div>
@@ -501,7 +501,7 @@
                 <form action="{{ route('admin.productions.pause', $production->id) }}" method="POST" class="space-y-2">
                     @csrf
                     <label for="keterangan" class="label text-xs">Keterangan <span class="text-ink-400 font-normal">(opsional)</span></label>
-                    <textarea name="keterangan" id="keterangan" rows="2" maxlength="500" class="input" placeholder="Contoh: istirahat, alat diperbaiki">{{ old('keterangan') }}</textarea>
+                    <textarea name="keterangan" id="keterangan" rows="2" maxlength="500" class="input" placeholder="Contoh: istirahat, mesin diperbaiki">{{ old('keterangan') }}</textarea>
                     <p class="text-[11px] text-ink-400">Jika dikosongkan, posisi tahap saat ini dicatat otomatis.</p>
                     @error('keterangan')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
                     <button class="btn-secondary w-full justify-center">Pause</button>

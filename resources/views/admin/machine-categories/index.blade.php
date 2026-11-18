@@ -1,19 +1,19 @@
 @extends('layouts.admin')
-@section('title', 'Kategori Alat')
+@section('title', 'Kategori Alat dan Mesin')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Kategori Alat']]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Kategori Alat</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Kategori Alat dan Mesin']]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Kategori Alat dan Mesin</h1>
 @endsection
 
 @section('content')
 <div class="bg-white border border-ink-100 rounded-xl overflow-hidden">
     <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-ink-100">
-        <p class="text-sm text-ink-500">Kelompok alat menurut fungsi atau tahap produksi.</p>
+        <p class="text-sm text-ink-500">Kelompok alat dan mesin menurut fungsi atau tahap produksi.</p>
         <a href="{{ route('admin.machine-categories.create') }}" class="btn-primary">+ Tambah Kategori</a>
     </div>
     <div class="p-5">
         <table id="tbl-cats" class="table-clean" style="width:100%">
-            <thead><tr><th>Kode</th><th>Nama</th><th>Tahap</th><th class="text-right">Jumlah Alat</th><th class="text-right">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Nama</th><th>Tahap</th><th class="text-right">Jumlah Alat/Mesin</th><th class="text-right">Aksi</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>

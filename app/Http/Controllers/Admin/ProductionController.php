@@ -702,7 +702,7 @@ class ProductionController extends Controller
             $mismatch = ProductionMachine::with('category')->whereKey($added)->get()
                 ->contains(fn (ProductionMachine $m) => $m->category?->stage !== $stage->stage);
             if ($mismatch) {
-                return back()->with('error', 'Alat yang dipilih tidak sesuai dengan tahap ini.');
+                return back()->with('error', 'Alat/mesin yang dipilih tidak sesuai dengan tahap ini.');
             }
         }
 

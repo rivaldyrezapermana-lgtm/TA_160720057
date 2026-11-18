@@ -10,7 +10,7 @@
     @csrf @method('PUT')
     <x-ui.card title="Informasi Produksi">
         <div class="grid md:grid-cols-3 gap-4">
-            <x-ui.select name="production_machine_id" label="Alat Produksi" :options="$machines->toArray()" :selected="$production->production_machine_id" placeholder="— Tanpa alat —" />
+            <x-ui.select name="production_machine_id" label="Alat/Mesin" :options="$machines->toArray()" :selected="$production->production_machine_id" placeholder="— Tanpa alat —" />
             @if ($production->sizes->isEmpty())
                 <x-ui.input name="planned_qty" type="number" label="Target Jumlah" required :value="$production->planned_qty" />
             @endif

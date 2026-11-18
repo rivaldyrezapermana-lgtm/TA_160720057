@@ -1,8 +1,8 @@
 @extends('layouts.admin')
-@section('title', 'Tambah Alat Produksi')
+@section('title', 'Tambah Alat/Mesin')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Alat Produksi', 'url' => route('admin.production-machines.index')], ['label' => 'Tambah']]" />
-    <h1 class="font-display text-xl font-semibold text-ink-900">Tambah Alat Produksi</h1>
+    <x-admin.breadcrumb :items="[['label' => 'Alat dan Mesin', 'url' => route('admin.production-machines.index')], ['label' => 'Tambah']]" />
+    <h1 class="font-display text-xl font-semibold text-ink-900">Tambah Alat/Mesin</h1>
 @endsection
 
 @section('content')
@@ -10,9 +10,9 @@
     @csrf
     <x-ui.card>
         <div class="grid md:grid-cols-2 gap-4">
-            <div class="md:col-span-2"><x-ui.input name="name" label="Nama Alat" required /></div>
+            <div class="md:col-span-2"><x-ui.input name="name" label="Nama Alat/Mesin" required /></div>
             <div class="field">
-                <label class="label">ID Alat</label>
+                <label class="label">ID Alat/Mesin</label>
                 <input type="text" value="{{ $nextKode }}" class="input bg-ink-50" readonly disabled>
                 <p class="field-help">Dibuat otomatis.</p>
             </div>

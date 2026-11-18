@@ -116,7 +116,7 @@ class ProductionStageMachinesTest extends TestCase
             $this->assertMatchesRegularExpression('/<option value="'.$machine->id.'"\s+selected/', $rows[$i]);
             $this->assertStringContainsString('js-machine-remove', $rows[$i]);
         }
-        $this->assertStringContainsString('+ Tambah Alat', $form);
+        $this->assertStringContainsString('+ Tambah Alat/Mesin', $form);
         $this->assertDoesNotMatchRegularExpression('/<button[^>]*js-machine-add[^>]*disabled/', $form);
     }
 
@@ -127,8 +127,8 @@ class ProductionStageMachinesTest extends TestCase
         $form = $this->cuttingForm();
 
         $this->assertCount(0, $this->machineRows($form));
-        $this->assertStringContainsString('Belum ada alat dipilih.', $form);
-        $this->assertStringContainsString('+ Tambah Alat', $form);
+        $this->assertStringContainsString('Belum ada alat/mesin dipilih.', $form);
+        $this->assertStringContainsString('+ Tambah Alat/Mesin', $form);
         // Template baris baru ikut dirender agar tombol tambah bisa menyalinnya.
         $this->assertStringContainsString('js-machine-template', $form);
     }
@@ -163,8 +163,8 @@ class ProductionStageMachinesTest extends TestCase
     {
         $form = $this->cuttingForm();
 
-        $this->assertStringContainsString('Belum ada alat untuk tahap ini.', $form);
-        $this->assertStringNotContainsString('+ Tambah Alat', $form);
+        $this->assertStringContainsString('Belum ada alat/mesin untuk tahap ini.', $form);
+        $this->assertStringNotContainsString('+ Tambah Alat/Mesin', $form);
     }
 
     public function test_rows_from_a_failed_submit_are_shown_again(): void

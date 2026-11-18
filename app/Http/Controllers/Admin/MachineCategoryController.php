@@ -38,7 +38,7 @@ class MachineCategoryController extends Controller
         MachineCategory::create($request->validate($this->rules()));
 
         return redirect()->route('admin.machine-categories.index')
-            ->with('success', 'Kategori alat berhasil ditambahkan.');
+            ->with('success', 'Kategori alat dan mesin berhasil ditambahkan.');
     }
 
     public function show(MachineCategory $machine_category)
@@ -59,20 +59,20 @@ class MachineCategoryController extends Controller
         $machine_category->update($request->validate($this->rules($machine_category)));
 
         return redirect()->route('admin.machine-categories.index')
-            ->with('success', 'Kategori alat berhasil diperbarui.');
+            ->with('success', 'Kategori alat dan mesin berhasil diperbarui.');
     }
 
     public function destroy(MachineCategory $machine_category)
     {
         if ($machine_category->machines()->exists()) {
             return redirect()->route('admin.machine-categories.index')
-                ->with('error', 'Kategori tidak dapat dihapus karena masih digunakan oleh alat.');
+                ->with('error', 'Kategori tidak dapat dihapus karena masih digunakan oleh alat atau mesin.');
         }
 
         $machine_category->delete();
 
         return redirect()->route('admin.machine-categories.index')
-            ->with('success', 'Kategori alat berhasil dihapus.');
+            ->with('success', 'Kategori alat dan mesin berhasil dihapus.');
     }
 
     private function rules(?MachineCategory $category = null): array

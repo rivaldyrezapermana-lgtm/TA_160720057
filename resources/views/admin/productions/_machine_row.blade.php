@@ -1,7 +1,7 @@
 {{-- Satu baris alat pada form tahap: $machines (id => nama), $selectedId (id atau null), $disabled. --}}
 <div class="flex items-center gap-2 js-machine-row">
-    <select name="production_machine_ids[]" aria-label="Alat" class="input js-machine-select disabled:bg-ink-50 disabled:cursor-not-allowed" @disabled($disabled)>
-        <option value="">Pilih alat</option>
+    <select name="production_machine_ids[]" aria-label="Alat/Mesin" class="input js-machine-select disabled:bg-ink-50 disabled:cursor-not-allowed" @disabled($disabled)>
+        <option value="">Pilih alat/mesin</option>
         @foreach ($machines as $mid => $mname)
             <option value="{{ $mid }}" @selected($selectedId === (int) $mid)>{{ $mname }}</option>
         @endforeach

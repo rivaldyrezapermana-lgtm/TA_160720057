@@ -1,7 +1,7 @@
 @extends('layouts.admin')
-@section('title', 'Ubah Kategori Alat')
+@section('title', 'Ubah Kategori Alat dan Mesin')
 @section('breadcrumb')
-    <x-admin.breadcrumb :items="[['label' => 'Kategori Alat', 'url' => route('admin.machine-categories.index')], ['label' => $category->name]]" />
+    <x-admin.breadcrumb :items="[['label' => 'Kategori Alat dan Mesin', 'url' => route('admin.machine-categories.index')], ['label' => $category->name]]" />
     <h1 class="font-display text-xl font-semibold text-ink-900">Ubah: {{ $category->name }}</h1>
 @endsection
 
