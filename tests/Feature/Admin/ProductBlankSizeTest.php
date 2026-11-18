@@ -28,7 +28,6 @@ class ProductBlankSizeTest extends TestCase
         return [
             'name' => 'Gamis Uji',
             'category_id' => Category::firstOrCreate(['name' => 'Gamis'])->id,
-            'price' => 1000,
             'sizes' => $sizes,
         ];
     }
@@ -37,7 +36,7 @@ class ProductBlankSizeTest extends TestCase
     {
         $this->actingAs($this->admin())->post(route('admin.products.store'), $this->payload([
             'S' => ['size' => 'S', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
-            'L' => ['size' => 'L', 'chest_cm' => '96', 'length_cm' => '', 'sleeve_cm' => ''],
+            'L' => ['size' => 'L', 'price' => '1000', 'chest_cm' => '96', 'length_cm' => '', 'sleeve_cm' => ''],
         ]))->assertRedirect(route('admin.products.index'));
 
         $sizes = Product::firstOrFail()->sizes()->pluck('size')->sort()->values()->all();
@@ -49,9 +48,11 @@ class ProductBlankSizeTest extends TestCase
     {
         $this->actingAs($this->admin())->post(route('admin.products.store'), $this->payload([
             'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => '5'],
-        ]))->assertRedirect(route('admin.products.index'));
+            // Produk wajib punya satu ukuran berharga; L membuktikan M tetap tidak dipakai.
+            'L' => ['size' => 'L', 'price' => '1000', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+        ]))->assertSessionHasNoErrors()->assertRedirect(route('admin.products.index'));
 
-        $this->assertSame(0, Product::firstOrFail()->sizes()->count());
+        $this->assertSame(['L'], Product::firstOrFail()->sizes()->pluck('size')->all());
     }
 
     public function test_a_size_used_only_by_the_recipe_gets_a_variant_at_stock_zero(): void
@@ -60,7 +61,7 @@ class ProductBlankSizeTest extends TestCase
 
         $this->actingAs($this->admin())->post(route('admin.products.store'), $this->payload([
             'S' => ['size' => 'S', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
-            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+            'M' => ['size' => 'M', 'price' => '1000', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
         ]) + ['materials' => [['material_id' => $kain->id, 'qty' => ['S' => '', 'M' => '1.5']]]])
             ->assertRedirect(route('admin.products.index'));
 
@@ -72,7 +73,8 @@ class ProductBlankSizeTest extends TestCase
     {
         $admin = $this->admin();
         $payload = $this->payload([
-            'M' => ['size' => 'M', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+            // Varian M yang sudah ada tetap wajib berharga; ukuran badannya kosong.
+            'M' => ['size' => 'M', 'price' => '1000', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
             'L' => ['size' => 'L', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
         ]);
         $product = Product::create([

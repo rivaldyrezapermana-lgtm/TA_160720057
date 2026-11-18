@@ -98,16 +98,15 @@ class MasterDataTest extends TestCase
             ->post(route('admin.products.store'), [
                 'name' => 'Gamis Navy',
                 'category_id' => $category->id,
-                'price' => 225000,
                 'is_active' => '1',
                 'sizes' => [
-                    'M' => ['size' => 'M', 'chest_cm' => 96, 'length_cm' => 137, 'sleeve_cm' => 57],
+                    'M' => ['size' => 'M', 'price' => 225000, 'chest_cm' => 96, 'length_cm' => 137, 'sleeve_cm' => 57],
                 ],
             ])
             ->assertRedirectToRoute('admin.products.index');
 
-        $this->assertDatabaseHas('products', ['name' => 'Gamis Navy', 'sku' => 'SKU-0001', 'is_active' => true]);
-        $this->assertDatabaseHas('product_sizes', ['size' => 'M', 'chest_cm' => 96, 'stock' => 0]);
+        $this->assertDatabaseHas('products', ['name' => 'Gamis Navy', 'sku' => 'SKU-0001', 'is_active' => true, 'price' => 225000]);
+        $this->assertDatabaseHas('product_sizes', ['size' => 'M', 'price' => 225000, 'chest_cm' => 96, 'stock' => 0]);
     }
 
     public function test_product_datatable_returns_json_rows(): void

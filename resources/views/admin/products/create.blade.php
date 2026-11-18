@@ -16,7 +16,6 @@
                 <input type="text" value="Dibuat otomatis saat disimpan" class="input bg-ink-50" readonly disabled>
             </div>
             <x-ui.select name="category_id" label="Kategori" required :options="$categories->pluck('name','id')->toArray()" />
-            <x-ui.input name="price" type="number" label="Harga Utama (Rp)" required />
             <div class="md:col-span-2"><x-ui.textarea name="description" label="Deskripsi" rows="4" /></div>
             <div class="md:col-span-2">
                 <label class="label">Foto Produk</label>
@@ -43,14 +42,15 @@
             @foreach ($sizes as $sz)
                 <div class="grid grid-cols-5 gap-2">
                     <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input" readonly>
-                    <input type="number" min="0" name="sizes[{{ $sz }}][price]" value="{{ old('sizes.'.$sz.'.price') }}" placeholder="Harga utama" data-col="{{ $loop->index }}" class="input js-size-price">
+                    <input type="number" min="0" name="sizes[{{ $sz }}][price]" value="{{ old('sizes.'.$sz.'.price') }}" placeholder="Rp" data-col="{{ $loop->index }}" class="input js-size-price">
                     <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm') }}" placeholder="cm" class="input">
                     <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm') }}" placeholder="cm" class="input">
                     <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm') }}" placeholder="cm" class="input">
                 </div>
             @endforeach
+            @error('sizes')<p class="field-error">{{ $message }}</p>@enderror
             @error('sizes.*.price')<p class="field-error">{{ $message }}</p>@enderror
-            <p class="field-help">Kosongkan Harga Jual jika ukuran tersebut mengikuti Harga Utama.</p>
+            <p class="field-help">Isi Harga Jual untuk setiap ukuran yang dijual. Ukuran yang dikosongkan seluruhnya tidak dijual.</p>
         </div>
     </x-ui.card>
 

@@ -32,11 +32,14 @@ class StockLockTest extends TestCase
         $this->actingAs($this->admin())
             ->put(route('admin.products.update', $product), [
                 'name' => 'Gamis A', 'sku' => 'GA-1', 'category_id' => $cat->id,
-                'price' => 120000, 'stock' => 9999, 'is_active' => 1,
+                'stock' => 9999, 'is_active' => 1,
+                'sizes' => ['M' => ['size' => 'M', 'price' => 120000, 'stock' => 9999]],
             ])
+            ->assertSessionHasNoErrors()
             ->assertRedirect();
 
         $this->assertEquals(40, $product->fresh()->stock); // unchanged
+        $this->assertEquals(0, $product->sizes()->where('size', 'M')->value('stock')); // new variant starts at 0
         $this->assertEquals(120000, (int) $product->fresh()->price); // other fields still update
     }
 
@@ -52,7 +55,8 @@ class StockLockTest extends TestCase
         $this->actingAs($this->admin())
             ->put(route('admin.products.update', $product), [
                 'name' => 'Gamis A', 'sku' => 'GA-1', 'category_id' => $cat->id,
-                'price' => 50000, 'is_active' => 1,
+                'is_active' => 1,
+                'sizes' => ['M' => ['size' => 'M', 'price' => 50000]],
                 'materials' => [['material_id' => $kain->id, 'qty' => ['M' => 3]]], // HPP = 75000 > 50000
             ])
             ->assertSessionHas('warning', 'Harga jual di bawah HPP pada ukuran M (harga Rp 50.000, HPP Rp 75.000). Periksa kembali margin.');

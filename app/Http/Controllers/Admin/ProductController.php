@@ -58,7 +58,7 @@ class ProductController extends Controller
             'name' => $data['name'],
             'sku' => Product::nextSku(),
             'description' => $data['description'] ?? null,
-            'price' => $data['price'],
+            'price' => 0, // diisi harga ukuran termurah setelah ukuran disimpan
             'stock' => 0, // stok hanya bertambah dari hasil produksi
             'is_active' => $request->boolean('is_active'),
             'image' => $request->hasFile('image')
@@ -118,7 +118,6 @@ class ProductController extends Controller
             'category_id' => $data['category_id'],
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'price' => $data['price'],
             'is_active' => $request->boolean('is_active'),
         ]);
 
@@ -213,9 +212,18 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['required', Rule::exists('categories', 'id')],
             'description' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
             'image' => ['nullable', 'image', 'max:2048'],
-            'sizes' => ['nullable', 'array'],
+            // Tidak ada harga utama: setiap ukuran yang dijual wajib punya harga sendiri.
+            // Produk baru wajib punya ukuran berharga; saat diubah, varian lama tetap tersimpan.
+            'sizes' => [$product ? 'nullable' : 'required', 'array', function ($attribute, $value, $fail) use ($product) {
+                $missing = $this->sizesWithoutPrice(is_array($value) ? $value : [], $product);
+                if ($missing !== []) {
+                    $fail('Isi harga jual untuk ukuran '.implode(', ', $missing).'.');
+                }
+                if (! collect(is_array($value) ? $value : [])->contains(fn ($row) => is_array($row) && filled($row['price'] ?? null))) {
+                    $fail('Isi harga jual minimal untuk satu ukuran.');
+                }
+            }],
             'sizes.*.size' => ['required', 'string', 'max:10', Rule::in($allowedSizes)],
             'sizes.*.price' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'sizes.*.chest_cm' => ['nullable', 'integer', 'min:0'],
@@ -287,8 +295,38 @@ class ProductController extends Controller
         DB::transaction(function () use ($product, $data, $lines) {
             $this->syncSizes($product, $data['sizes'] ?? [], $lines);
             $this->syncMaterials($product, $lines);
+            // products.price tetap diisi (harga termurah) untuk pengurutan, laporan, dan
+            // cadangan ukuran lama yang belum punya harga sendiri.
+            $product->forceFill(['price' => (float) ($product->sizes()->whereNotNull('price')->min('price') ?? 0)])->save();
             $this->refreshHpp($product);
         });
+    }
+
+    /**
+     * Ukuran yang dijual tetapi harganya kosong: baris berisi ukuran badan atau
+     * jumlah resep, atau varian yang sudah ada pada produk.
+     *
+     * @return list<string>
+     */
+    private function sizesWithoutPrice(array $sizes, ?Product $product): array
+    {
+        $recipeSizes = $this->recipeLines(request()->input('materials', []))
+            ->flatMap(fn (array $line) => array_keys($line['qty']))
+            ->map(fn ($size) => (string) $size);
+        $existing = $product?->sizes()->pluck('size')->map(fn ($size) => (string) $size) ?? collect();
+
+        return collect($sizes)
+            ->filter(fn ($row) => is_array($row) && filled($row['size'] ?? null) && blank($row['price'] ?? null))
+            ->filter(function (array $row) use ($recipeSizes, $existing) {
+                $size = (string) $row['size'];
+                $measured = collect(['chest_cm', 'length_cm', 'sleeve_cm'])->contains(fn ($field) => filled($row[$field] ?? null));
+
+                return $measured || $recipeSizes->contains($size) || $existing->contains($size);
+            })
+            ->pluck('size')
+            ->map(fn ($size) => (string) $size)
+            ->values()
+            ->all();
     }
 
     /**

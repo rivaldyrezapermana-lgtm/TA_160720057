@@ -24,7 +24,8 @@ class ProductSkuTest extends TestCase
     private function payload(Category $cat, array $extra = []): array
     {
         return array_merge([
-            'name' => 'Gamis Baru', 'category_id' => $cat->id, 'price' => 150000, 'is_active' => '1',
+            'name' => 'Gamis Baru', 'category_id' => $cat->id, 'is_active' => '1',
+            'sizes' => ['M' => ['size' => 'M', 'price' => 150000]],
         ], $extra);
     }
 

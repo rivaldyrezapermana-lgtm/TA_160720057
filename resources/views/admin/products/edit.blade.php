@@ -18,7 +18,6 @@
                 <p class="field-help">SKU dibuat otomatis dan tidak dapat diubah.</p>
             </div>
             <x-ui.select name="category_id" label="Kategori" required :selected="$product->category_id" :options="$categories->pluck('name','id')->toArray()" />
-            <x-ui.input name="price" type="number" label="Harga Utama (Rp)" :value="$product->price" required />
             <div class="field">
                 <label class="label">Stok</label>
                 <input type="number" value="{{ $product->stock }}" class="input bg-ink-50" readonly disabled>
@@ -57,15 +56,16 @@
                 @php $row = $sizeRows->get($sz); @endphp
                 <div class="grid grid-cols-6 gap-2">
                     <input type="text" name="sizes[{{ $sz }}][size]" value="{{ $sz }}" class="input" readonly>
-                    <input type="number" min="0" name="sizes[{{ $sz }}][price]" value="{{ old('sizes.'.$sz.'.price', $row->price ?? '') }}" placeholder="Harga utama" data-col="{{ $loop->index }}" class="input js-size-price">
+                    <input type="number" min="0" name="sizes[{{ $sz }}][price]" value="{{ old('sizes.'.$sz.'.price', $row ? ($row->price ?? $product->price) : '') }}" placeholder="Rp" data-col="{{ $loop->index }}" class="input js-size-price">
                     <input type="number" name="sizes[{{ $sz }}][chest_cm]" value="{{ old('sizes.'.$sz.'.chest_cm', $row->chest_cm ?? '') }}" placeholder="cm" class="input">
                     <input type="number" name="sizes[{{ $sz }}][length_cm]" value="{{ old('sizes.'.$sz.'.length_cm', $row->length_cm ?? '') }}" placeholder="cm" class="input">
                     <input type="number" name="sizes[{{ $sz }}][sleeve_cm]" value="{{ old('sizes.'.$sz.'.sleeve_cm', $row->sleeve_cm ?? '') }}" placeholder="cm" class="input">
                     <input type="text" value="{{ $row->stock ?? 0 }}" aria-label="Stok ukuran {{ $sz }}" class="input bg-ink-50 text-right tabular-nums js-size-stock" readonly disabled>
                 </div>
             @endforeach
+            @error('sizes')<p class="field-error">{{ $message }}</p>@enderror
             @error('sizes.*.price')<p class="field-error">{{ $message }}</p>@enderror
-            <p class="field-help">Kosongkan Harga Jual jika ukuran tersebut mengikuti Harga Utama. Stok bertambah otomatis dari hasil produksi.</p>
+            <p class="field-help">Isi Harga Jual untuk setiap ukuran yang dijual. Stok bertambah otomatis dari hasil produksi.</p>
         </div>
     </x-ui.card>
 

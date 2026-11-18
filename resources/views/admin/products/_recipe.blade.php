@@ -71,12 +71,9 @@ $(function () {
             $(this).text(fmt(totals[$(this).data('col')]));
         });
 
-        const mainPrice = parseFloat($('#price').val()) || 0;
-        const priceOf = col => {
-            const own = parseFloat($('.js-size-price[data-col="' + col + '"]').val());
-            return isNaN(own) ? mainPrice : own;
-        };
-        const under = sizes.filter((size, col) => totals[col] > 0 && priceOf(col) < totals[col]);
+        // Ukuran yang harganya belum diisi tidak dibandingkan dengan HPP.
+        const priceOf = col => parseFloat($('.js-size-price[data-col="' + col + '"]').val());
+        const under = sizes.filter((size, col) => totals[col] > 0 && ! isNaN(priceOf(col)) && priceOf(col) < totals[col]);
         $('#hpp-warning-sizes').text(under.join(', '));
         $('#hpp-warning').toggleClass('hidden', under.length === 0);
         $('#bom-empty').toggleClass('hidden', $('.js-bom-row').length > 0);
@@ -90,7 +87,7 @@ $(function () {
         $(this).closest('.js-bom-row').remove();
         recalc();
     });
-    $(document).on('input change', '.js-bom-qty, .js-bom-material, .js-size-price, #price', recalc);
+    $(document).on('input change', '.js-bom-qty, .js-bom-material, .js-size-price', recalc);
     recalc();
 });
 </script>

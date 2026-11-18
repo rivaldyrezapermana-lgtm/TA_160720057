@@ -145,7 +145,6 @@ class ProductRecipePerSizeTest extends TestCase
         return $extra + [
             'name' => 'Gamis A',
             'category_id' => $this->product->category_id,
-            'price' => 100000,
             'is_active' => 1,
             'materials' => $materials,
         ];
@@ -156,7 +155,8 @@ class ProductRecipePerSizeTest extends TestCase
         $this->actingAs($this->admin())->post(route('admin.products.store'), $this->formPayload([
             ['material_id' => $this->kain->id, 'qty' => ['S' => '2', 'M' => '2.25', 'L' => '2.5', 'XL' => '']],
             ['material_id' => $this->label->id, 'qty' => ['S' => '1', 'M' => '1', 'L' => '1', 'XL' => '0']],
-        ]))->assertSessionHasNoErrors();
+        ], ['sizes' => collect(['S', 'M', 'L'])->mapWithKeys(fn ($size) => [$size => ['size' => $size, 'price' => 150000]])->all()]))
+            ->assertSessionHasNoErrors();
 
         $product = Product::latest('id')->first();
 
@@ -225,7 +225,7 @@ class ProductRecipePerSizeTest extends TestCase
     public function test_removing_every_row_empties_the_recipe(): void
     {
         $this->actingAs($this->admin())->put(route('admin.products.update', $this->product), [
-            'name' => 'Gamis A', 'category_id' => $this->product->category_id, 'price' => 100000,
+            'name' => 'Gamis A', 'category_id' => $this->product->category_id,
         ])->assertSessionHasNoErrors();
 
         $this->assertSame(0, $this->product->materials()->count());
@@ -242,9 +242,9 @@ class ProductRecipePerSizeTest extends TestCase
         ], [
             'stock' => 999,
             'sizes' => [
-                'M' => ['size' => 'M', 'chest_cm' => '96', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => '999'],
-                'L' => ['size' => 'L', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
-                'XL' => ['size' => 'XL', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+                'M' => ['size' => 'M', 'price' => '100000', 'chest_cm' => '96', 'length_cm' => '', 'sleeve_cm' => '', 'stock' => '999'],
+                'L' => ['size' => 'L', 'price' => '100000', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
+                'XL' => ['size' => 'XL', 'price' => '100000', 'chest_cm' => '', 'length_cm' => '', 'sleeve_cm' => ''],
             ],
         ]))->assertSessionHasNoErrors();
 
@@ -260,7 +260,7 @@ class ProductRecipePerSizeTest extends TestCase
     {
         $this->actingAs($this->admin())->post(route('admin.products.store'), $this->formPayload([], [
             'stock' => 77,
-            'sizes' => ['M' => ['size' => 'M', 'chest_cm' => '90', 'stock' => '12']],
+            'sizes' => ['M' => ['size' => 'M', 'price' => '100000', 'chest_cm' => '90', 'stock' => '12']],
         ]))->assertSessionHasNoErrors();
 
         $product = Product::latest('id')->first();
@@ -326,7 +326,12 @@ class ProductRecipePerSizeTest extends TestCase
     {
         $this->actingAs($this->admin())->put(route('admin.products.update', $this->product), $this->formPayload([
             ['material_id' => $this->kain->id, 'qty' => ['S' => '2', 'M' => '2.25', 'L' => '2.5']],
-        ], ['price' => 95000]))->assertSessionHas(
+        ], ['sizes' => [
+            // HPP S 80.000, M 90.000, L 100.000: hanya L yang rugi pada 95.000.
+            'S' => ['size' => 'S', 'price' => '95000'],
+            'M' => ['size' => 'M', 'price' => '95000'],
+            'L' => ['size' => 'L', 'price' => '95000'],
+        ]]))->assertSessionHas(
             'warning',
             'Harga jual di bawah HPP pada ukuran L (harga Rp 95.000, HPP Rp 100.000). Periksa kembali margin.'
         );
@@ -343,7 +348,12 @@ class ProductRecipePerSizeTest extends TestCase
     {
         $this->actingAs($this->admin())->put(route('admin.products.update', $this->product), $this->formPayload([
             ['material_id' => $this->kain->id, 'qty' => ['L' => '2.5']],
-        ]))->assertSessionMissing('warning');
+        ], ['sizes' => [
+            // HPP L 100.000 sama dengan harganya; S dan M tanpa resep.
+            'S' => ['size' => 'S', 'price' => '100000'],
+            'M' => ['size' => 'M', 'price' => '100000'],
+            'L' => ['size' => 'L', 'price' => '100000'],
+        ]]))->assertSessionHasNoErrors()->assertSessionMissing('warning');
     }
 
     public function test_show_page_lists_hpp_margin_and_recipe_per_size(): void
