@@ -39,8 +39,8 @@ class MaterialController extends Controller
 
     public function store(Request $request)
     {
-        // Stok awal selalu 0; stok hanya masuk lewat pembelian yang diterima.
-        Material::create($request->validate($this->rules()) + ['stock' => 0]);
+        // Stok dan harga mulai dari 0; keduanya diisi oleh pembelian yang diterima.
+        Material::create($request->validate($this->rules()) + ['stock' => 0, 'unit_cost' => 0]);
 
         return redirect()->route('admin.materials.index')
             ->with('success', 'Bahan baku berhasil ditambahkan.');
@@ -89,7 +89,8 @@ class MaterialController extends Controller
             'code' => ['required', 'string', 'max:255', Rule::unique('materials', 'code')->ignore($material)],
             'unit' => ['required', 'string', 'max:20'],
             'min_stock' => ['required', 'integer', 'min:0'],
-            'unit_cost' => ['required', 'numeric', 'min:0'],
+            // Harga hanya dapat dikoreksi pada form ubah; bahan baru belum punya harga.
+            ...($material ? ['unit_cost' => ['required', 'numeric', 'min:0']] : []),
         ];
     }
 }

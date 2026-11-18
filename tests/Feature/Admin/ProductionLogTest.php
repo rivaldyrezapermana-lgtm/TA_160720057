@@ -196,7 +196,7 @@ class ProductionLogTest extends TestCase
 
         $this->actingAs($this->admin())->get(route('admin.productions.show', $prod))
             ->assertOk()
-            ->assertSee('Belum ada catatan pause.')
+            ->assertSee('Belum ada catatan.')
             ->assertSee(route('admin.productions.pause', $prod), false)
             ->assertSee('name="keterangan"', false);
     }

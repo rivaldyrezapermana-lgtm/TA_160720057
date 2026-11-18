@@ -16,10 +16,9 @@
             <div class="field">
                 <label class="label">Stok Awal</label>
                 <input type="text" value="0" class="input bg-ink-50" readonly disabled>
-                <p class="field-help">Stok bertambah otomatis saat pembelian diterima.</p>
+                <p class="field-help">Stok dan harga bahan terisi otomatis saat pembelian diterima.</p>
             </div>
             <x-ui.input name="min_stock" type="number" label="Stok Minimum" required help="Digunakan untuk peringatan stok rendah." />
-            <x-ui.input name="unit_cost" type="number" label="Harga Awal per Unit (Rp)" required help="Perkiraan untuk HPP sampai pembelian pertama diterima." />
         </div>
     </x-ui.card>
     <div class="flex justify-end gap-3 mt-4">

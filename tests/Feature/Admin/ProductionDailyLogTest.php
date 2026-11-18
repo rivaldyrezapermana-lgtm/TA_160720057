@@ -178,22 +178,22 @@ class ProductionDailyLogTest extends TestCase
 
     public function test_several_saves_accumulate_in_the_summary_and_reconcile(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-11-09 02:00:00', 'UTC'));
         $prod = $this->sizedBatch();
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 30, 'L' => 10]]);
-
-        Carbon::setTestNow(Carbon::parse('2026-11-09 05:00:00', 'UTC'));
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 10]]);
 
+        $summary = $prod->fresh()->openDaySummary();
+
         $this->assertSame(
-            [['stage' => 'Cutting', 'input' => 80, 'output' => 50, 'sisa' => 30]],
-            $prod->fresh()->todayLogSummary()
+            [['stage' => 'Cutting', 'input' => 80, 'output' => 50, 'sisa' => 30, 'sizes' => ['M' => 40, 'L' => 10]]],
+            $summary['stages']
         );
+        $this->assertSame(50, $summary['total']);
+        $this->assertSame(['M' => 40, 'L' => 10], $summary['sizes']);
     }
 
     public function test_row_reconciles_when_the_stage_receives_more_during_the_day(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-11-09 02:00:00', 'UTC'));
         $prod = $this->sizedBatch();
 
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 40]]);
@@ -203,67 +203,30 @@ class ProductionDailyLogTest extends TestCase
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['L' => 10]]);
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5, 'L' => 5]], 'sewing');
 
-        $summary = collect($prod->fresh()->todayLogSummary())->keyBy('stage');
+        $rows = collect($prod->fresh()->openDaySummary()['stages'])->keyBy('stage');
 
-        $this->assertSame(['Cutting', 'Sewing'], $summary->keys()->all());
-        $this->assertSame(['stage' => 'Cutting', 'input' => 80, 'output' => 50, 'sisa' => 30], $summary['Cutting']);
-        $this->assertSame(['stage' => 'Sewing', 'input' => 50, 'output' => 20, 'sisa' => 30], $summary['Sewing']);
+        $this->assertSame(['Cutting', 'Sewing'], $rows->keys()->all());
+        $this->assertSame([80, 50, 30], [$rows['Cutting']['input'], $rows['Cutting']['output'], $rows['Cutting']['sisa']]);
+        $this->assertSame([50, 20, 30], [$rows['Sewing']['input'], $rows['Sewing']['output'], $rows['Sewing']['sisa']]);
+        $this->assertSame(['M' => 15, 'L' => 5], $rows['Sewing']['sizes']);
     }
 
-    public function test_summary_uses_the_wib_calendar_day(): void
+    public function test_today_card_shows_saved_pcs_per_stage_and_size(): void
     {
-        // 16:59 UTC = 9 Nov 23:59 WIB (kemarin); 17:30 UTC = 10 Nov 00:30 WIB (hari ini).
-        Carbon::setTestNow(Carbon::parse('2026-11-09 16:59:00', 'UTC'));
-        $prod = $this->sizedBatch();
-        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 20]]);
-
-        Carbon::setTestNow(Carbon::parse('2026-11-09 17:30:00', 'UTC'));
-        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5]]);
-
-        $this->assertSame(
-            [['stage' => 'Cutting', 'input' => 60, 'output' => 5, 'sisa' => 55]],
-            $prod->fresh()->todayLogSummary()
-        );
-    }
-
-    public function test_entry_from_early_wib_morning_is_still_today_at_end_of_the_wib_day(): void
-    {
-        // 18:00 UTC tanggal 9 = 10 Nov 01:00 WIB; 16:00 UTC tanggal 10 = 10 Nov 23:00 WIB.
-        Carbon::setTestNow(Carbon::parse('2026-11-09 18:00:00', 'UTC'));
-        $prod = $this->sizedBatch();
-        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5]]);
-
-        Carbon::setTestNow(Carbon::parse('2026-11-10 16:00:00', 'UTC'));
-        $this->assertSame(5, $prod->fresh()->todayLogSummary()[0]['output']);
-
-        Carbon::setTestNow(Carbon::parse('2026-11-10 17:00:00', 'UTC'));
-        $this->assertSame([], $prod->fresh()->todayLogSummary());
-    }
-
-    public function test_show_page_lists_today_card_and_quantities_in_the_log(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-11-09 07:00:00', 'UTC'));
         $prod = $this->sizedBatch();
         $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 30, 'L' => 20]]);
 
         $this->showPage($prod)
-            ->assertSeeInOrder(['Log Hari Ini', 'Senin, 9 November 2026', 'Tahap', 'Input', 'Output', 'Sisa', 'Cutting', '80 pcs', '50 pcs', '30 pcs'])
-            ->assertSeeInOrder(['Log Produksi', 'Senin, 9 November 2026 14:00', 'Cutting', 'Input 80', 'Output 50', 'Sisa 30', 'M 30, L 20', 'Operator'])
-            ->assertDontSee('Belum ada hasil produksi yang dicatat hari ini.');
+            ->assertSeeInOrder(['Log Hari Ini', 'Belum dimulai', 'Tahap', 'Input', 'Output', 'Sisa', 'Rincian Ukuran', 'Cutting', '80 pcs', '50 pcs', '30 pcs', 'M 30, L 20'])
+            ->assertSee('Total output:')
+            ->assertDontSee('Belum ada pcs yang disimpan hari ini.');
     }
 
     public function test_today_card_has_an_empty_state(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-11-09 16:59:00', 'UTC'));
-        $prod = $this->sizedBatch();
-        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 20]]);
-
-        Carbon::setTestNow(Carbon::parse('2026-11-09 17:30:00', 'UTC'));
-
-        // Kemarin tetap ada di Log Produksi, tapi tidak di Log Hari Ini.
-        $this->showPage($prod)
-            ->assertSee('Belum ada hasil produksi yang dicatat hari ini.')
-            ->assertSee('Input 80');
+        $this->showPage($this->sizedBatch())
+            ->assertSee('Belum ada pcs yang disimpan hari ini.')
+            ->assertSee('Belum dimulai');
     }
 
     private function inputTag(string $html, string $name): string
@@ -287,34 +250,48 @@ class ProductionDailyLogTest extends TestCase
         return $buttons;
     }
 
-    public function test_running_stage_inputs_are_open_and_saving_asks_for_confirmation(): void
-    {
-        $prod = $this->sizedBatch();
-
-        $html = $this->showPage($prod)
-            ->assertSee('id="modal-konfirmasi-harian"', false)
-            ->assertSee('Yakin menyelesaikan', false)
-            ->assertSee('data-stage-label="Cutting"', false)
-            ->getContent();
-
-        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
-        $this->assertSame(
-            ['Selesai Hari Ini' => false, 'Simpan' => false, 'Selesai' => false],
-            $this->stageButtons($html, $this->stage($prod)->id),
-        );
-    }
-
-    public function test_selesai_hari_ini_records_the_pcs_like_a_save(): void
+    public function test_running_stage_inputs_are_open_and_simpan_saves_without_a_popup(): void
     {
         $prod = $this->sizedBatch();
 
         $html = $this->showPage($prod)->getContent();
-        $this->assertMatchesRegularExpression('/<button name="action" value="save" data-daily-today/', $html);
 
-        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5]])->assertSessionHasNoErrors();
+        $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
+        $this->assertSame(['Simpan' => false, 'Selesai' => false], $this->stageButtons($html, $this->stage($prod)->id));
+        $this->assertStringNotContainsString('data-daily-form', $html);
+    }
 
-        $this->assertSame(5, (int) $this->stage($prod)->output_qty);
-        $this->assertSame('in_progress', $this->stage($prod)->status);
+    public function test_day_flow_mulai_simpan_then_selesai_hari_ini_writes_one_summary(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-18 01:00:00', 'UTC'));
+        $prod = $this->sizedBatch();
+        $prod->forceFill(['status' => 'planned'])->save();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod))->assertSessionHas('success');
+        $this->assertSame('in_progress', $prod->fresh()->status);
+        $this->showPage($prod)->assertSee('Berjalan')->assertSee('sejak pukul 08:00');
+
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 30, 'L' => 20]]);
+        $this->stage($prod, 'sewing')->update(['status' => 'in_progress']);
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 10, 'L' => 5]], 'sewing');
+
+        Carbon::setTestNow(Carbon::parse('2026-11-18 10:00:00', 'UTC'));
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod))->assertSessionHas('success');
+
+        $log = ProductionLog::where('jenis', ProductionLog::SELESAI_HARI)->sole();
+        $this->assertSame('Selesai mengerjakan Cutting dan Sewing, total 65 pcs: M 40 pcs, L 25 pcs.', $log->keterangan);
+        $this->assertSame(65, $log->output_qty);
+        $this->assertSame(['Cutting', 'Sewing'], array_column($log->rincian['stages'], 'stage'));
+
+        $html = $this->showPage($prod)
+            ->assertSee('Selesai')
+            ->assertSee('pukul 17:00')
+            ->assertSee('Belum ada pcs yang disimpan hari ini.')
+            ->assertSeeInOrder(['Log Produksi', 'Mulai', 'Produksi hari ini dimulai.', 'Selesai Hari Ini', 'Selesai mengerjakan Cutting dan Sewing', 'Cutting: 50 pcs (M 30, L 20)', 'Sewing: 15 pcs (M 10, L 5)'])
+            ->getContent();
+
+        // Hasil Simpan tidak tampil satu per satu di Log Produksi.
+        $this->assertStringNotContainsString('Input 80', $html);
     }
 
     public function test_unsized_running_stage_input_is_open(): void
@@ -355,7 +332,7 @@ class ProductionDailyLogTest extends TestCase
 
         // Tombol tetap terlihat, hanya nonaktif.
         $this->assertSame(
-            ['Selesai Hari Ini' => true, 'Simpan' => true, 'Selesai' => true],
+            ['Simpan' => true, 'Selesai' => true],
             $this->stageButtons($html, $stage->id),
         );
     }
@@ -369,7 +346,7 @@ class ProductionDailyLogTest extends TestCase
         $html = $this->showPage($prod)->assertSee('Isian terkunci setelah sisanya habis.')->getContent();
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', $this->inputTag($html, 'size_qty[M]'));
         $this->assertSame(
-            ['Selesai Hari Ini' => false, 'Simpan' => false, 'Selesai' => true],
+            ['Simpan' => false, 'Selesai' => true],
             $this->stageButtons($html, $this->stage($prod)->id),
         );
 
@@ -406,19 +383,15 @@ class ProductionDailyLogTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\bdisabled\b/', str_replace('disabled:', '', $match[0]));
     }
 
-    public function test_completed_batch_keeps_its_buttons_disabled_and_has_no_popup(): void
+    public function test_completed_batch_keeps_its_buttons_disabled(): void
     {
         $prod = $this->sizedBatch();
         $prod->forceFill(['status' => 'completed'])->save();
 
-        $html = $this->showPage($prod)
-            ->assertDontSee('id="modal-konfirmasi-harian"', false)
-            ->getContent();
+        $html = $this->showPage($prod)->getContent();
 
-        $this->assertSame(
-            ['Selesai Hari Ini' => true, 'Simpan' => true, 'Selesai' => true],
-            $this->stageButtons($html, $this->stage($prod)->id),
-        );
+        $this->assertSame(['Simpan' => true, 'Selesai' => true], $this->stageButtons($html, $this->stage($prod)->id));
+        $this->assertMatchesRegularExpression('/<button[^>]*\sdisabled(?=[\s>])[^>]*>Mulai<\/button>/', $html);
     }
 
     public function test_pause_still_has_null_quantities_and_is_left_out_of_the_summary(): void
@@ -430,15 +403,121 @@ class ProductionDailyLogTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $log = ProductionLog::sole();
+        $this->assertSame(ProductionLog::PAUSE, $log->jenis);
         $this->assertNull($log->production_stage_id);
-        $this->assertNull($log->input_qty);
         $this->assertNull($log->output_qty);
-        $this->assertNull($log->sisa_qty);
-        $this->assertSame([], $prod->fresh()->todayLogSummary());
+        $this->assertSame([], $prod->fresh()->openDaySummary()['stages']);
 
         $this->showPage($prod)
             ->assertSee('Istirahat')
-            ->assertDontSee('Input 0')
-            ->assertSee('Belum ada hasil produksi yang dicatat hari ini.');
+            ->assertSee('Belum ada pcs yang disimpan hari ini.');
+    }
+
+    public function test_selesai_hari_ini_needs_mulai_first(): void
+    {
+        $prod = $this->sizedBatch();
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5]]);
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod))->assertSessionHas('error');
+
+        $this->assertSame(0, ProductionLog::where('jenis', ProductionLog::SELESAI_HARI)->count());
+        $this->assertMatchesRegularExpression('/id="btn-selesai-hari"[^>]*\sdisabled(?=[\s>])/', $this->showPage($prod)->getContent());
+    }
+
+    public function test_mulai_cannot_be_pressed_twice_and_is_disabled_while_running(): void
+    {
+        $prod = $this->sizedBatch();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod))->assertSessionHas('success');
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod))->assertSessionHas('error');
+
+        $this->assertSame(1, ProductionLog::where('jenis', ProductionLog::MULAI)->count());
+        $html = $this->showPage($prod)->getContent();
+        $this->assertMatchesRegularExpression('/<button[^>]*\sdisabled(?=[\s>])[^>]*>Mulai<\/button>/', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="btn-selesai-hari"[^>]*\sdisabled(?=[\s>])/', $html);
+    }
+
+    public function test_pcs_saved_before_mulai_are_included_in_the_next_summary(): void
+    {
+        $prod = $this->sizedBatch();
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 5]]);
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod));
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['L' => 3]]);
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod));
+
+        $this->assertSame(8, ProductionLog::where('jenis', ProductionLog::SELESAI_HARI)->sole()->output_qty);
+    }
+
+    public function test_next_day_starts_a_fresh_summary(): void
+    {
+        $prod = $this->sizedBatch();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod));
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 20]]);
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod));
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod));
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['L' => 7]]);
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod));
+
+        $this->assertSame(
+            ['Selesai mengerjakan Cutting, total 20 pcs: M 20 pcs.', 'Selesai mengerjakan Cutting, total 7 pcs: L 7 pcs.'],
+            ProductionLog::where('jenis', ProductionLog::SELESAI_HARI)->orderBy('id')->pluck('keterangan')->all()
+        );
+    }
+
+    public function test_a_day_with_no_pcs_can_still_be_closed(): void
+    {
+        $prod = $this->sizedBatch();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod));
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod))->assertSessionHas('success');
+
+        $this->assertSame('Selesai hari ini tanpa pcs yang dicatat.', ProductionLog::where('jenis', ProductionLog::SELESAI_HARI)->sole()->keterangan);
+    }
+
+    public function test_finish_day_popup_shows_the_summary_text(): void
+    {
+        $prod = $this->sizedBatch();
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod));
+        $this->saveStage($prod, ['action' => 'save', 'size_qty' => ['M' => 30, 'L' => 20]]);
+
+        $this->showPage($prod)
+            ->assertSee('id="modal-konfirmasi-harian"', false)
+            ->assertSee('data-summary="Selesai mengerjakan Cutting, total 50 pcs: M 30 pcs, L 20 pcs."', false);
+    }
+
+    public function test_unsized_pcs_are_counted_without_a_size_breakdown(): void
+    {
+        $prod = $this->unsizedBatch();
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod));
+        $this->saveStage($prod, ['action' => 'save', 'qty' => 25]);
+        $this->actingAs($this->admin())->post(route('admin.productions.day.finish', $prod));
+
+        $this->assertSame('Selesai mengerjakan Cutting, total 25 pcs.', ProductionLog::where('jenis', ProductionLog::SELESAI_HARI)->sole()->keterangan);
+    }
+
+    public function test_mulai_is_refused_for_a_closed_batch(): void
+    {
+        $prod = $this->sizedBatch();
+        $prod->forceFill(['status' => 'cancelled'])->save();
+
+        $this->actingAs($this->admin())->post(route('admin.productions.day.start', $prod))->assertSessionHas('error');
+
+        $this->assertSame(0, ProductionLog::count());
+    }
+
+    public function test_old_log_rows_are_read_by_their_size_text(): void
+    {
+        $prod = $this->sizedBatch();
+        $prod->logs()->create([
+            'production_stage_id' => $this->stage($prod)->id, 'waktu' => now(),
+            'input_qty' => 80, 'output_qty' => 50, 'sisa_qty' => 30, 'keterangan' => 'M 30, L 20',
+        ]);
+
+        $log = ProductionLog::sole();
+        $this->assertSame(ProductionLog::HASIL, $log->jenis);
+        $this->assertSame(['M' => 30, 'L' => 20], $log->sizeQty());
     }
 }

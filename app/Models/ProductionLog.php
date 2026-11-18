@@ -13,8 +13,17 @@ class ProductionLog extends Model
 {
     protected $table = 'log_produksi';
 
+    public const MULAI = 'mulai';
+
+    public const HASIL = 'hasil';
+
+    public const SELESAI_HARI = 'selesai_hari';
+
+    public const PAUSE = 'pause';
+
     protected $fillable = [
-        'produksi_id', 'production_stage_id', 'waktu', 'keterangan', 'input_qty', 'output_qty', 'sisa_qty', 'user_id',
+        'produksi_id', 'jenis', 'production_stage_id', 'waktu', 'keterangan',
+        'input_qty', 'output_qty', 'sisa_qty', 'rincian', 'user_id',
     ];
 
     protected $casts = [
@@ -22,7 +31,33 @@ class ProductionLog extends Model
         'input_qty' => 'integer',
         'output_qty' => 'integer',
         'sisa_qty' => 'integer',
+        'rincian' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        // Catatan tanpa jenis mengikuti aturan data lama: ada pcs berarti hasil, selain itu pause.
+        static::creating(function (ProductionLog $log) {
+            $log->jenis ??= ($log->production_stage_id !== null || $log->output_qty !== null) ? self::HASIL : self::PAUSE;
+        });
+    }
+
+    /**
+     * Pcs per ukuran pada catatan hasil. Catatan lama hanya punya teks
+     * seperti "M 30, L 20", jadi teks itu dibaca kalau rincian kosong.
+     *
+     * @return array<string, int>
+     */
+    public function sizeQty(): array
+    {
+        if (is_array($this->rincian)) {
+            return array_map('intval', $this->rincian);
+        }
+
+        preg_match_all('/([^,\s]+)\s+(\d+)/', (string) $this->keterangan, $matches, PREG_SET_ORDER);
+
+        return collect($matches)->mapWithKeys(fn ($m) => [$m[1] => (int) $m[2]])->all();
+    }
 
     public function stage()
     {

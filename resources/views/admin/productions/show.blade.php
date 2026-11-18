@@ -130,7 +130,6 @@
                             // supaya pcs itu tidak tersangkut di sisa.
                             $stageClosed = $locked
                                 || ($stage->status === 'completed' && (! $qtyEditable || (int) $stage->input_qty === 0));
-                            $confirmsPcs = $qtyEditable && ! $stageClosed;
                             $badge = match($stage->status) {
                                 'completed' => ['bg-emerald-50 border-emerald-200', 'Selesai'],
                                 'in_progress' => ['bg-ink-50 border-ink-200', 'Berjalan'],
@@ -157,8 +156,7 @@
                                     @endswitch
                                 </p>
                             @else
-                                <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="grid grid-cols-2 md:grid-cols-4 gap-2 items-end"
-                                    @if ($confirmsPcs) data-daily-form data-stage-label="{{ $stage->label() }}" @endif>
+                                <form action="{{ route('admin.productions.stage', [$production->id, $stage->id]) }}" method="POST" class="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                                     @csrf @method('PATCH')
                                     <input type="hidden" name="_stage" value="{{ $stage->id }}">
                                     @if ($sizedStage)
@@ -290,9 +288,6 @@
                                     {{-- Tombol selalu terlihat dan baru nonaktif setelah tahapnya selesai. --}}
                                     @php $buttonState = 'disabled:opacity-50 disabled:cursor-not-allowed'; @endphp
                                     <div class="col-span-2 md:col-span-4 flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 pt-3 mt-1">
-                                        @if ($qtyEditable)
-                                            <button name="action" value="{{ $stage->status === 'pending' ? 'start' : 'save' }}" data-daily-today class="btn-secondary text-xs mr-auto {{ $buttonState }}" title="Menyimpan pcs yang diselesaikan hari ini" @disabled($stageClosed)>Selesai Hari Ini</button>
-                                        @endif
                                         @if ($stage->status === 'pending' && ! $stageClosed)
                                             <button name="action" value="start" class="btn-secondary text-xs">Mulai</button>
                                         @else
@@ -372,25 +367,58 @@
             </x-ui.card>
         @endforeach
 
+        @php
+            $day = $production->dayStatus();
+            $daySummary = $production->openDaySummary();
+            $wibTime = fn ($log) => $log->waktu->copy()->timezone('Asia/Jakarta')->format('H:i');
+            $sizeText = fn (array $sizes) => collect($sizes)->map(fn ($qty, $size) => $size.' '.$qty)->implode(', ');
+        @endphp
         <x-ui.card title="Log Hari Ini" subtitle="{{ now('Asia/Jakarta')->locale('id')->translatedFormat('l, j F Y') }} (WIB)">
-            @php $todayLogs = $production->todayLogSummary(); @endphp
-            @if ($todayLogs === [])
-                <p class="text-sm text-ink-400">Belum ada hasil produksi yang dicatat hari ini.</p>
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <p class="text-sm text-ink-700">Status:
+                    @switch ($day['state'])
+                        @case ('berjalan')
+                            <span class="badge-green">Berjalan</span> <span class="text-ink-500">sejak pukul {{ $wibTime($day['log']) }}</span>
+                            @break
+                        @case ('selesai')
+                            <span class="badge-gray">Selesai</span> <span class="text-ink-500">pukul {{ $wibTime($day['log']) }}</span>
+                            @break
+                        @default
+                            <span class="badge-gray">Belum dimulai</span>
+                    @endswitch
+                </p>
+                <div class="flex gap-2">
+                    <form action="{{ route('admin.productions.day.start', $production->id) }}" method="POST">
+                        @csrf
+                        <button class="btn btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed" @disabled($day['state'] === 'berjalan' || in_array($production->status, ['completed', 'cancelled'], true))>Mulai</button>
+                    </form>
+                    <form id="form-selesai-hari" action="{{ route('admin.productions.day.finish', $production->id) }}" method="POST">
+                        @csrf
+                        <button type="button" id="btn-selesai-hari" data-summary="{{ \App\Models\Production::daySummaryText($daySummary) }}" class="btn btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed" @disabled($day['state'] !== 'berjalan')>Selesai Hari Ini</button>
+                    </form>
+                </div>
+            </div>
+
+            @if ($daySummary['stages'] === [])
+                <p class="text-sm text-ink-400">Belum ada pcs yang disimpan hari ini.</p>
             @else
                 <table class="table-clean">
-                    <thead><tr><th>Tahap</th><th class="text-right">Input</th><th class="text-right">Output</th><th class="text-right">Sisa</th></tr></thead>
+                    <thead><tr><th>Tahap</th><th class="!text-right">Input</th><th class="!text-right">Output</th><th class="!text-right">Sisa</th><th>Rincian Ukuran</th></tr></thead>
                     <tbody>
-                        @foreach ($todayLogs as $row)
+                        @foreach ($daySummary['stages'] as $row)
                             <tr>
                                 <td class="font-medium">{{ $row['stage'] }}</td>
                                 <td class="text-right tabular-nums">{{ $row['input'] }} pcs</td>
                                 <td class="text-right tabular-nums">{{ $row['output'] }} pcs</td>
                                 <td class="text-right tabular-nums">{{ $row['sisa'] }} pcs</td>
+                                <td class="text-ink-600">{{ $row['sizes'] === [] ? '—' : $sizeText($row['sizes']) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+                <p class="text-sm text-ink-700 mt-3">Total output: <span class="font-semibold tabular-nums">{{ $daySummary['total'] }} pcs</span>@if ($daySummary['sizes'] !== []) ({{ $sizeText($daySummary['sizes']) }})@endif</p>
             @endif
+            <p class="text-[11px] text-ink-400 mt-3">Klik Mulai, simpan pcs di setiap tahap dengan tombol Simpan, lalu klik Selesai Hari Ini untuk mencatat ringkasan hari ini ke Log Produksi.</p>
         </x-ui.card>
 
         @if ($production->sampleRevisions->isNotEmpty())
@@ -474,19 +502,31 @@
         @endunless
 
         <x-ui.card title="Log Produksi">
-            @if ($production->logs->isEmpty())
-                <p class="text-sm text-ink-400">Belum ada catatan pause.</p>
+            @php $timeline = $production->timelineLogs(); @endphp
+            @if ($timeline->isEmpty())
+                <p class="text-sm text-ink-400">Belum ada catatan.</p>
             @else
                 <ul class="space-y-3">
-                    @foreach ($production->logs as $log)
-                        <li class="border-l-2 border-ink-200 pl-3">
+                    @foreach ($timeline as $log)
+                        @php
+                            [$border, $title] = match ($log->jenis) {
+                                \App\Models\ProductionLog::MULAI => ['border-emerald-300', 'Mulai'],
+                                \App\Models\ProductionLog::SELESAI_HARI => ['border-ink-900', 'Selesai Hari Ini'],
+                                default => ['border-amber-300', 'Pause'],
+                            };
+                        @endphp
+                        <li class="border-l-2 {{ $border }} pl-3">
                             <p class="text-xs text-ink-500">{{ $log->waktu_label }}</p>
-                            @if ($log->output_qty !== null)
-                                <p class="text-sm font-medium text-ink-800">{{ $log->stage?->label() ?? 'Tahap dihapus' }}</p>
-                                <p class="text-xs text-ink-700 tabular-nums">Input {{ $log->input_qty }} · Output {{ $log->output_qty }} · Sisa {{ $log->sisa_qty }}</p>
-                            @endif
+                            <p class="text-sm font-medium text-ink-900">{{ $title }}</p>
                             @if (filled($log->keterangan))
                                 <p class="text-sm text-ink-800 break-words">{{ $log->keterangan }}</p>
+                            @endif
+                            @if ($log->jenis === \App\Models\ProductionLog::SELESAI_HARI && ! empty($log->rincian['stages']))
+                                <ul class="mt-1 text-xs text-ink-600 tabular-nums">
+                                    @foreach ($log->rincian['stages'] as $row)
+                                        <li>{{ $row['stage'] }}: {{ $row['output'] }} pcs{{ empty($row['sizes']) ? '' : ' ('.collect($row['sizes'])->map(fn ($qty, $size) => $size.' '.$qty)->implode(', ').')' }} · sisa {{ $row['sisa'] }} pcs</li>
+                                    @endforeach
+                                </ul>
                             @endif
                             <p class="text-xs text-ink-400">{{ $log->user?->name ?? '—' }}</p>
                         </li>
@@ -559,22 +599,19 @@
     </x-ui.modal>
 @endif
 
-@unless ($locked)
-    <x-ui.modal id="modal-konfirmasi-harian" title="Konfirmasi Hasil Harian">
+<x-ui.modal id="modal-konfirmasi-harian" title="Konfirmasi Selesai Hari Ini">
         <p id="konfirmasi-harian-teks" class="text-sm text-ink-800"></p>
         <div class="flex justify-end gap-2 mt-4">
             <button type="button" id="konfirmasi-harian-batal" class="btn btn-secondary">Batal</button>
             <button type="button" id="konfirmasi-harian-ya" class="btn btn-primary">Ya</button>
         </div>
     </x-ui.modal>
-@endunless
 @endsection
 
 @push('scripts')
 <script>
 $(function () {
     const MODAL = 'modal-konfirmasi-harian';
-    let pending = null;
 
     // Pilihan mesin per form tahap: mesin yang sudah dipilih di baris lain tidak bisa dipilih lagi,
     // dan tombol tambah nonaktif bila barisnya sudah sebanyak mesin yang tersedia.
@@ -617,25 +654,10 @@ $(function () {
         refreshMachines($(this).closest('[data-machine-picker]'));
     });
 
-    // Event submit baru muncul setelah validasi min/max browser lolos, dan menekan
-    // Enter di isian pcs memakai tombol submit pertama (Simpan) sebagai submitter.
-    $(document).on('submit', 'form[data-daily-form]', function (e) {
-        const form = $(this);
-        form.find('input.js-daily-action').remove();
-
-        let total = 0;
-        form.find('[data-daily-qty]:enabled').each(function () {
-            total += parseInt(this.value, 10) || 0;
-        });
-        if (total <= 0) {
-            return;
-        }
-
-        e.preventDefault();
-        pending = { form: this, submitter: e.originalEvent ? e.originalEvent.submitter : null };
-        $('#konfirmasi-harian-teks').text('Yakin menyelesaikan ' + total + ' pcs pada tahap ' + form.data('stage-label') + ' hari ini?');
+    // Selesai Hari Ini menampilkan ringkasan hari ini dan baru disimpan setelah Ya.
+    $('#btn-selesai-hari').on('click', function () {
+        $('#konfirmasi-harian-teks').text('Yakin menyelesaikan produksi hari ini? ' + $(this).data('summary'));
         openModal(MODAL);
-        // Fokus di Batal: Enter yang tertahan dari isian tidak langsung menyimpan.
         $('#konfirmasi-harian-batal').trigger('focus');
     });
 
@@ -644,21 +666,8 @@ $(function () {
     });
 
     $('#konfirmasi-harian-ya').on('click', function () {
-        if (pending === null) {
-            return;
-        }
-        const { form, submitter } = pending;
-        pending = null;
         closeModal(MODAL);
-
-        // form.submit() tidak mengirim nilai tombol, jadi aksinya dibawa input tersembunyi.
-        $('<input>', {
-            type: 'hidden',
-            class: 'js-daily-action',
-            name: 'action',
-            value: submitter && submitter.name === 'action' ? submitter.value : 'save',
-        }).appendTo(form);
-        form.submit();
+        $('#form-selesai-hari').trigger('submit');
     });
 });
 </script>

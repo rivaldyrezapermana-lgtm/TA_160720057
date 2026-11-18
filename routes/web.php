@@ -134,6 +134,8 @@ Route::middleware(['auth', 'role:admin,karyawan'])
         Route::resource('productions', ProductionController::class);
         Route::patch('productions/{production}/stage/{stage}', [ProductionController::class, 'updateStage'])->name('productions.stage');
         Route::post('productions/{production}/pause', [ProductionController::class, 'pause'])->name('productions.pause');
+        Route::post('productions/{production}/day/start', [ProductionController::class, 'startDay'])->name('productions.day.start');
+        Route::post('productions/{production}/day/finish', [ProductionController::class, 'finishDay'])->name('productions.day.finish');
         Route::post('productions/{production}/reuse-sample', [ProductionController::class, 'reuseSample'])->name('productions.reuse-sample');
         Route::post('productions/{production}/check-sample', [ProductionController::class, 'checkSample'])->name('productions.check-sample');
         Route::post('productions/{production}/sketches', [ProductionDesignSketchController::class, 'store'])->name('productions.sketches.store');

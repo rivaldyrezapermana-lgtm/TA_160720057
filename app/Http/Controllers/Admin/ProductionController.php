@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Material;
 use App\Models\Product;
 use App\Models\Production;
+use App\Models\ProductionLog;
 use App\Models\ProductionMachine;
 use App\Models\ProductionStage;
 use App\Models\ProductSize;
@@ -534,12 +535,66 @@ class ProductionController extends Controller
         $production->load('stages');
 
         $production->logs()->create([
+            'jenis' => ProductionLog::PAUSE,
             'waktu' => now(),
             'keterangan' => filled($data['keterangan'] ?? null) ? $data['keterangan'] : $production->positionSummary(),
             'user_id' => auth()->id(),
         ]);
 
         return back()->with('success', 'Catatan pause berhasil disimpan.');
+    }
+
+    /** Mulai: membuka log produksi hari ini dan menjadikan batch Berjalan. */
+    public function startDay(Production $production)
+    {
+        if (in_array($production->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'Batch sudah selesai atau dibatalkan. Produksi hari ini tidak dapat dimulai.');
+        }
+
+        $production->load('logs');
+        if ($production->dayStatus()['state'] === 'berjalan') {
+            return back()->with('error', 'Produksi hari ini sudah dimulai.');
+        }
+
+        DB::transaction(function () use ($production) {
+            $production->logs()->create([
+                'jenis' => ProductionLog::MULAI,
+                'waktu' => now(),
+                'keterangan' => 'Produksi hari ini dimulai.',
+                'user_id' => auth()->id(),
+            ]);
+
+            if ($production->status === 'planned') {
+                $production->forceFill(['status' => 'in_progress'])->save();
+            }
+        });
+
+        return back()->with('success', 'Produksi hari ini dimulai.');
+    }
+
+    /**
+     * Selesai Hari Ini: menyimpan satu ringkasan dari semua pcs yang disimpan
+     * sejak hari terakhir ditutup, per tahap dan per ukuran.
+     */
+    public function finishDay(Production $production)
+    {
+        $production->load('logs.stage');
+        if ($production->dayStatus()['state'] !== 'berjalan') {
+            return back()->with('error', 'Klik Mulai terlebih dahulu sebelum menyelesaikan produksi hari ini.');
+        }
+
+        $summary = $production->openDaySummary();
+
+        $production->logs()->create([
+            'jenis' => ProductionLog::SELESAI_HARI,
+            'waktu' => now(),
+            'keterangan' => Production::daySummaryText($summary),
+            'output_qty' => $summary['total'],
+            'rincian' => $summary,
+            'user_id' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'Log produksi hari ini berhasil disimpan.');
     }
 
     public function destroy(Production $production)
@@ -721,6 +776,7 @@ class ProductionController extends Controller
             $recorded = $sizedStage ? array_sum($sizeQty) : ($qtyEditable ? (int) ($data['qty'] ?? 0) : 0);
             if ($recorded > 0) {
                 $production->logs()->create([
+                    'jenis' => ProductionLog::HASIL,
                     'production_stage_id' => $stage->id,
                     'waktu' => now(),
                     'user_id' => auth()->id(),
@@ -728,6 +784,7 @@ class ProductionController extends Controller
                     'output_qty' => $recorded,
                     'sisa_qty' => (int) $stage->input_qty,
                     'keterangan' => $sizedStage ? $this->sizeBreakdown($sizeQty) : null,
+                    'rincian' => $sizedStage ? array_filter($sizeQty) : null,
                 ]);
             }
 

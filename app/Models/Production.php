@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class Production extends Model
 {
@@ -52,42 +53,123 @@ class Production extends Model
         return $this->hasMany(ProductionSize::class)->orderBy('id');
     }
 
-    /** Catatan tombol Pause dan hasil harian tahap, urut dari yang paling lama. */
+    /** Catatan Mulai, hasil Simpan, Selesai Hari Ini, dan Pause, urut dari yang paling lama. */
     public function logs()
     {
         return $this->hasMany(ProductionLog::class, 'produksi_id')->orderBy('waktu')->orderBy('id');
     }
 
     /**
-     * Rekap Log Hari Ini per tahap. "Hari ini" adalah tanggal kalender WIB, karena
-     * waktu log tersimpan dalam UTC. Output adalah jumlah pcs hari ini, sisa diambil
-     * dari catatan terakhir hari ini, dan input = output + sisa supaya tiap baris
-     * selalu cocok walaupun tahap menerima pcs tambahan di tengah hari.
+     * Status hari produksi: 'berjalan' setelah Mulai, 'selesai' setelah Selesai
+     * Hari Ini pada hari yang sama, atau 'belum'.
      *
-     * @return list<array{stage: string, input: int, output: int, sisa: int}>
+     * @return array{state: string, log: ?ProductionLog}
      */
-    public function todayLogSummary(): array
+    public function dayStatus(): array
     {
-        $today = now('Asia/Jakarta')->toDateString();
+        $logs = $this->logs->values();
+        $startAt = $logs->keys()->filter(fn ($i) => $logs[$i]->jenis === ProductionLog::MULAI)->last();
+        $closeAt = $logs->keys()->filter(fn ($i) => $logs[$i]->jenis === ProductionLog::SELESAI_HARI)->last();
 
-        return $this->logs
-            ->filter(fn (ProductionLog $log) => $log->stage !== null
-                && $log->waktu->copy()->timezone('Asia/Jakarta')->toDateString() === $today)
+        if ($startAt !== null && ($closeAt === null || $startAt > $closeAt)) {
+            return ['state' => 'berjalan', 'log' => $logs[$startAt]];
+        }
+
+        if ($closeAt !== null && $logs[$closeAt]->waktu->copy()->timezone('Asia/Jakarta')->isSameDay(now('Asia/Jakarta'))) {
+            return ['state' => 'selesai', 'log' => $logs[$closeAt]];
+        }
+
+        return ['state' => 'belum', 'log' => null];
+    }
+
+    /** Catatan hasil Simpan yang belum ditutup dengan Selesai Hari Ini. */
+    public function openDayEntries(): Collection
+    {
+        $logs = $this->logs->values();
+        $closeAt = $logs->keys()->filter(fn ($i) => $logs[$i]->jenis === ProductionLog::SELESAI_HARI)->last();
+
+        return $logs->slice($closeAt === null ? 0 : $closeAt + 1)
+            ->filter(fn (ProductionLog $log) => $log->jenis === ProductionLog::HASIL && $log->stage !== null)
+            ->values();
+    }
+
+    /**
+     * Rekap pcs yang dicatat sejak hari terakhir ditutup, per tahap dan per
+     * ukuran. Input = output + sisa terakhir, jadi tiap baris selalu cocok
+     * walaupun tahap menerima pcs tambahan dari tahap sebelumnya.
+     *
+     * @return array{stages: list<array{stage: string, input: int, output: int, sisa: int, sizes: array<string, int>}>, total: int, sizes: array<string, int>, unsized: int}
+     */
+    public function openDaySummary(): array
+    {
+        $order = Size::ordered()->pluck('name')->flip();
+        $sorted = fn (array $sizes) => collect($sizes)
+            ->filter(fn (int $qty) => $qty > 0)
+            ->sortBy(fn ($qty, $size) => $order[$size] ?? PHP_INT_MAX)
+            ->all();
+
+        $stages = $this->openDayEntries()
             ->groupBy('production_stage_id')
-            ->sortBy(fn ($entries) => $entries->first()->stage->sort_order)
-            ->map(function ($entries) {
+            ->sortBy(fn (Collection $entries) => $entries->first()->stage->sort_order)
+            ->map(function (Collection $entries) use ($sorted) {
                 $output = (int) $entries->sum('output_qty');
                 $sisa = (int) $entries->last()->sisa_qty;
+                $sizes = [];
+                foreach ($entries as $entry) {
+                    foreach ($entry->sizeQty() as $size => $qty) {
+                        $sizes[$size] = ($sizes[$size] ?? 0) + $qty;
+                    }
+                }
 
                 return [
                     'stage' => $entries->first()->stage->label(),
                     'input' => $output + $sisa,
                     'output' => $output,
                     'sisa' => $sisa,
+                    'sizes' => $sorted($sizes),
                 ];
             })
             ->values()
             ->all();
+
+        $sizes = [];
+        foreach ($stages as $row) {
+            foreach ($row['sizes'] as $size => $qty) {
+                $sizes[$size] = ($sizes[$size] ?? 0) + $qty;
+            }
+        }
+        $total = array_sum(array_column($stages, 'output'));
+
+        return ['stages' => $stages, 'total' => $total, 'sizes' => $sorted($sizes), 'unsized' => $total - array_sum($sizes)];
+    }
+
+    /**
+     * Kalimat ringkasan harian, mis. "Selesai mengerjakan Cutting dan QC & Packing,
+     * total 500 pcs: S 120 pcs, M 150 pcs, L 130 pcs, XL 100 pcs."
+     */
+    public static function daySummaryText(array $summary): string
+    {
+        if ($summary['total'] <= 0) {
+            return 'Selesai hari ini tanpa pcs yang dicatat.';
+        }
+
+        $names = array_column($summary['stages'], 'stage');
+        $last = array_pop($names);
+        $stages = $names === [] ? $last : implode(', ', $names).' dan '.$last;
+
+        $parts = collect($summary['sizes'])->map(fn (int $qty, $size) => $size.' '.$qty.' pcs')->values();
+        if ($parts->isNotEmpty() && $summary['unsized'] > 0) {
+            $parts->push('tanpa rincian ukuran '.$summary['unsized'].' pcs');
+        }
+
+        return 'Selesai mengerjakan '.$stages.', total '.$summary['total'].' pcs'
+            .($parts->isEmpty() ? '' : ': '.$parts->implode(', ')).'.';
+    }
+
+    /** Catatan untuk daftar Log Produksi. Hasil Simpan sudah tercakup di rekap harian. */
+    public function timelineLogs(): Collection
+    {
+        return $this->logs->reject(fn (ProductionLog $log) => $log->jenis === ProductionLog::HASIL)->values();
     }
 
     public function sampleRevisions()

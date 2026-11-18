@@ -158,8 +158,9 @@ class MasterDataTest extends TestCase
             ])
             ->assertRedirectToRoute('admin.materials.index');
 
-        // Stok awal dikunci: nilai yang terkirim diabaikan.
+        // Stok awal dan harga awal dikunci: nilai yang terkirim diabaikan.
         $this->assertEquals(0, (float) Material::where('code', 'MAT-001')->value('stock'));
+        $this->assertEquals(0, (float) Material::where('code', 'MAT-001')->value('unit_cost'));
     }
 
     public function test_material_code_must_be_unique(): void
